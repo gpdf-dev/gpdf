@@ -41,4 +41,3 @@ func gfDiv(a, b byte) byte {
 	}
 	return gfExp[(int(gfLog[a])-int(gfLog[b]))+255]
 }
-
