@@ -134,8 +134,8 @@ func (qr *QRCode) PNG(scale int) ([]byte, error) {
 
 	// IHDR chunk.
 	writeChunk(&buf, "IHDR", func(w *bytes.Buffer) {
-		binary.Write(w, binary.BigEndian, uint32(width))
-		binary.Write(w, binary.BigEndian, uint32(height))
+		_ = binary.Write(w, binary.BigEndian, uint32(width))
+		_ = binary.Write(w, binary.BigEndian, uint32(height))
 		w.WriteByte(8) // bit depth
 		w.WriteByte(2) // color type: RGB
 		w.WriteByte(0) // compression method
