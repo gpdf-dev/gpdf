@@ -89,10 +89,10 @@ func TestExample_31_GoTemplate(t *testing.T) {
 			{"Performance Optimization", "15 hrs", "$170.00", "$2,550.00"},
 			{"Documentation", "10 hrs", "$100.00", "$1,000.00"},
 		},
-		"Subtotal":  "$23,350.00",
-		"TaxRate":   "10%",
-		"TaxAmount": "$2,335.00",
-		"Total":     "$25,685.00",
+		"Subtotal":   "$23,350.00",
+		"TaxRate":    "10%",
+		"TaxAmount":  "$2,335.00",
+		"Total":      "$25,685.00",
 		"FooterNote": "Thank you for your business! Payment due within 30 days.",
 	}
 
