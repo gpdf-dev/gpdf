@@ -116,11 +116,11 @@ func (b *Barcode) PNG(barWidth, height int) ([]byte, error) {
 	writeChunk(&buf, "IHDR", func(d *bytes.Buffer) {
 		_ = binary.Write(d, binary.BigEndian, uint32(width))  // width
 		_ = binary.Write(d, binary.BigEndian, uint32(height)) // height
-		d.WriteByte(8)                                    // bit depth
-		d.WriteByte(2)                                    // color type: RGB
-		d.WriteByte(0)                                    // compression
-		d.WriteByte(0)                                    // filter
-		d.WriteByte(0)                                    // interlace
+		d.WriteByte(8)                                        // bit depth
+		d.WriteByte(2)                                        // color type: RGB
+		d.WriteByte(0)                                        // compression
+		d.WriteByte(0)                                        // filter
+		d.WriteByte(0)                                        // interlace
 	})
 
 	// IDAT chunk: zlib header (0x78 0x9C) + deflated data + zlib checksum.
