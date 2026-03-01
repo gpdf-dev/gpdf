@@ -30,11 +30,11 @@ import (
 //	  ]
 //	}
 type Schema struct {
-	Page     SchemaPage   `json:"page"`
-	Metadata *SchemaMeta  `json:"metadata,omitempty"`
-	Header   []SchemaRow  `json:"header,omitempty"`
-	Footer   []SchemaRow  `json:"footer,omitempty"`
-	Body     []SchemaRow  `json:"body"`
+	Page     SchemaPage  `json:"page"`
+	Metadata *SchemaMeta `json:"metadata,omitempty"`
+	Header   []SchemaRow `json:"header,omitempty"`
+	Footer   []SchemaRow `json:"footer,omitempty"`
+	Body     []SchemaRow `json:"body"`
 }
 
 // SchemaPage defines page-level settings.
@@ -105,9 +105,9 @@ type SchemaStyle struct {
 	Size          float64 `json:"size,omitempty"`
 	Bold          bool    `json:"bold,omitempty"`
 	Italic        bool    `json:"italic,omitempty"`
-	Align         string  `json:"align,omitempty"`       // "left", "center", "right"
-	Color         string  `json:"color,omitempty"`       // "#RRGGBB" or named
-	Background    string  `json:"background,omitempty"`  // "#RRGGBB" or named
+	Align         string  `json:"align,omitempty"`      // "left", "center", "right"
+	Color         string  `json:"color,omitempty"`      // "#RRGGBB" or named
+	Background    string  `json:"background,omitempty"` // "#RRGGBB" or named
 	FontFamily    string  `json:"fontFamily,omitempty"`
 	Underline     bool    `json:"underline,omitempty"`
 	Strikethrough bool    `json:"strikethrough,omitempty"`
