@@ -54,9 +54,9 @@ func newFunctionPatternMask(size, version int) [][]bool {
 	}
 
 	// Finder patterns + separators.
-	markRect(mask, 0, 0, 9, 9)           // top-left
-	markRect(mask, 0, size-8, 9, 8)      // top-right
-	markRect(mask, size-8, 0, 8, 9)      // bottom-left
+	markRect(mask, 0, 0, 9, 9)      // top-left
+	markRect(mask, 0, size-8, 9, 8) // top-right
+	markRect(mask, size-8, 0, 8, 9) // bottom-left
 
 	// Timing patterns.
 	for i := 8; i < size-8; i++ {

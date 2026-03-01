@@ -124,7 +124,7 @@ func (qr *QRCode) PNG(scale int) ([]byte, error) {
 
 	// Adler-32 checksum of uncompressed data.
 	adler := adler32(raw)
-	binary.Write(&compressed, binary.BigEndian, adler)
+	_ = binary.Write(&compressed, binary.BigEndian, adler)
 
 	// Build PNG file.
 	var buf bytes.Buffer
@@ -134,8 +134,8 @@ func (qr *QRCode) PNG(scale int) ([]byte, error) {
 
 	// IHDR chunk.
 	writeChunk(&buf, "IHDR", func(w *bytes.Buffer) {
-		binary.Write(w, binary.BigEndian, uint32(width))
-		binary.Write(w, binary.BigEndian, uint32(height))
+		_ = binary.Write(w, binary.BigEndian, uint32(width))
+		_ = binary.Write(w, binary.BigEndian, uint32(height))
 		w.WriteByte(8) // bit depth
 		w.WriteByte(2) // color type: RGB
 		w.WriteByte(0) // compression method
@@ -160,7 +160,7 @@ func writeChunk(buf *bytes.Buffer, chunkType string, dataFn func(*bytes.Buffer))
 	dataFn(&data)
 
 	// Length.
-	binary.Write(buf, binary.BigEndian, uint32(data.Len()))
+	_ = binary.Write(buf, binary.BigEndian, uint32(data.Len()))
 	// Type.
 	buf.WriteString(chunkType)
 	// Data.
@@ -169,7 +169,7 @@ func writeChunk(buf *bytes.Buffer, chunkType string, dataFn func(*bytes.Buffer))
 	crc := crc32.NewIEEE()
 	crc.Write([]byte(chunkType))
 	crc.Write(data.Bytes())
-	binary.Write(buf, binary.BigEndian, crc.Sum32())
+	_ = binary.Write(buf, binary.BigEndian, crc.Sum32())
 }
 
 // adler32 computes the Adler-32 checksum.

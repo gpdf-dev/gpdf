@@ -44,7 +44,7 @@ func charCountBits(version int, m mode) int {
 		idx = 2
 	}
 	table := [3][3]int{
-		{10, 9, 8},  // v1-9:  numeric, alphanum, byte
+		{10, 9, 8},   // v1-9:  numeric, alphanum, byte
 		{12, 11, 16}, // v10-26
 		{14, 13, 16}, // v27-40
 	}
@@ -154,41 +154,41 @@ var ecTable = [40][4]ecBlockInfo{
 // alignmentPositions lists the row/column coordinates for alignment patterns
 // per version. Version 1 has no alignment patterns.
 var alignmentPositions = [41][]int{
-	{},                         // version 0 (unused)
-	{},                         // version 1
-	{6, 18},                    // version 2
-	{6, 22},                    // version 3
-	{6, 26},                    // version 4
-	{6, 30},                    // version 5
-	{6, 34},                    // version 6
-	{6, 22, 38},                // version 7
-	{6, 24, 42},                // version 8
-	{6, 26, 46},                // version 9
-	{6, 28, 50},                // version 10
-	{6, 30, 54},                // version 11
-	{6, 32, 58},                // version 12
-	{6, 34, 62},                // version 13
-	{6, 26, 46, 66},            // version 14
-	{6, 26, 48, 70},            // version 15
-	{6, 26, 50, 74},            // version 16
-	{6, 30, 54, 78},            // version 17
-	{6, 30, 56, 82},            // version 18
-	{6, 30, 58, 86},            // version 19
-	{6, 34, 62, 90},            // version 20
-	{6, 28, 50, 72, 94},        // version 21
-	{6, 26, 50, 74, 98},        // version 22
-	{6, 30, 54, 78, 102},       // version 23
-	{6, 28, 54, 80, 106},       // version 24
-	{6, 32, 58, 84, 110},       // version 25
-	{6, 30, 58, 86, 114},       // version 26
-	{6, 34, 62, 90, 118},       // version 27
-	{6, 26, 50, 74, 98, 122},   // version 28
-	{6, 30, 54, 78, 102, 126},  // version 29
-	{6, 26, 52, 78, 104, 130},  // version 30
-	{6, 30, 56, 82, 108, 134},  // version 31
-	{6, 34, 60, 86, 112, 138},  // version 32
-	{6, 30, 58, 86, 114, 142},  // version 33
-	{6, 34, 62, 90, 118, 146},  // version 34
+	{},                             // version 0 (unused)
+	{},                             // version 1
+	{6, 18},                        // version 2
+	{6, 22},                        // version 3
+	{6, 26},                        // version 4
+	{6, 30},                        // version 5
+	{6, 34},                        // version 6
+	{6, 22, 38},                    // version 7
+	{6, 24, 42},                    // version 8
+	{6, 26, 46},                    // version 9
+	{6, 28, 50},                    // version 10
+	{6, 30, 54},                    // version 11
+	{6, 32, 58},                    // version 12
+	{6, 34, 62},                    // version 13
+	{6, 26, 46, 66},                // version 14
+	{6, 26, 48, 70},                // version 15
+	{6, 26, 50, 74},                // version 16
+	{6, 30, 54, 78},                // version 17
+	{6, 30, 56, 82},                // version 18
+	{6, 30, 58, 86},                // version 19
+	{6, 34, 62, 90},                // version 20
+	{6, 28, 50, 72, 94},            // version 21
+	{6, 26, 50, 74, 98},            // version 22
+	{6, 30, 54, 78, 102},           // version 23
+	{6, 28, 54, 80, 106},           // version 24
+	{6, 32, 58, 84, 110},           // version 25
+	{6, 30, 58, 86, 114},           // version 26
+	{6, 34, 62, 90, 118},           // version 27
+	{6, 26, 50, 74, 98, 122},       // version 28
+	{6, 30, 54, 78, 102, 126},      // version 29
+	{6, 26, 52, 78, 104, 130},      // version 30
+	{6, 30, 56, 82, 108, 134},      // version 31
+	{6, 34, 60, 86, 112, 138},      // version 32
+	{6, 30, 58, 86, 114, 142},      // version 33
+	{6, 34, 62, 90, 118, 146},      // version 34
 	{6, 30, 54, 78, 102, 126, 150}, // version 35
 	{6, 24, 50, 76, 102, 128, 154}, // version 36
 	{6, 28, 54, 80, 106, 132, 158}, // version 37

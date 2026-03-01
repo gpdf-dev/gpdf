@@ -32,7 +32,7 @@ func rsEncode(data []byte, ecCount int) []byte {
 		// Subtract gen * coeff.
 		if coeff != 0 {
 			for j := 0; j < ecCount; j++ {
-				result[j] ^= gfMul(gen[j], coeff)
+				result[j] ^= gfMul(gen[ecCount-1-j], coeff)
 			}
 		}
 	}

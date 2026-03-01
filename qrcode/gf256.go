@@ -41,15 +41,3 @@ func gfDiv(a, b byte) byte {
 	}
 	return gfExp[(int(gfLog[a])-int(gfLog[b]))+255]
 }
-
-// gfPow returns a^n in GF(2^8).
-func gfPow(a byte, n int) byte {
-	if n == 0 {
-		return 1
-	}
-	if a == 0 {
-		return 0
-	}
-	log := int(gfLog[a])
-	return gfExp[(log*n)%255]
-}

@@ -180,7 +180,7 @@ func (m *matrix) placeData(data []byte) {
 			col-- // skip timing pattern column
 		}
 		// Upward or downward depending on column pair position.
-		upward := ((size - 1 - col) / 2) % 2 == 0
+		upward := ((size-1-col)/2)%2 == 0
 
 		for i := 0; i < size; i++ {
 			row := i
@@ -274,9 +274,9 @@ func buildMatrix(data []byte, version int, ecLevel ErrorCorrectionLevel, maskID 
 	m := newMatrix(size)
 
 	// 1. Finder patterns.
-	m.placeFinderPattern(3, 3)                 // top-left
-	m.placeFinderPattern(3, size-4)            // top-right
-	m.placeFinderPattern(size-4, 3)            // bottom-left
+	m.placeFinderPattern(3, 3)      // top-left
+	m.placeFinderPattern(3, size-4) // top-right
+	m.placeFinderPattern(size-4, 3) // bottom-left
 	m.placeSeparators(size)
 
 	// 2. Alignment patterns.

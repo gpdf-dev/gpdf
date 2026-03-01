@@ -153,86 +153,11 @@ func encodeCode128(data string) ([]int, error) {
 	for pos < len(data) {
 		switch currentSet {
 		case 'C':
-			// In Code C, encode digit pairs.
-			digitRun := countDigits(data, pos)
-			if digitRun >= 2 {
-				// Encode pairs of digits.
-				pairs := digitRun / 2
-				for i := 0; i < pairs; i++ {
-					d1 := int(data[pos] - '0')
-					d2 := int(data[pos+1] - '0')
-					symbols = append(symbols, d1*10+d2)
-					pos += 2
-				}
-				// If we have remaining non-digit chars or odd digit, switch to B.
-				if pos < len(data) {
-					symbols = append(symbols, code128SwitchB)
-					currentSet = 'B'
-				}
-			} else {
-				// Less than 2 digits remaining in Code C, switch to B.
-				symbols = append(symbols, code128SwitchB)
-				currentSet = 'B'
-			}
-
+			pos, symbols, currentSet = encodeSetC(data, pos, symbols)
 		case 'B':
-			// Check if we should switch to Code C for a run of digits.
-			digitRun := countDigits(data, pos)
-			if digitRun >= 4 && digitRun%2 == 0 {
-				symbols = append(symbols, code128SwitchC)
-				currentSet = 'C'
-				continue
-			}
-			// Check for even digit run at end of data.
-			if digitRun >= 4 && pos+digitRun == len(data) {
-				// Trim to even count.
-				symbols = append(symbols, code128SwitchC)
-				currentSet = 'C'
-				continue
-			}
-
-			ch := data[pos]
-			if ch < 32 {
-				// Control character: switch to Code A for this character.
-				symbols = append(symbols, code128SwitchA)
-				symbols = append(symbols, int(ch))
-				pos++
-				// Switch back to B.
-				symbols = append(symbols, code128SwitchB)
-			} else {
-				// Normal Code B character.
-				symbols = append(symbols, int(ch)-32)
-				pos++
-			}
-
+			pos, symbols, currentSet = encodeSetB(data, pos, symbols)
 		case 'A':
-			// Check if we should switch to Code C for a run of digits.
-			digitRun := countDigits(data, pos)
-			if digitRun >= 4 && digitRun%2 == 0 {
-				symbols = append(symbols, code128SwitchC)
-				currentSet = 'C'
-				continue
-			}
-			if digitRun >= 4 && pos+digitRun == len(data) {
-				symbols = append(symbols, code128SwitchC)
-				currentSet = 'C'
-				continue
-			}
-
-			ch := data[pos]
-			if ch >= 32 && ch <= 95 {
-				// Printable ASCII in Code A range.
-				symbols = append(symbols, int(ch)-32)
-				pos++
-			} else if ch < 32 {
-				// Control characters.
-				symbols = append(symbols, int(ch)+64)
-				pos++
-			} else {
-				// Character > 95, switch to Code B.
-				symbols = append(symbols, code128SwitchB)
-				currentSet = 'B'
-			}
+			pos, symbols, currentSet = encodeSetA(data, pos, symbols)
 		}
 	}
 
@@ -247,6 +172,89 @@ func encodeCode128(data string) ([]int, error) {
 	symbols = append(symbols, code128Stop)
 
 	return symbols, nil
+}
+
+// encodeSetC processes Code Set C encoding at the current position.
+func encodeSetC(data string, pos int, symbols []int) (int, []int, byte) {
+	digitRun := countDigits(data, pos)
+	if digitRun < 2 {
+		// Less than 2 digits remaining in Code C, switch to B.
+		symbols = append(symbols, code128SwitchB)
+		return pos, symbols, 'B'
+	}
+	// Encode pairs of digits.
+	pairs := digitRun / 2
+	for i := 0; i < pairs; i++ {
+		d1 := int(data[pos] - '0')
+		d2 := int(data[pos+1] - '0')
+		symbols = append(symbols, d1*10+d2)
+		pos += 2
+	}
+	// If we have remaining non-digit chars or odd digit, switch to B.
+	if pos < len(data) {
+		symbols = append(symbols, code128SwitchB)
+		return pos, symbols, 'B'
+	}
+	return pos, symbols, 'C'
+}
+
+// encodeSetB processes Code Set B encoding at the current position.
+func encodeSetB(data string, pos int, symbols []int) (int, []int, byte) {
+	// Check if we should switch to Code C for a run of digits.
+	if shouldSwitchToC(data, pos) {
+		symbols = append(symbols, code128SwitchC)
+		return pos, symbols, 'C'
+	}
+
+	ch := data[pos]
+	if ch < 32 {
+		// Control character: switch to Code A for this character.
+		symbols = append(symbols, code128SwitchA)
+		symbols = append(symbols, int(ch))
+		pos++
+		// Switch back to B.
+		symbols = append(symbols, code128SwitchB)
+	} else {
+		// Normal Code B character.
+		symbols = append(symbols, int(ch)-32)
+		pos++
+	}
+	return pos, symbols, 'B'
+}
+
+// encodeSetA processes Code Set A encoding at the current position.
+func encodeSetA(data string, pos int, symbols []int) (int, []int, byte) {
+	// Check if we should switch to Code C for a run of digits.
+	if shouldSwitchToC(data, pos) {
+		symbols = append(symbols, code128SwitchC)
+		return pos, symbols, 'C'
+	}
+
+	ch := data[pos]
+	if ch >= 32 && ch <= 95 {
+		// Printable ASCII in Code A range.
+		symbols = append(symbols, int(ch)-32)
+		pos++
+	} else if ch < 32 {
+		// Control characters.
+		symbols = append(symbols, int(ch)+64)
+		pos++
+	} else {
+		// Character > 95, switch to Code B.
+		symbols = append(symbols, code128SwitchB)
+		return pos, symbols, 'B'
+	}
+	return pos, symbols, 'A'
+}
+
+// shouldSwitchToC returns true if the current position has a digit run
+// of 4+ that warrants switching to Code C.
+func shouldSwitchToC(data string, pos int) bool {
+	digitRun := countDigits(data, pos)
+	if digitRun < 4 {
+		return false
+	}
+	return digitRun%2 == 0 || pos+digitRun == len(data)
 }
 
 // chooseStartCode determines the optimal starting code set and returns the

@@ -34,22 +34,17 @@ func TestGF256DivInverse(t *testing.T) {
 }
 
 func TestReedSolomon(t *testing.T) {
-	// Test with a small known case.
+	// Version 1-M data codewords with known correct EC output.
 	data := []byte{32, 91, 11, 120, 209, 114, 220, 77, 67, 64, 236, 17, 236, 17, 236, 17}
 	ec := rsEncode(data, 10)
-	if len(ec) != 10 {
-		t.Fatalf("rsEncode returned %d EC codewords, want 10", len(ec))
+	want := []byte{196, 35, 39, 119, 235, 215, 231, 226, 93, 23}
+	if len(ec) != len(want) {
+		t.Fatalf("rsEncode returned %d EC codewords, want %d", len(ec), len(want))
 	}
-	// Verify non-zero output (basic sanity).
-	allZero := true
-	for _, b := range ec {
-		if b != 0 {
-			allZero = false
-			break
+	for i := range ec {
+		if ec[i] != want[i] {
+			t.Errorf("rsEncode[%d] = %d, want %d", i, ec[i], want[i])
 		}
-	}
-	if allZero {
-		t.Error("rsEncode returned all zeros")
 	}
 }
 
