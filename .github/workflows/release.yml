@@ -15,31 +15,11 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Update _benchmark/go.mod version
-        if: steps.extract.outputs.found == 'true' && steps.check.outputs.exists != 'true'
-        run: |
-          TAG=${{ steps.extract.outputs.version }}
-          sed -i "s|github.com/gpdf-dev/gpdf v.*|github.com/gpdf-dev/gpdf ${TAG}|" _benchmark/go.mod
-          if git diff --quiet; then
-            echo "No changes to _benchmark/go.mod"
-          else
-            git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            git add _benchmark/go.mod
-            git commit -m "chore: update _benchmark/go.mod to ${TAG}"
-            git push origin main
-          fi
-
-      - name: Extract version from merge commit
+      - name: Extract version from source
         id: extract
         run: |
-          COMMIT_MSG=$(git log -1 --pretty=%B)
-          echo "Commit message: $COMMIT_MSG"
-
-          # Extract version from branch name patterns:
-          #   "Merge pull request #N from .../v/X.Y.Z..."
-          #   "Merge branch 'v/X.Y.Z'"
-          VERSION=$(echo "$COMMIT_MSG" | sed -n 's|.*v/\([0-9]\+\.[0-9]\+\.[0-9]\+\).*|\1|p' | head -1)
+          # Read version from the single source of truth: internal/buildinfo/version.go
+          VERSION=$(sed -n 's/^const Version = "\(.*\)"/\1/p' internal/buildinfo/version.go)
 
           if [ -n "$VERSION" ]; then
             echo "version=v${VERSION}" >> "$GITHUB_OUTPUT"
@@ -47,7 +27,7 @@ jobs:
             echo "Detected version: v${VERSION}"
           else
             echo "found=false" >> "$GITHUB_OUTPUT"
-            echo "No version pattern found in commit message"
+            echo "Could not extract version from internal/buildinfo/version.go"
           fi
 
       - name: Check if tag exists
@@ -69,3 +49,18 @@ jobs:
           git tag "$TAG"
           git push origin "$TAG"
           echo "Created and pushed tag: $TAG"
+
+      - name: Update _benchmark/go.mod version
+        if: steps.extract.outputs.found == 'true' && steps.check.outputs.exists != 'true'
+        run: |
+          TAG=${{ steps.extract.outputs.version }}
+          sed -i "s|github.com/gpdf-dev/gpdf v.*|github.com/gpdf-dev/gpdf ${TAG}|" _benchmark/go.mod
+          if git diff --quiet; then
+            echo "No changes to _benchmark/go.mod"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add _benchmark/go.mod
+            git commit -m "chore: update _benchmark/go.mod to ${TAG}"
+            git push origin main
+          fi

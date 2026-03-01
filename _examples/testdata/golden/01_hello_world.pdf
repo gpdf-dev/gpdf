@@ -21,7 +21,7 @@ endobj
 << /Count 1 /Kids [5 0 R] /Type /Pages >>
 endobj
 6 0 obj
-<< /Producer (gpdf) >>
+<< /Producer (gpdf/0.5.0) >>
 endobj
 1 0 obj
 << /Pages 2 0 R /Type /Catalog >>
@@ -29,7 +29,7 @@ endobj
 xref
 0 7
 0000000000 65535 f 
-0000000418 00000 n 
+0000000424 00000 n 
 0000000323 00000 n 
 0000000009 00000 n 
 0000000084 00000 n 
@@ -38,5 +38,5 @@ xref
 trailer
 << /Info 6 0 R /Root 1 0 R /Size 7 >>
 startxref
-467
+473
 %%EOF

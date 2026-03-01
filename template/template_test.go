@@ -7,6 +7,7 @@ import (
 
 	"github.com/gpdf-dev/gpdf/document"
 	"github.com/gpdf-dev/gpdf/document/layout"
+	"github.com/gpdf-dev/gpdf/internal/buildinfo"
 	"github.com/gpdf-dev/gpdf/pdf"
 	"github.com/gpdf-dev/gpdf/pdf/font"
 )
@@ -212,8 +213,9 @@ func TestBuildDocumentDefaultProducer(t *testing.T) {
 	doc := New()
 	doc.AddPage()
 	built := doc.buildDocument()
-	if built.Metadata.Producer != "gpdf" {
-		t.Errorf("producer: got %q, want %q", built.Metadata.Producer, "gpdf")
+	want := "gpdf/" + buildinfo.Version
+	if built.Metadata.Producer != want {
+		t.Errorf("producer: got %q, want %q", built.Metadata.Producer, want)
 	}
 }
 
