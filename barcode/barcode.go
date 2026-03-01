@@ -146,7 +146,7 @@ func writeChunk(w *bytes.Buffer, chunkType string, fill func(d *bytes.Buffer)) {
 	fill(&data)
 
 	// Length.
-	binary.Write(w, binary.BigEndian, uint32(data.Len()))
+	_ = binary.Write(w, binary.BigEndian, uint32(data.Len()))
 	// Type + Data for CRC.
 	typeBytes := []byte(chunkType)
 	w.Write(typeBytes)
@@ -155,7 +155,7 @@ func writeChunk(w *bytes.Buffer, chunkType string, fill func(d *bytes.Buffer)) {
 	crc := crc32.NewIEEE()
 	crc.Write(typeBytes)
 	crc.Write(data.Bytes())
-	binary.Write(w, binary.BigEndian, crc.Sum32())
+	_ = binary.Write(w, binary.BigEndian, crc.Sum32())
 }
 
 // adler32 computes the Adler-32 checksum of data.
