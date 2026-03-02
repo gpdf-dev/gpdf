@@ -153,16 +153,28 @@ func (c *converter) convertChildren(parent *html.Node, parentComputed css.Comput
 			fragments = append(fragments, frags...)
 		}
 		if len(fragments) > 0 {
-			blockStyle := applyStyle(parentComputed)
-			// Clear box-model properties — they belong to the parent
-			// container (Box, TableCell), not the inline text content.
-			blockStyle.Border = document.BorderEdges{}
-			blockStyle.Margin = document.Edges{}
-			blockStyle.Padding = document.Edges{}
-			blockStyle.Background = nil
-			rt := wrapInlineAsRichText(fragments, blockStyle)
-			if rt != nil {
-				result = append(result, rt)
+			// Skip anonymous blocks that contain only whitespace.
+			// In block formatting context, inter-element whitespace
+			// (indentation, newlines) should not generate visible blocks.
+			allWhitespace := true
+			for _, f := range fragments {
+				if strings.TrimSpace(f.Content) != "" {
+					allWhitespace = false
+					break
+				}
+			}
+			if !allWhitespace {
+				blockStyle := applyStyle(parentComputed)
+				// Clear box-model properties — they belong to the parent
+				// container (Box, TableCell), not the inline text content.
+				blockStyle.Border = document.BorderEdges{}
+				blockStyle.Margin = document.Edges{}
+				blockStyle.Padding = document.Edges{}
+				blockStyle.Background = nil
+				rt := wrapInlineAsRichText(fragments, blockStyle)
+				if rt != nil {
+					result = append(result, rt)
+				}
 			}
 		}
 		inlineBuffer = nil

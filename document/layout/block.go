@@ -60,11 +60,25 @@ func (bl *BlockLayout) Layout(node document.DocumentNode, constraints Constraint
 
 	var placed []PlacedNode
 	cursorY := 0.0
+	prevMarginBottom := 0.0
 	children := node.Children()
 
 	for i, child := range children {
 		if child == nil {
 			continue
+		}
+
+		// Collapse adjacent vertical margins between siblings (CSS §8.3.1).
+		// When both margins are positive, the gap is max(m1, m2) not m1+m2.
+		if len(placed) > 0 {
+			childMarginTop := resolveMarginTop(child, bc.contentWidth, bc.contentHeight-cursorY)
+			if prevMarginBottom > 0 && childMarginTop > 0 {
+				collapse := prevMarginBottom
+				if childMarginTop < collapse {
+					collapse = childMarginTop
+				}
+				cursorY -= collapse
+			}
 		}
 
 		result, done := bl.layoutVerticalChild(&bc, child, children, i, placed, cursorY)
@@ -82,6 +96,7 @@ func (bl *BlockLayout) Layout(node document.DocumentNode, constraints Constraint
 			Children: result.Children,
 		})
 		cursorY += result.Bounds.Height
+		prevMarginBottom = resolveMarginBottom(child, bc.contentWidth, bc.contentHeight)
 
 		if result.Overflow != nil {
 			remaining := make([]document.DocumentNode, 0, 1+len(children[i+1:]))
@@ -200,6 +215,26 @@ func (bl *BlockLayout) finishVerticalLayout(bc *blockContext, placed []PlacedNod
 		},
 		Children: placed,
 	}
+}
+
+// resolveMarginTop returns the resolved top margin of a node.
+func resolveMarginTop(node document.DocumentNode, availWidth, availHeight float64) float64 {
+	style := node.Style()
+	fontSize := style.FontSize
+	if fontSize <= 0 {
+		fontSize = 12
+	}
+	return style.Margin.Resolve(availWidth, availHeight, fontSize).Top
+}
+
+// resolveMarginBottom returns the resolved bottom margin of a node.
+func resolveMarginBottom(node document.DocumentNode, availWidth, availHeight float64) float64 {
+	style := node.Style()
+	fontSize := style.FontSize
+	if fontSize <= 0 {
+		fontSize = 12
+	}
+	return style.Margin.Resolve(availWidth, availHeight, fontSize).Bottom
 }
 
 // extractBreakPolicy returns the BreakPolicy for a node. Box and RichText

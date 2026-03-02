@@ -182,6 +182,17 @@ func collectInlineFragments(node *html.Node, computed css.ComputedStyles, cascad
 		frags := collectInlineFragments(child, childComputed, cascade)
 		fragments = append(fragments, frags...)
 	}
+
+	// Propagate text-decoration from this element to child fragments.
+	// In CSS, text-decoration is not inherited but the decorating element
+	// paints decoration lines across all its descendant content.
+	parentDeco := applyStyle(computed).TextDecoration
+	if parentDeco != document.DecorationNone {
+		for i := range fragments {
+			fragments[i].FragmentStyle.TextDecoration |= parentDeco
+		}
+	}
+
 	return fragments
 }
 

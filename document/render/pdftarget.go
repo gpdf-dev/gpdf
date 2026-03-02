@@ -408,20 +408,32 @@ func (r *PDFRenderer) renderPlacedNode(pn layout.PlacedNode, offsetX, offsetY fl
 
 	style := pn.Node.Style()
 
-	// Render background if present.
+	// Resolve margins so background and borders render at the border box,
+	// not the margin box. The PlacedNode position/size includes margins.
+	fontSize := style.FontSize
+	if fontSize <= 0 {
+		fontSize = 12
+	}
+	margin := style.Margin.Resolve(pn.Size.Width, pn.Size.Height, fontSize)
+	borderX := absX + margin.Left
+	borderY := absY + margin.Top
+	borderW := pn.Size.Width - margin.Left - margin.Right
+	borderH := pn.Size.Height - margin.Top - margin.Bottom
+
+	// Render background if present (within border box).
 	if style.Background != nil {
 		if err := r.RenderRect(document.Rectangle{
-			X:      absX,
-			Y:      absY,
-			Width:  pn.Size.Width,
-			Height: pn.Size.Height,
+			X:      borderX,
+			Y:      borderY,
+			Width:  borderW,
+			Height: borderH,
 		}, RectStyle{FillColor: style.Background}); err != nil {
 			return err
 		}
 	}
 
-	// Render borders if any.
-	if err := r.renderBorders(pn, style, absX, absY); err != nil {
+	// Render borders if any (within border box).
+	if err := r.renderBorders(pn, style, borderX, borderY, borderW, borderH); err != nil {
 		return err
 	}
 
@@ -513,12 +525,8 @@ func (r *PDFRenderer) renderTextDecoration(style document.Style, absX, absY, tex
 
 // renderBorders draws the border sides of a placed node at the given
 // absolute position (absX, absY).
-func (r *PDFRenderer) renderBorders(pn layout.PlacedNode, style document.Style, absX, absY float64) error {
+func (r *PDFRenderer) renderBorders(pn layout.PlacedNode, style document.Style, x, y, w, h float64) error {
 	border := style.Border
-	x := absX
-	y := absY
-	w := pn.Size.Width
-	h := pn.Size.Height
 
 	if border.Top.Style != document.BorderNone {
 		bw := border.Top.Width.Resolve(w, style.FontSize)
