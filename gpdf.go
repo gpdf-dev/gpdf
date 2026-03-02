@@ -25,7 +25,6 @@ import (
 	gotemplate "text/template"
 
 	"github.com/gpdf-dev/gpdf/document"
-	"github.com/gpdf-dev/gpdf/htmlpdf"
 	"github.com/gpdf-dev/gpdf/template"
 )
 
@@ -98,32 +97,6 @@ var (
 	NewReport = template.Report
 	// NewLetter creates a ready-to-generate business letter PDF from structured data.
 	NewLetter = template.Letter
-)
-
-// FromHTML converts an HTML string to PDF bytes.
-// This is a convenience wrapper around htmlpdf.FromHTML.
-func FromHTML(html string, opts ...htmlpdf.Option) ([]byte, error) {
-	result, err := htmlpdf.FromHTML(html, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return result.Bytes()
-}
-
-// Re-export HTML→PDF option functions for convenience.
-var (
-	// HTMLWithPageSize sets the page dimensions for HTML→PDF conversion.
-	HTMLWithPageSize = htmlpdf.WithPageSize
-	// HTMLWithMargins sets the page margins for HTML→PDF conversion.
-	HTMLWithMargins = htmlpdf.WithMargins
-	// HTMLWithFont registers a TrueType font for HTML→PDF conversion.
-	HTMLWithFont = htmlpdf.WithFont
-	// HTMLWithDefaultFont sets the default font for HTML→PDF conversion.
-	HTMLWithDefaultFont = htmlpdf.WithDefaultFont
-	// HTMLWithStylesheet adds additional CSS for HTML→PDF conversion.
-	HTMLWithStylesheet = htmlpdf.WithStylesheet
-	// HTMLWithBaseURL sets the base URL for resolving relative paths.
-	HTMLWithBaseURL = htmlpdf.WithBaseURL
 )
 
 // NewDocumentFromJSON is an alias for FromJSON that creates a Document
