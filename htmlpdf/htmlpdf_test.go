@@ -380,17 +380,17 @@ func TestResult_Write(t *testing.T) {
 
 func TestFontResolver_NoFonts(t *testing.T) {
 	fr := &htmlFontResolver{
-		fonts:   make(map[string]*font.TrueTypeFont),
+		fonts:   make(map[string]font.Font),
 		metrics: make(map[string]layout.FontMetrics),
 	}
 
 	resolved := fr.Resolve("Arial", document.WeightNormal, false)
-	if resolved.ID != "default" {
-		t.Errorf("expected 'default' ID for no-font resolver, got %q", resolved.ID)
+	if resolved.ID != "Helvetica" {
+		t.Errorf("expected 'Helvetica' ID for no-font resolver, got %q", resolved.ID)
 	}
 
 	width := fr.MeasureString(resolved, "Hello", 12)
-	// 5 chars * 12 * 0.5 = 30
+	// 5 chars * 12 * 0.5 = 30 (fallback approximation)
 	expected := 30.0
 	if width != expected {
 		t.Errorf("MeasureString: got %v, want %v", width, expected)
@@ -399,7 +399,7 @@ func TestFontResolver_NoFonts(t *testing.T) {
 
 func TestFontResolver_Fallback(t *testing.T) {
 	fr := &htmlFontResolver{
-		fonts:   make(map[string]*font.TrueTypeFont),
+		fonts:   make(map[string]font.Font),
 		metrics: make(map[string]layout.FontMetrics),
 	}
 

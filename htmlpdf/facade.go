@@ -175,14 +175,28 @@ func defaultConfig() *Config {
 
 // htmlFontResolver implements layout.FontResolver for HTML→PDF conversion.
 type htmlFontResolver struct {
-	fonts   map[string]*font.TrueTypeFont
+	fonts   map[string]font.Font
 	metrics map[string]layout.FontMetrics
 }
 
 func newHTMLFontResolver(config *Config) (*htmlFontResolver, error) {
 	fr := &htmlFontResolver{
-		fonts:   make(map[string]*font.TrueTypeFont),
+		fonts:   make(map[string]font.Font),
 		metrics: make(map[string]layout.FontMetrics),
+	}
+
+	// Register Base-14 Helvetica variants as defaults so that layout
+	// measurement matches the PDF viewer's built-in Helvetica rendering
+	// even when no custom fonts are provided.
+	base14 := map[string]font.Font{
+		"Helvetica":             font.Helvetica(),
+		"Helvetica-Bold":        font.HelveticaBold(),
+		"Helvetica-Oblique":     font.HelveticaOblique(),
+		"Helvetica-BoldOblique": font.HelveticaBoldOblique(),
+	}
+	for name, f := range base14 {
+		fr.fonts[name] = f
+		fr.metrics[name] = extractBase14Metrics(f)
 	}
 
 	for family, data := range config.Fonts {
@@ -195,6 +209,20 @@ func newHTMLFontResolver(config *Config) (*htmlFontResolver, error) {
 	}
 
 	return fr, nil
+}
+
+func extractBase14Metrics(f font.Font) layout.FontMetrics {
+	m := f.Metrics()
+	unitsPerEm := float64(m.UnitsPerEm)
+	if unitsPerEm == 0 {
+		unitsPerEm = 1000
+	}
+	return layout.FontMetrics{
+		Ascender:   float64(m.Ascender) / unitsPerEm,
+		Descender:  float64(m.Descender) / unitsPerEm,
+		LineHeight: float64(m.Ascender-m.Descender) / unitsPerEm,
+		CapHeight:  float64(m.CapHeight) / unitsPerEm,
+	}
 }
 
 func extractMetrics(ttf *font.TrueTypeFont) layout.FontMetrics {
@@ -212,47 +240,74 @@ func extractMetrics(ttf *font.TrueTypeFont) layout.FontMetrics {
 }
 
 func (fr *htmlFontResolver) Resolve(family string, weight document.FontWeight, italic bool) layout.ResolvedFont {
-	// Try exact family match
+	// Try exact family match (custom user fonts take priority).
 	if _, ok := fr.fonts[family]; ok {
 		return layout.ResolvedFont{
 			ID:      family,
 			Metrics: fr.metrics[family],
 		}
 	}
-	// Fall back to first available font
-	for name := range fr.fonts {
+
+	// Fall back to Helvetica variant matching the requested weight/style.
+	// This mirrors the rendering side's resolvePDFFontName logic so that
+	// measured widths match the actual PDF output.
+	name := resolveHelveticaVariant(weight, italic)
+	if _, ok := fr.fonts[name]; ok {
 		return layout.ResolvedFont{
 			ID:      name,
 			Metrics: fr.metrics[name],
 		}
 	}
-	// No fonts available — return a placeholder
+
+	// Last resort: return any available font.
+	for n := range fr.fonts {
+		return layout.ResolvedFont{
+			ID:      n,
+			Metrics: fr.metrics[n],
+		}
+	}
 	return layout.ResolvedFont{
-		ID: "default",
+		ID: "Helvetica",
 		Metrics: layout.FontMetrics{
-			Ascender:   0.8,
-			Descender:  -0.2,
-			LineHeight: 1.0,
-			CapHeight:  0.7,
+			Ascender:   0.718,
+			Descender:  -0.207,
+			LineHeight: 0.925,
+			CapHeight:  0.718,
 		},
 	}
 }
 
+// resolveHelveticaVariant returns the Helvetica variant name for the
+// given weight and style, matching the PDF renderer's base14Variants logic.
+func resolveHelveticaVariant(weight document.FontWeight, italic bool) string {
+	bold := weight >= document.WeightBold
+	switch {
+	case bold && italic:
+		return "Helvetica-BoldOblique"
+	case bold:
+		return "Helvetica-Bold"
+	case italic:
+		return "Helvetica-Oblique"
+	default:
+		return "Helvetica"
+	}
+}
+
 func (fr *htmlFontResolver) MeasureString(f layout.ResolvedFont, text string, size float64) float64 {
-	ttf, ok := fr.fonts[f.ID]
+	fnt, ok := fr.fonts[f.ID]
 	if !ok {
 		// Approximate: 0.5 * fontSize per character
 		return float64(len([]rune(text))) * size * 0.5
 	}
-	return font.MeasureString(ttf, text, size)
+	return font.MeasureString(fnt, text, size)
 }
 
 func (fr *htmlFontResolver) LineBreak(f layout.ResolvedFont, text string, size float64, maxWidth float64) []string {
-	ttf, ok := fr.fonts[f.ID]
+	fnt, ok := fr.fonts[f.ID]
 	if !ok {
 		return simpleLineBreak(text, size, maxWidth)
 	}
-	return font.LineBreak(ttf, text, size, maxWidth)
+	return font.LineBreak(fnt, text, size, maxWidth)
 }
 
 // simpleLineBreak is a fallback word-wrap without font metrics.
