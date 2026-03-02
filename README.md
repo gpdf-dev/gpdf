@@ -15,12 +15,13 @@ A pure Go, zero-dependency PDF generation library with a layered architecture an
 - **Zero dependencies** — only the Go standard library
 - **Layered architecture** — low-level PDF primitives, document model, and high-level template API
 - **12-column grid system** — Bootstrap-style responsive layout
-- **TrueType font support** — embed custom fonts with subsetting
-- **CJK ready** — full CJK text support from day one
+- **TrueType font support** — embed custom fonts with automatic subsetting
+- **CJK ready** — full Unicode support including Japanese, Chinese, and Korean text
+- **Rich text** — mixed inline styles (bold, italic, colors) within a single paragraph
 - **Tables** — headers, column widths, striped rows, vertical alignment
 - **Headers & Footers** — consistent across all pages with page numbers
-- **Lists** — bulleted and numbered lists
-- **QR codes** — pure Go QR code generation with error correction levels
+- **Lists** — bulleted and numbered lists with configurable indent
+- **QR codes** — pure Go QR code generation (version 1-40, error correction L/M/Q/H)
 - **Barcodes** — Code 128 barcode generation
 - **Text decorations** — underline, strikethrough, letter spacing, text indent
 - **Page numbers** — automatic page number and total page count
@@ -30,6 +31,8 @@ A pure Go, zero-dependency PDF generation library with a layered architecture an
 - **Multiple units** — pt, mm, cm, in, em, %
 - **Color spaces** — RGB, Grayscale, CMYK
 - **Images** — JPEG and PNG embedding with fit options
+- **Flate compression** — automatic PDF stream compression for smaller file sizes
+- **Font subsetting** — only embeds glyphs actually used, reducing output size
 - **Document metadata** — title, author, subject, creator
 
 ## Architecture
@@ -106,6 +109,61 @@ page.AutoRow(func(r *template.RowBuilder) {
 		c.Text("Right aligned", template.AlignRight())
 	})
 })
+```
+
+### Custom Fonts
+
+Embed TrueType fonts for custom typography and CJK text:
+
+```go
+fontData, _ := os.ReadFile("NotoSansJP-Regular.ttf")
+boldData, _ := os.ReadFile("NotoSansJP-Bold.ttf")
+
+doc := gpdf.NewDocument(
+	gpdf.WithPageSize(gpdf.A4),
+	gpdf.WithFont("NotoSansJP", fontData),
+	gpdf.WithFont("NotoSansJP-Bold", boldData),
+	gpdf.WithDefaultFont("NotoSansJP", 12),
+)
+
+page := doc.AddPage()
+page.AutoRow(func(r *template.RowBuilder) {
+	r.Col(12, func(c *template.ColBuilder) {
+		c.Text("日本語テキスト — gpdf は CJK をフルサポート")
+		c.Text("中文文本 — 支持中日韩文字")
+		c.Text("한국어 텍스트 — CJK 완벽 지원")
+		c.Text("Bold title", template.FontFamily("NotoSansJP-Bold"), template.FontSize(18))
+	})
+})
+```
+
+Only the glyphs actually used are embedded (automatic font subsetting), keeping output files small.
+
+### Rich Text
+
+Mix multiple styles within a single paragraph using `RichText`:
+
+```go
+page.AutoRow(func(r *template.RowBuilder) {
+	r.Col(12, func(c *template.ColBuilder) {
+		c.RichText(func(rt *template.RichTextBuilder) {
+			rt.Span("This is ")
+			rt.Span("bold", template.Bold())
+			rt.Span(" and this is ")
+			rt.Span("red italic", template.Italic(), template.TextColor(pdf.Red))
+			rt.Span(" in a single paragraph.")
+		})
+	})
+})
+```
+
+Block-level options (alignment, indent) can be passed as additional arguments to `RichText`:
+
+```go
+c.RichText(func(rt *template.RichTextBuilder) {
+	rt.Span("Centered mixed text: ")
+	rt.Span("$1,234.56", template.Bold(), template.TextColor(pdf.RGBHex(0x2E7D32)))
+}, template.AlignCenter())
 ```
 
 ### 12-Column Grid Layout
@@ -255,6 +313,9 @@ c.List([]string{"First item", "Second item", "Third item"})
 
 // Numbered list
 c.OrderedList([]string{"Step one", "Step two", "Step three"})
+
+// Custom indent
+c.List([]string{"Indented", "Items"}, template.ListIndent(document.Mm(10)))
 ```
 
 ### QR Codes
@@ -441,8 +502,14 @@ doc := template.Invoice(template.InvoiceData{
 		{Description: "Web Development", Quantity: "40 hrs", UnitPrice: 150, Amount: 6000},
 		{Description: "UI/UX Design", Quantity: "20 hrs", UnitPrice: 120, Amount: 2400},
 	},
-	TaxRate: 10,
-	Notes:   "Thank you for your business!",
+	TaxRate:  10,
+	Currency: "¥",  // default: "$"
+	Notes:    "Thank you for your business!",
+	Payment: &template.InvoicePayment{
+		BankName: "Tokyo Bank",
+		Account:  "1234567",
+		Routing:  "001-0123",
+	},
 })
 data, _ := doc.Generate()
 ```
@@ -561,6 +628,7 @@ doc.Render(f)
 | `c.Image(data, opts...)` | Add an image (JPEG/PNG) |
 | `c.QRCode(data, opts...)` | Add a QR code |
 | `c.Barcode(data, opts...)` | Add a barcode (Code 128) |
+| `c.RichText(fn, opts...)` | Add mixed inline styles in one paragraph |
 | `c.List(items, opts...)` | Add a bulleted list |
 | `c.OrderedList(items, opts...)` | Add a numbered list |
 | `c.PageNumber(opts...)` | Add current page number |
@@ -602,6 +670,12 @@ doc.Render(f)
 | `template.FitWidth(value)` | Scale to fit width (keeps aspect ratio) |
 | `template.FitHeight(value)` | Scale to fit height (keeps aspect ratio) |
 
+### List Options
+
+| Option | Description |
+|---|---|
+| `template.ListIndent(value)` | Set bullet/number indent width |
+
 ### QR Code Options
 
 | Option | Description |
@@ -633,6 +707,12 @@ doc.Render(f)
 | `template.Invoice(data)` | Generate a professional invoice PDF |
 | `template.Report(data)` | Generate a structured report PDF |
 | `template.Letter(data)` | Generate a business letter PDF |
+
+### Rich Text Builder
+
+| Method | Description |
+|---|---|
+| `rt.Span(text, opts...)` | Add an inline text fragment with styling |
 
 ### Line Options
 
@@ -700,6 +780,34 @@ Run benchmarks yourself:
 ```bash
 cd _benchmark && go test -bench=. -benchmem -count=5
 ```
+
+## Advanced: Lower-Level APIs
+
+The `template` package (Layer 3) covers most use cases. For full control, you can use the lower-level packages directly:
+
+| Package | Layer | Description |
+|---|---|---|
+| `template` | 3 | Declarative builder API, grid system, components |
+| `document` | 2 | Node tree, box model, styles, layout engine |
+| `pdf` | 1 | PDF writer, TrueType font parsing, streams, images |
+| `qrcode` | — | Standalone QR code encoder (versions 1-40) |
+| `barcode` | — | Standalone Code 128 barcode encoder |
+
+**Layer 2 (document)** gives access to:
+- Box model with margins, padding, borders (solid/dashed/dotted)
+- Page break control (`BreakPolicy` — avoid, always, page)
+- Table cells with `ColSpan` / `RowSpan`
+- Image fit modes (`FitContain`, `FitCover`, `FitStretch`, `FitOriginal`)
+- Vertical/horizontal layout direction
+
+**Layer 1 (pdf)** gives access to:
+- Raw PDF object writing (`Writer`)
+- TrueType font parsing and subsetting
+- JPEG/PNG image registration
+- Flate stream compression
+- Content stream operators
+
+See the [GoDoc](https://pkg.go.dev/github.com/gpdf-dev/gpdf) for full API details.
 
 ## License
 

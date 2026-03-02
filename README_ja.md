@@ -14,12 +14,13 @@
 - **外部依存ゼロ** — Go標準ライブラリのみ使用
 - **レイヤードアーキテクチャ** — 低レベルPDFプリミティブ、ドキュメントモデル、高レベルテンプレートAPI
 - **12カラムグリッドシステム** — Bootstrap風のレスポンシブレイアウト
-- **TrueTypeフォント対応** — カスタムフォントの埋め込みとサブセット化
-- **CJK対応** — 日中韓テキストを初日からフルサポート
+- **TrueTypeフォント対応** — カスタムフォントの埋め込みと自動サブセット化
+- **CJK対応** — 日本語・中国語・韓国語を含む完全なUnicodeサポート
+- **リッチテキスト** — 1つの段落内で複数のインラインスタイル（太字、イタリック、色）を混在
 - **テーブル** — ヘッダー、カラム幅指定、ストライプ行、垂直揃え
 - **ヘッダー＆フッター** — ページ番号付きで全ページに一貫表示
-- **リスト** — 箇条書きリストと番号付きリスト
-- **QRコード** — 純GoのQRコード生成（誤り訂正レベル対応）
+- **リスト** — インデント設定可能な箇条書きリストと番号付きリスト
+- **QRコード** — 純GoのQRコード生成（バージョン1-40、誤り訂正レベルL/M/Q/H）
 - **バーコード** — Code 128バーコード生成
 - **テキスト装飾** — 下線、取り消し線、字間、字下げ
 - **ページ番号** — 自動ページ番号と総ページ数
@@ -29,6 +30,8 @@
 - **複数の単位** — pt, mm, cm, in, em, %
 - **カラースペース** — RGB、グレースケール、CMYK
 - **画像** — JPEGとPNGの埋め込み（フィットオプション対応）
+- **Flate圧縮** — PDFストリームの自動圧縮でファイルサイズを削減
+- **フォントサブセット化** — 使用したグリフのみ埋め込み、出力サイズを削減
 - **ドキュメントメタデータ** — タイトル、著者、件名、作成者
 
 ## アーキテクチャ
@@ -105,6 +108,61 @@ page.AutoRow(func(r *template.RowBuilder) {
 		c.Text("右揃え", template.AlignRight())
 	})
 })
+```
+
+### カスタムフォント
+
+TrueTypeフォントを埋め込んでカスタムタイポグラフィやCJKテキストに対応:
+
+```go
+fontData, _ := os.ReadFile("NotoSansJP-Regular.ttf")
+boldData, _ := os.ReadFile("NotoSansJP-Bold.ttf")
+
+doc := gpdf.NewDocument(
+	gpdf.WithPageSize(gpdf.A4),
+	gpdf.WithFont("NotoSansJP", fontData),
+	gpdf.WithFont("NotoSansJP-Bold", boldData),
+	gpdf.WithDefaultFont("NotoSansJP", 12),
+)
+
+page := doc.AddPage()
+page.AutoRow(func(r *template.RowBuilder) {
+	r.Col(12, func(c *template.ColBuilder) {
+		c.Text("日本語テキスト — gpdf は CJK をフルサポート")
+		c.Text("中文文本 — 支持中日韩文字")
+		c.Text("한국어 텍스트 — CJK 완벽 지원")
+		c.Text("太字タイトル", template.FontFamily("NotoSansJP-Bold"), template.FontSize(18))
+	})
+})
+```
+
+実際に使用されたグリフのみが埋め込まれ（自動フォントサブセット化）、出力ファイルを小さく保ちます。
+
+### リッチテキスト
+
+`RichText` を使って1つの段落内で複数のスタイルを混在:
+
+```go
+page.AutoRow(func(r *template.RowBuilder) {
+	r.Col(12, func(c *template.ColBuilder) {
+		c.RichText(func(rt *template.RichTextBuilder) {
+			rt.Span("これは ")
+			rt.Span("太字", template.Bold())
+			rt.Span(" で、これは ")
+			rt.Span("赤いイタリック", template.Italic(), template.TextColor(pdf.Red))
+			rt.Span(" の1つの段落です。")
+		})
+	})
+})
+```
+
+ブロックレベルのオプション（配置、字下げ）は `RichText` の追加引数として渡せます:
+
+```go
+c.RichText(func(rt *template.RichTextBuilder) {
+	rt.Span("中央揃えの混合テキスト: ")
+	rt.Span("¥1,234", template.Bold(), template.TextColor(pdf.RGBHex(0x2E7D32)))
+}, template.AlignCenter())
 ```
 
 ### 12カラムグリッドレイアウト
@@ -207,6 +265,9 @@ c.List([]string{"項目1", "項目2", "項目3"})
 
 // 番号付きリスト
 c.OrderedList([]string{"ステップ1", "ステップ2", "ステップ3"})
+
+// カスタムインデント
+c.List([]string{"インデント", "項目"}, template.ListIndent(document.Mm(10)))
 ```
 
 ### QRコード
@@ -360,8 +421,14 @@ doc := template.Invoice(template.InvoiceData{
 		{Description: "Web開発", Quantity: "40時間", UnitPrice: 150, Amount: 6000},
 		{Description: "UI/UXデザイン", Quantity: "20時間", UnitPrice: 120, Amount: 2400},
 	},
-	TaxRate: 10,
-	Notes:   "ご利用ありがとうございます！",
+	TaxRate:  10,
+	Currency: "¥",  // デフォルト: "$"
+	Notes:    "ご利用ありがとうございます！",
+	Payment: &template.InvoicePayment{
+		BankName: "三菱UFJ銀行",
+		Account:  "1234567",
+		Routing:  "001-0123",
+	},
 })
 data, _ := doc.Generate()
 ```
@@ -480,6 +547,7 @@ doc.Render(f)
 | `c.Image(data, opts...)` | 画像を追加 (JPEG/PNG) |
 | `c.QRCode(data, opts...)` | QRコードを追加 |
 | `c.Barcode(data, opts...)` | バーコードを追加 (Code 128) |
+| `c.RichText(fn, opts...)` | 1つの段落内で複数のインラインスタイルを追加 |
 | `c.List(items, opts...)` | 箇条書きリストを追加 |
 | `c.OrderedList(items, opts...)` | 番号付きリストを追加 |
 | `c.PageNumber(opts...)` | 現在のページ番号を追加 |
@@ -521,6 +589,12 @@ doc.Render(f)
 | `template.FitWidth(value)` | 幅に合わせてスケール（アスペクト比維持） |
 | `template.FitHeight(value)` | 高さに合わせてスケール（アスペクト比維持） |
 
+### リストオプション
+
+| オプション | 説明 |
+|---|---|
+| `template.ListIndent(value)` | 箇条書き/番号のインデント幅を設定 |
+
 ### QRコードオプション
 
 | オプション | 説明 |
@@ -552,6 +626,12 @@ doc.Render(f)
 | `template.Invoice(data)` | プロフェッショナルな請求書PDFを生成 |
 | `template.Report(data)` | 構造化されたレポートPDFを生成 |
 | `template.Letter(data)` | ビジネスレターPDFを生成 |
+
+### リッチテキストビルダー
+
+| メソッド | 説明 |
+|---|---|
+| `rt.Span(text, opts...)` | スタイル付きインラインテキスト断片を追加 |
 
 ### 罫線オプション
 
@@ -619,6 +699,34 @@ pdf.Yellow, pdf.Cyan, pdf.Magenta
 ```bash
 cd _benchmark && go test -bench=. -benchmem -count=5
 ```
+
+## 上級: 低レベルAPI
+
+`template` パッケージ（レイヤー3）でほとんどのユースケースに対応できます。完全な制御が必要な場合、低レベルパッケージを直接使用できます:
+
+| パッケージ | レイヤー | 説明 |
+|---|---|---|
+| `template` | 3 | 宣言的ビルダーAPI、グリッドシステム、コンポーネント |
+| `document` | 2 | ノードツリー、ボックスモデル、スタイル、レイアウトエンジン |
+| `pdf` | 1 | PDF Writer、TrueTypeフォント解析、ストリーム、画像 |
+| `qrcode` | — | スタンドアロンQRコードエンコーダー（バージョン1-40） |
+| `barcode` | — | スタンドアロンCode 128バーコードエンコーダー |
+
+**レイヤー2 (document)** で利用可能:
+- マージン、パディング、ボーダー（実線/破線/点線）付きボックスモデル
+- ページ区切り制御（`BreakPolicy` — avoid, always, page）
+- `ColSpan` / `RowSpan` 付きテーブルセル
+- 画像フィットモード（`FitContain`、`FitCover`、`FitStretch`、`FitOriginal`）
+- 垂直/水平レイアウト方向
+
+**レイヤー1 (pdf)** で利用可能:
+- 生PDFオブジェクト書き込み（`Writer`）
+- TrueTypeフォント解析とサブセット化
+- JPEG/PNG画像登録
+- Flateストリーム圧縮
+- コンテンツストリームオペレーター
+
+詳細なAPIドキュメントは [GoDoc](https://pkg.go.dev/github.com/gpdf-dev/gpdf) を参照してください。
 
 ## ライセンス
 

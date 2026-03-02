@@ -14,12 +14,13 @@
 - **외부 의존성 제로** — Go 표준 라이브러리만 사용
 - **레이어드 아키텍처** — 저수준 PDF 프리미티브, 문서 모델, 고수준 템플릿 API
 - **12컬럼 그리드 시스템** — Bootstrap 스타일의 반응형 레이아웃
-- **TrueType 폰트 지원** — 커스텀 폰트 임베딩 및 서브셋팅
-- **CJK 지원** — 첫날부터 한중일 텍스트 완벽 지원
+- **TrueType 폰트 지원** — 자동 서브셋팅을 포함한 커스텀 폰트 임베딩
+- **CJK 지원** — 한국어, 중국어, 일본어를 포함한 완전한 유니코드 지원
+- **리치 텍스트** — 하나의 단락에서 여러 인라인 스타일(굵게, 이탤릭, 색상) 혼합
 - **테이블** — 헤더, 컬럼 너비, 줄무늬 행, 수직 정렬
 - **머리글 및 바닥글** — 페이지 번호 포함, 모든 페이지에서 일관된 표시
-- **리스트** — 글머리 기호 목록 및 번호 목록
-- **QR 코드** — 순수 Go QR 코드 생성 (오류 정정 레벨 지원)
+- **리스트** — 들여쓰기 설정 가능한 글머리 기호 목록 및 번호 목록
+- **QR 코드** — 순수 Go QR 코드 생성 (버전 1-40, 오류 정정 레벨 L/M/Q/H)
 - **바코드** — Code 128 바코드 생성
 - **텍스트 장식** — 밑줄, 취소선, 자간, 들여쓰기
 - **페이지 번호** — 자동 페이지 번호 및 전체 페이지 수
@@ -29,6 +30,8 @@
 - **다양한 단위** — pt, mm, cm, in, em, %
 - **색상 공간** — RGB, 그레이스케일, CMYK
 - **이미지** — JPEG 및 PNG 임베딩 (맞춤 옵션 지원)
+- **Flate 압축** — 자동 PDF 스트림 압축으로 파일 크기 절감
+- **폰트 서브셋팅** — 실제 사용된 글리프만 임베딩하여 출력 크기 절감
 - **문서 메타데이터** — 제목, 저자, 주제, 작성자
 
 ## 아키텍처
@@ -105,6 +108,61 @@ page.AutoRow(func(r *template.RowBuilder) {
 		c.Text("오른쪽 정렬", template.AlignRight())
 	})
 })
+```
+
+### 커스텀 폰트
+
+TrueType 폰트를 임베딩하여 커스텀 타이포그래피와 CJK 텍스트 지원:
+
+```go
+fontData, _ := os.ReadFile("NotoSansKR-Regular.ttf")
+boldData, _ := os.ReadFile("NotoSansKR-Bold.ttf")
+
+doc := gpdf.NewDocument(
+	gpdf.WithPageSize(gpdf.A4),
+	gpdf.WithFont("NotoSansKR", fontData),
+	gpdf.WithFont("NotoSansKR-Bold", boldData),
+	gpdf.WithDefaultFont("NotoSansKR", 12),
+)
+
+page := doc.AddPage()
+page.AutoRow(func(r *template.RowBuilder) {
+	r.Col(12, func(c *template.ColBuilder) {
+		c.Text("한국어 텍스트 — gpdf는 CJK를 완벽 지원합니다")
+		c.Text("日本語テキスト — CJK をフルサポート")
+		c.Text("中文文本 — 支持中日韩文字")
+		c.Text("굵은 제목", template.FontFamily("NotoSansKR-Bold"), template.FontSize(18))
+	})
+})
+```
+
+실제 사용된 글리프만 임베딩되어(자동 폰트 서브셋팅) 출력 파일을 작게 유지합니다.
+
+### 리치 텍스트
+
+`RichText`를 사용하여 하나의 단락에서 여러 스타일을 혼합:
+
+```go
+page.AutoRow(func(r *template.RowBuilder) {
+	r.Col(12, func(c *template.ColBuilder) {
+		c.RichText(func(rt *template.RichTextBuilder) {
+			rt.Span("이것은 ")
+			rt.Span("굵은 글씨", template.Bold())
+			rt.Span("이고, 이것은 ")
+			rt.Span("빨간 이탤릭", template.Italic(), template.TextColor(pdf.Red))
+			rt.Span("입니다. 하나의 단락에서요.")
+		})
+	})
+})
+```
+
+블록 레벨 옵션(정렬, 들여쓰기)은 `RichText`의 추가 인수로 전달할 수 있습니다:
+
+```go
+c.RichText(func(rt *template.RichTextBuilder) {
+	rt.Span("가운데 정렬 혼합 텍스트: ")
+	rt.Span("₩1,234", template.Bold(), template.TextColor(pdf.RGBHex(0x2E7D32)))
+}, template.AlignCenter())
 ```
 
 ### 12컬럼 그리드 레이아웃
@@ -197,6 +255,83 @@ c.Line(template.LineThickness(document.Pt(3)))      // 굵은 선
 c.Spacer(document.Mm(5))                            // 5mm 세로 간격
 ```
 
+### 리스트
+
+글머리 기호 목록과 번호 목록:
+
+```go
+// 글머리 기호 목록
+c.List([]string{"항목 1", "항목 2", "항목 3"})
+
+// 번호 목록
+c.OrderedList([]string{"단계 1", "단계 2", "단계 3"})
+
+// 커스텀 들여쓰기
+c.List([]string{"들여쓰기", "항목"}, template.ListIndent(document.Mm(10)))
+```
+
+### QR 코드
+
+크기와 오류 정정 레벨을 설정 가능한 QR 코드 생성:
+
+```go
+// 기본 QR 코드
+c.QRCode("https://gpdf.dev")
+
+// 크기와 오류 정정 레벨 지정
+c.QRCode("https://gpdf.dev",
+	template.QRSize(document.Mm(30)),
+	template.QRErrorCorrection(qrcode.LevelH))
+```
+
+### 바코드
+
+Code 128 바코드 생성:
+
+```go
+// 기본 바코드
+c.Barcode("INV-2026-0001")
+
+// 너비 지정
+c.Barcode("INV-2026-0001", template.BarcodeWidth(document.Mm(80)))
+```
+
+### 페이지 번호
+
+자동 페이지 번호와 전체 페이지 수:
+
+```go
+doc.Footer(func(p *template.PageBuilder) {
+	p.AutoRow(func(r *template.RowBuilder) {
+		r.Col(6, func(c *template.ColBuilder) {
+			c.Text("gpdf로 생성", template.FontSize(8))
+		})
+		r.Col(6, func(c *template.ColBuilder) {
+			c.PageNumber(template.AlignRight(), template.FontSize(8))
+		})
+	})
+})
+
+doc.Header(func(p *template.PageBuilder) {
+	p.AutoRow(func(r *template.RowBuilder) {
+		r.Col(12, func(c *template.ColBuilder) {
+			c.TotalPages(template.AlignRight(), template.FontSize(9))
+		})
+	})
+})
+```
+
+### 텍스트 장식
+
+밑줄, 취소선, 자간, 들여쓰기:
+
+```go
+c.Text("밑줄 텍스트", template.Underline())
+c.Text("취소선 텍스트", template.Strikethrough())
+c.Text("넓은 자간", template.LetterSpacing(3))
+c.Text("들여쓰기 단락...", template.TextIndent(document.Pt(24)))
+```
+
 ### 머리글 및 바닥글
 
 모든 페이지에 반복 표시되는 머리글과 바닥글:
@@ -224,6 +359,64 @@ doc.Footer(func(p *template.PageBuilder) {
 })
 ```
 
+### 다중 페이지 문서
+
+```go
+for i := 1; i <= 5; i++ {
+	page := doc.AddPage()
+	page.AutoRow(func(r *template.RowBuilder) {
+		r.Col(12, func(c *template.ColBuilder) {
+			c.Text("페이지 콘텐츠")
+		})
+	})
+}
+```
+
+### JSON 스키마
+
+JSON으로만 문서 정의:
+
+```go
+schema := []byte(`{
+	"page": {"size": "A4", "margins": "20mm"},
+	"metadata": {"title": "보고서", "author": "gpdf"},
+	"body": [
+		{"row": {"cols": [
+			{"span": 12, "text": "JSON에서 안녕하세요", "style": {"size": 24, "bold": true}}
+		]}}
+	]
+}`)
+
+doc, err := template.FromJSON(schema, nil)
+data, _ := doc.Generate()
+```
+
+### Go 템플릿 통합
+
+Go 템플릿과 JSON 스키마로 동적 콘텐츠 생성:
+
+```go
+schema := []byte(`{
+	"page": {"size": "A4", "margins": "20mm"},
+	"metadata": {"title": "{{.Title}}"},
+	"body": [
+		{"row": {"cols": [
+			{"span": 12, "text": "{{.Title}}", "style": {"size": 24, "bold": true}}
+		]}}
+	]
+}`)
+
+data := map[string]any{"Title": "동적 보고서"}
+doc, err := template.FromJSON(schema, data)
+```
+
+사전 파싱된 Go 템플릿으로 더 많은 제어:
+
+```go
+tmpl, _ := gotemplate.New("doc").Funcs(template.TemplateFuncMap()).Parse(schemaStr)
+doc, err := template.FromTemplate(tmpl, data)
+```
+
 ### 재사용 가능 컴포넌트
 
 함수 하나로 일반적인 문서 유형을 생성할 수 있습니다:
@@ -241,8 +434,14 @@ doc := template.Invoice(template.InvoiceData{
 		{Description: "웹 개발", Quantity: "40시간", UnitPrice: 150, Amount: 6000},
 		{Description: "UI/UX 디자인", Quantity: "20시간", UnitPrice: 120, Amount: 2400},
 	},
-	TaxRate: 10,
-	Notes:   "이용해 주셔서 감사합니다!",
+	TaxRate:  10,
+	Currency: "₩",  // 기본값: "$"
+	Notes:    "이용해 주셔서 감사합니다!",
+	Payment: &template.InvoicePayment{
+		BankName: "국민은행",
+		Account:  "123-456-789012",
+		Routing:  "004",
+	},
 })
 data, _ := doc.Generate()
 ```
@@ -361,6 +560,7 @@ doc.Render(f)
 | `c.Image(data, opts...)` | 이미지 추가 (JPEG/PNG) |
 | `c.QRCode(data, opts...)` | QR 코드 추가 |
 | `c.Barcode(data, opts...)` | 바코드 추가 (Code 128) |
+| `c.RichText(fn, opts...)` | 하나의 단락에서 여러 인라인 스타일 추가 |
 | `c.List(items, opts...)` | 글머리 기호 목록 추가 |
 | `c.OrderedList(items, opts...)` | 번호 목록 추가 |
 | `c.PageNumber(opts...)` | 현재 페이지 번호 추가 |
@@ -402,6 +602,12 @@ doc.Render(f)
 | `template.FitWidth(value)` | 너비에 맞춰 스케일 (비율 유지) |
 | `template.FitHeight(value)` | 높이에 맞춰 스케일 (비율 유지) |
 
+### 리스트 옵션
+
+| 옵션 | 설명 |
+|---|---|
+| `template.ListIndent(value)` | 글머리 기호/번호 들여쓰기 너비 설정 |
+
 ### QR 코드 옵션
 
 | 옵션 | 설명 |
@@ -433,6 +639,12 @@ doc.Render(f)
 | `template.Invoice(data)` | 전문적인 송장 PDF 생성 |
 | `template.Report(data)` | 구조화된 보고서 PDF 생성 |
 | `template.Letter(data)` | 비즈니스 레터 PDF 생성 |
+
+### 리치 텍스트 빌더
+
+| 메서드 | 설명 |
+|---|---|
+| `rt.Span(text, opts...)` | 스타일이 적용된 인라인 텍스트 조각 추가 |
 
 ### 선 옵션
 
@@ -500,6 +712,34 @@ pdf.Yellow, pdf.Cyan, pdf.Magenta
 ```bash
 cd _benchmark && go test -bench=. -benchmem -count=5
 ```
+
+## 고급: 저수준 API
+
+`template` 패키지(레이어 3)로 대부분의 사용 사례를 처리할 수 있습니다. 완전한 제어가 필요한 경우, 저수준 패키지를 직접 사용할 수 있습니다:
+
+| 패키지 | 레이어 | 설명 |
+|---|---|---|
+| `template` | 3 | 선언적 빌더 API, 그리드 시스템, 컴포넌트 |
+| `document` | 2 | 노드 트리, 박스 모델, 스타일, 레이아웃 엔진 |
+| `pdf` | 1 | PDF Writer, TrueType 폰트 파싱, 스트림, 이미지 |
+| `qrcode` | — | 독립형 QR 코드 인코더 (버전 1-40) |
+| `barcode` | — | 독립형 Code 128 바코드 인코더 |
+
+**레이어 2 (document)** 에서 사용 가능:
+- 마진, 패딩, 보더(실선/파선/점선)를 포함한 박스 모델
+- 페이지 나누기 제어 (`BreakPolicy` — avoid, always, page)
+- `ColSpan` / `RowSpan`을 지원하는 테이블 셀
+- 이미지 맞춤 모드 (`FitContain`, `FitCover`, `FitStretch`, `FitOriginal`)
+- 수직/수평 레이아웃 방향
+
+**레이어 1 (pdf)** 에서 사용 가능:
+- 원시 PDF 객체 쓰기 (`Writer`)
+- TrueType 폰트 파싱 및 서브셋팅
+- JPEG/PNG 이미지 등록
+- Flate 스트림 압축
+- 콘텐츠 스트림 오퍼레이터
+
+자세한 API 문서는 [GoDoc](https://pkg.go.dev/github.com/gpdf-dev/gpdf)을 참조하세요.
 
 ## 라이선스
 

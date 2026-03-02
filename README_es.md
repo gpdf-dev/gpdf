@@ -14,12 +14,13 @@ Biblioteca de generación de PDF en Go puro, sin dependencias externas, con arqu
 - **Cero dependencias** — solo la biblioteca estándar de Go
 - **Arquitectura por capas** — primitivas PDF de bajo nivel, modelo de documento y API de plantillas de alto nivel
 - **Sistema de cuadrícula de 12 columnas** — diseño responsivo estilo Bootstrap
-- **Soporte de fuentes TrueType** — incrustación de fuentes personalizadas con subconjuntos
-- **Listo para CJK** — soporte completo de texto chino, japonés y coreano desde el primer día
+- **Soporte de fuentes TrueType** — incrustación de fuentes personalizadas con subconjuntos automáticos
+- **Listo para CJK** — soporte completo de Unicode incluyendo texto chino, japonés y coreano
+- **Texto enriquecido** — mezclar múltiples estilos en línea (negrita, cursiva, colores) en un solo párrafo
 - **Tablas** — encabezados, anchos de columna, filas alternadas, alineación vertical
 - **Encabezados y pies de página** — con números de página, consistentes en todas las páginas
-- **Listas** — listas con viñetas y numeradas
-- **Códigos QR** — generación de QR en Go puro (niveles de corrección de errores)
+- **Listas** — listas con viñetas y numeradas con sangría configurable
+- **Códigos QR** — generación de QR en Go puro (versiones 1-40, corrección de errores L/M/Q/H)
 - **Códigos de barras** — generación de Code 128
 - **Decoraciones de texto** — subrayado, tachado, espaciado de letras, sangría
 - **Números de página** — número de página automático y total de páginas
@@ -29,6 +30,8 @@ Biblioteca de generación de PDF en Go puro, sin dependencias externas, con arqu
 - **Múltiples unidades** — pt, mm, cm, in, em, %
 - **Espacios de color** — RGB, escala de grises, CMYK
 - **Imágenes** — incrustación de JPEG y PNG con opciones de ajuste
+- **Compresión Flate** — compresión automática de flujos PDF para archivos más pequeños
+- **Subconjuntos de fuentes** — solo incrusta los glifos utilizados, reduciendo el tamaño de salida
 - **Metadatos del documento** — título, autor, asunto, creador
 
 ## Arquitectura
@@ -105,6 +108,61 @@ page.AutoRow(func(r *template.RowBuilder) {
 		c.Text("Alineado a la derecha", template.AlignRight())
 	})
 })
+```
+
+### Fuentes personalizadas
+
+Incrustar fuentes TrueType para tipografía personalizada y texto CJK:
+
+```go
+fontData, _ := os.ReadFile("NotoSans-Regular.ttf")
+boldData, _ := os.ReadFile("NotoSans-Bold.ttf")
+
+doc := gpdf.NewDocument(
+	gpdf.WithPageSize(gpdf.A4),
+	gpdf.WithFont("NotoSans", fontData),
+	gpdf.WithFont("NotoSans-Bold", boldData),
+	gpdf.WithDefaultFont("NotoSans", 12),
+)
+
+page := doc.AddPage()
+page.AutoRow(func(r *template.RowBuilder) {
+	r.Col(12, func(c *template.ColBuilder) {
+		c.Text("日本語テキスト — gpdf は CJK をフルサポート")
+		c.Text("中文文本 — 支持中日韩文字")
+		c.Text("한국어 텍스트 — CJK 완벽 지원")
+		c.Text("Título en negrita", template.FontFamily("NotoSans-Bold"), template.FontSize(18))
+	})
+})
+```
+
+Solo se incrustan los glifos realmente utilizados (subconjuntos automáticos de fuentes), manteniendo los archivos de salida pequeños.
+
+### Texto enriquecido
+
+Mezcle múltiples estilos dentro de un solo párrafo usando `RichText`:
+
+```go
+page.AutoRow(func(r *template.RowBuilder) {
+	r.Col(12, func(c *template.ColBuilder) {
+		c.RichText(func(rt *template.RichTextBuilder) {
+			rt.Span("Esto es ")
+			rt.Span("negrita", template.Bold())
+			rt.Span(" y esto es ")
+			rt.Span("cursiva roja", template.Italic(), template.TextColor(pdf.Red))
+			rt.Span(" en un solo párrafo.")
+		})
+	})
+})
+```
+
+Las opciones a nivel de bloque (alineación, sangría) se pueden pasar como argumentos adicionales a `RichText`:
+
+```go
+c.RichText(func(rt *template.RichTextBuilder) {
+	rt.Span("Texto mixto centrado: ")
+	rt.Span("$1,234.56", template.Bold(), template.TextColor(pdf.RGBHex(0x2E7D32)))
+}, template.AlignCenter())
 ```
 
 ### Cuadrícula de 12 columnas
@@ -197,6 +255,83 @@ c.Line(template.LineThickness(document.Pt(3)))      // Gruesa
 c.Spacer(document.Mm(5))                            // Espacio vertical de 5mm
 ```
 
+### Listas
+
+Listas con viñetas y numeradas:
+
+```go
+// Lista con viñetas
+c.List([]string{"Primer elemento", "Segundo elemento", "Tercer elemento"})
+
+// Lista numerada
+c.OrderedList([]string{"Paso uno", "Paso dos", "Paso tres"})
+
+// Sangría personalizada
+c.List([]string{"Con sangría", "Elementos"}, template.ListIndent(document.Mm(10)))
+```
+
+### Códigos QR
+
+Generación de códigos QR con tamaño y corrección de errores configurables:
+
+```go
+// Código QR básico
+c.QRCode("https://gpdf.dev")
+
+// Tamaño y nivel de corrección personalizados
+c.QRCode("https://gpdf.dev",
+	template.QRSize(document.Mm(30)),
+	template.QRErrorCorrection(qrcode.LevelH))
+```
+
+### Códigos de barras
+
+Generación de códigos de barras Code 128:
+
+```go
+// Código de barras básico
+c.Barcode("INV-2026-0001")
+
+// Ancho personalizado
+c.Barcode("INV-2026-0001", template.BarcodeWidth(document.Mm(80)))
+```
+
+### Números de página
+
+Números de página automáticos y total de páginas:
+
+```go
+doc.Footer(func(p *template.PageBuilder) {
+	p.AutoRow(func(r *template.RowBuilder) {
+		r.Col(6, func(c *template.ColBuilder) {
+			c.Text("Generado con gpdf", template.FontSize(8))
+		})
+		r.Col(6, func(c *template.ColBuilder) {
+			c.PageNumber(template.AlignRight(), template.FontSize(8))
+		})
+	})
+})
+
+doc.Header(func(p *template.PageBuilder) {
+	p.AutoRow(func(r *template.RowBuilder) {
+		r.Col(12, func(c *template.ColBuilder) {
+			c.TotalPages(template.AlignRight(), template.FontSize(9))
+		})
+	})
+})
+```
+
+### Decoraciones de texto
+
+Subrayado, tachado, espaciado de letras y sangría:
+
+```go
+c.Text("Texto subrayado", template.Underline())
+c.Text("Texto tachado", template.Strikethrough())
+c.Text("Espaciado amplio", template.LetterSpacing(3))
+c.Text("Párrafo con sangría...", template.TextIndent(document.Pt(24)))
+```
+
 ### Encabezados y pies de página
 
 Defina encabezados y pies de página que se repiten en cada página:
@@ -224,6 +359,64 @@ doc.Footer(func(p *template.PageBuilder) {
 })
 ```
 
+### Documentos de múltiples páginas
+
+```go
+for i := 1; i <= 5; i++ {
+	page := doc.AddPage()
+	page.AutoRow(func(r *template.RowBuilder) {
+		r.Col(12, func(c *template.ColBuilder) {
+			c.Text("Contenido de la página")
+		})
+	})
+}
+```
+
+### Esquema JSON
+
+Defina documentos completamente en JSON:
+
+```go
+schema := []byte(`{
+	"page": {"size": "A4", "margins": "20mm"},
+	"metadata": {"title": "Informe", "author": "gpdf"},
+	"body": [
+		{"row": {"cols": [
+			{"span": 12, "text": "Hola desde JSON", "style": {"size": 24, "bold": true}}
+		]}}
+	]
+}`)
+
+doc, err := template.FromJSON(schema, nil)
+data, _ := doc.Generate()
+```
+
+### Integración con Go templates
+
+Use plantillas Go con esquema JSON para contenido dinámico:
+
+```go
+schema := []byte(`{
+	"page": {"size": "A4", "margins": "20mm"},
+	"metadata": {"title": "{{.Title}}"},
+	"body": [
+		{"row": {"cols": [
+			{"span": 12, "text": "{{.Title}}", "style": {"size": 24, "bold": true}}
+		]}}
+	]
+}`)
+
+data := map[string]any{"Title": "Informe Dinámico"}
+doc, err := template.FromJSON(schema, data)
+```
+
+Para más control, use una plantilla Go pre-parseada:
+
+```go
+tmpl, _ := gotemplate.New("doc").Funcs(template.TemplateFuncMap()).Parse(schemaStr)
+doc, err := template.FromTemplate(tmpl, data)
+```
+
 ### Componentes reutilizables
 
 Genere tipos de documentos comunes con una sola llamada de función:
@@ -241,8 +434,14 @@ doc := template.Invoice(template.InvoiceData{
 		{Description: "Desarrollo Web", Quantity: "40 hrs", UnitPrice: 150, Amount: 6000},
 		{Description: "Diseño UI/UX", Quantity: "20 hrs", UnitPrice: 120, Amount: 2400},
 	},
-	TaxRate: 10,
-	Notes:   "¡Gracias por su preferencia!",
+	TaxRate:  10,
+	Currency: "€",  // por defecto: "$"
+	Notes:    "¡Gracias por su preferencia!",
+	Payment: &template.InvoicePayment{
+		BankName: "Banco Santander",
+		Account:  "ES12 3456 7890 1234",
+		Routing:  "BSCHESMM",
+	},
 })
 data, _ := doc.Generate()
 ```
@@ -361,6 +560,7 @@ doc.Render(f)
 | `c.Image(data, opts...)` | Agregar una imagen (JPEG/PNG) |
 | `c.QRCode(data, opts...)` | Agregar un código QR |
 | `c.Barcode(data, opts...)` | Agregar un código de barras (Code 128) |
+| `c.RichText(fn, opts...)` | Agregar múltiples estilos en línea en un párrafo |
 | `c.List(items, opts...)` | Agregar lista con viñetas |
 | `c.OrderedList(items, opts...)` | Agregar lista numerada |
 | `c.PageNumber(opts...)` | Agregar número de página actual |
@@ -402,6 +602,12 @@ doc.Render(f)
 | `template.FitWidth(value)` | Escalar al ancho (mantiene proporción) |
 | `template.FitHeight(value)` | Escalar a la altura (mantiene proporción) |
 
+### Opciones de lista
+
+| Opción | Descripción |
+|---|---|
+| `template.ListIndent(value)` | Ancho de sangría de viñeta/número |
+
 ### Opciones de código QR
 
 | Opción | Descripción |
@@ -425,6 +631,12 @@ doc.Render(f)
 | `template.FromJSON(schema, data)` | Generar documento desde esquema JSON |
 | `template.FromTemplate(tmpl, data)` | Generar documento desde plantilla Go |
 | `template.TemplateFuncMap()` | Obtener funciones auxiliares de plantilla (incluye `toJSON`) |
+
+### Constructor de texto enriquecido
+
+| Método | Descripción |
+|---|---|
+| `rt.Span(text, opts...)` | Agregar fragmento de texto en línea con estilo |
 
 ### Opciones de línea
 
@@ -492,6 +704,34 @@ Ejecutar benchmarks:
 ```bash
 cd _benchmark && go test -bench=. -benchmem -count=5
 ```
+
+## Avanzado: APIs de bajo nivel
+
+El paquete `template` (Capa 3) cubre la mayoría de los casos de uso. Para control total, puede usar los paquetes de bajo nivel directamente:
+
+| Paquete | Capa | Descripción |
+|---|---|---|
+| `template` | 3 | API declarativa de constructores, sistema de cuadrícula, componentes |
+| `document` | 2 | Árbol de nodos, modelo de caja, estilos, motor de layout |
+| `pdf` | 1 | PDF Writer, análisis de fuentes TrueType, flujos, imágenes |
+| `qrcode` | — | Codificador independiente de QR (versiones 1-40) |
+| `barcode` | — | Codificador independiente de Code 128 |
+
+**Capa 2 (document)** proporciona acceso a:
+- Modelo de caja con márgenes, relleno, bordes (sólido/punteado/líneas)
+- Control de saltos de página (`BreakPolicy` — avoid, always, page)
+- Celdas de tabla con `ColSpan` / `RowSpan`
+- Modos de ajuste de imagen (`FitContain`, `FitCover`, `FitStretch`, `FitOriginal`)
+- Dirección de layout vertical/horizontal
+
+**Capa 1 (pdf)** proporciona acceso a:
+- Escritura de objetos PDF sin procesar (`Writer`)
+- Análisis y subconjuntos de fuentes TrueType
+- Registro de imágenes JPEG/PNG
+- Compresión Flate de flujos
+- Operadores de flujo de contenido
+
+Consulte [GoDoc](https://pkg.go.dev/github.com/gpdf-dev/gpdf) para detalles completos de la API.
 
 ## Licencia
 

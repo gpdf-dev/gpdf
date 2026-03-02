@@ -14,12 +14,13 @@
 - **零依赖** — 仅使用 Go 标准库
 - **分层架构** — 底层 PDF 原语、文档模型和高层模板 API
 - **12 列网格系统** — Bootstrap 风格的响应式布局
-- **TrueType 字体支持** — 自定义字体嵌入与子集化
-- **CJK 就绪** — 从第一天起完整支持中日韩文本
+- **TrueType 字体支持** — 自定义字体嵌入与自动子集化
+- **CJK 就绪** — 完整的 Unicode 支持，包括中文、日文和韩文
+- **富文本** — 在单个段落中混合多种内联样式（粗体、斜体、颜色）
 - **表格** — 表头、列宽、条纹行、垂直对齐
 - **页眉和页脚** — 带页码，所有页面统一显示
-- **列表** — 无序列表和有序列表
-- **二维码** — 纯 Go 二维码生成（支持纠错等级）
+- **列表** — 可配置缩进的无序列表和有序列表
+- **二维码** — 纯 Go 二维码生成（版本 1-40，纠错等级 L/M/Q/H）
 - **条形码** — Code 128 条形码生成
 - **文本装饰** — 下划线、删除线、字间距、首行缩进
 - **页码** — 自动页码和总页数
@@ -29,6 +30,8 @@
 - **多种单位** — pt、mm、cm、in、em、%
 - **色彩空间** — RGB、灰度、CMYK
 - **图片** — JPEG 和 PNG 嵌入（支持缩放选项）
+- **Flate 压缩** — 自动 PDF 流压缩，减小文件大小
+- **字体子集化** — 仅嵌入实际使用的字形，减小输出大小
 - **文档元数据** — 标题、作者、主题、创建者
 
 ## 架构
@@ -105,6 +108,61 @@ page.AutoRow(func(r *template.RowBuilder) {
 		c.Text("右对齐", template.AlignRight())
 	})
 })
+```
+
+### 自定义字体
+
+嵌入 TrueType 字体以支持自定义排版和 CJK 文本：
+
+```go
+fontData, _ := os.ReadFile("NotoSansSC-Regular.ttf")
+boldData, _ := os.ReadFile("NotoSansSC-Bold.ttf")
+
+doc := gpdf.NewDocument(
+	gpdf.WithPageSize(gpdf.A4),
+	gpdf.WithFont("NotoSansSC", fontData),
+	gpdf.WithFont("NotoSansSC-Bold", boldData),
+	gpdf.WithDefaultFont("NotoSansSC", 12),
+)
+
+page := doc.AddPage()
+page.AutoRow(func(r *template.RowBuilder) {
+	r.Col(12, func(c *template.ColBuilder) {
+		c.Text("中文文本 — gpdf 完整支持 CJK")
+		c.Text("日本語テキスト — CJK をフルサポート")
+		c.Text("한국어 텍스트 — CJK 완벽 지원")
+		c.Text("粗体标题", template.FontFamily("NotoSansSC-Bold"), template.FontSize(18))
+	})
+})
+```
+
+仅嵌入实际使用的字形（自动字体子集化），保持输出文件较小。
+
+### 富文本
+
+使用 `RichText` 在单个段落中混合多种样式：
+
+```go
+page.AutoRow(func(r *template.RowBuilder) {
+	r.Col(12, func(c *template.ColBuilder) {
+		c.RichText(func(rt *template.RichTextBuilder) {
+			rt.Span("这是 ")
+			rt.Span("粗体", template.Bold())
+			rt.Span("，这是 ")
+			rt.Span("红色斜体", template.Italic(), template.TextColor(pdf.Red))
+			rt.Span("，在同一段落中。")
+		})
+	})
+})
+```
+
+块级选项（对齐、缩进）可以作为 `RichText` 的附加参数传递：
+
+```go
+c.RichText(func(rt *template.RichTextBuilder) {
+	rt.Span("居中混合文本：")
+	rt.Span("¥1,234", template.Bold(), template.TextColor(pdf.RGBHex(0x2E7D32)))
+}, template.AlignCenter())
 ```
 
 ### 12 列网格布局
@@ -197,6 +255,83 @@ c.Line(template.LineThickness(document.Pt(3)))      // 粗线
 c.Spacer(document.Mm(5))                            // 5mm 垂直间距
 ```
 
+### 列表
+
+无序列表和有序列表：
+
+```go
+// 无序列表
+c.List([]string{"第一项", "第二项", "第三项"})
+
+// 有序列表
+c.OrderedList([]string{"步骤一", "步骤二", "步骤三"})
+
+// 自定义缩进
+c.List([]string{"缩进", "项目"}, template.ListIndent(document.Mm(10)))
+```
+
+### 二维码
+
+可配置大小和纠错等级的二维码生成：
+
+```go
+// 基本二维码
+c.QRCode("https://gpdf.dev")
+
+// 自定义大小和纠错等级
+c.QRCode("https://gpdf.dev",
+	template.QRSize(document.Mm(30)),
+	template.QRErrorCorrection(qrcode.LevelH))
+```
+
+### 条形码
+
+Code 128 条形码生成：
+
+```go
+// 基本条形码
+c.Barcode("INV-2026-0001")
+
+// 自定义宽度
+c.Barcode("INV-2026-0001", template.BarcodeWidth(document.Mm(80)))
+```
+
+### 页码
+
+自动页码和总页数：
+
+```go
+doc.Footer(func(p *template.PageBuilder) {
+	p.AutoRow(func(r *template.RowBuilder) {
+		r.Col(6, func(c *template.ColBuilder) {
+			c.Text("由 gpdf 生成", template.FontSize(8))
+		})
+		r.Col(6, func(c *template.ColBuilder) {
+			c.PageNumber(template.AlignRight(), template.FontSize(8))
+		})
+	})
+})
+
+doc.Header(func(p *template.PageBuilder) {
+	p.AutoRow(func(r *template.RowBuilder) {
+		r.Col(12, func(c *template.ColBuilder) {
+			c.TotalPages(template.AlignRight(), template.FontSize(9))
+		})
+	})
+})
+```
+
+### 文本装饰
+
+下划线、删除线、字间距和首行缩进：
+
+```go
+c.Text("下划线文本", template.Underline())
+c.Text("删除线文本", template.Strikethrough())
+c.Text("宽字间距", template.LetterSpacing(3))
+c.Text("首行缩进段落...", template.TextIndent(document.Pt(24)))
+```
+
 ### 页眉和页脚
 
 定义在每一页重复显示的页眉和页脚：
@@ -224,6 +359,64 @@ doc.Footer(func(p *template.PageBuilder) {
 })
 ```
 
+### 多页文档
+
+```go
+for i := 1; i <= 5; i++ {
+	page := doc.AddPage()
+	page.AutoRow(func(r *template.RowBuilder) {
+		r.Col(12, func(c *template.ColBuilder) {
+			c.Text("页面内容")
+		})
+	})
+}
+```
+
+### JSON 模式
+
+完全用 JSON 定义文档：
+
+```go
+schema := []byte(`{
+	"page": {"size": "A4", "margins": "20mm"},
+	"metadata": {"title": "报告", "author": "gpdf"},
+	"body": [
+		{"row": {"cols": [
+			{"span": 12, "text": "来自 JSON 的问候", "style": {"size": 24, "bold": true}}
+		]}}
+	]
+}`)
+
+doc, err := template.FromJSON(schema, nil)
+data, _ := doc.Generate()
+```
+
+### Go 模板集成
+
+使用 Go 模板与 JSON 模式生成动态内容：
+
+```go
+schema := []byte(`{
+	"page": {"size": "A4", "margins": "20mm"},
+	"metadata": {"title": "{{.Title}}"},
+	"body": [
+		{"row": {"cols": [
+			{"span": 12, "text": "{{.Title}}", "style": {"size": 24, "bold": true}}
+		]}}
+	]
+}`)
+
+data := map[string]any{"Title": "动态报告"}
+doc, err := template.FromJSON(schema, data)
+```
+
+使用预解析的 Go 模板获得更多控制：
+
+```go
+tmpl, _ := gotemplate.New("doc").Funcs(template.TemplateFuncMap()).Parse(schemaStr)
+doc, err := template.FromTemplate(tmpl, data)
+```
+
 ### 可复用组件
 
 一个函数调用即可生成常见文档类型：
@@ -241,8 +434,14 @@ doc := template.Invoice(template.InvoiceData{
 		{Description: "Web开发", Quantity: "40小时", UnitPrice: 150, Amount: 6000},
 		{Description: "UI/UX设计", Quantity: "20小时", UnitPrice: 120, Amount: 2400},
 	},
-	TaxRate: 10,
-	Notes:   "感谢您的惠顾！",
+	TaxRate:  10,
+	Currency: "¥",  // 默认: "$"
+	Notes:    "感谢您的惠顾！",
+	Payment: &template.InvoicePayment{
+		BankName: "中国工商银行",
+		Account:  "1234567890",
+		Routing:  "102100099996",
+	},
 })
 data, _ := doc.Generate()
 ```
@@ -361,6 +560,7 @@ doc.Render(f)
 | `c.Image(data, opts...)` | 添加图片（JPEG/PNG） |
 | `c.QRCode(data, opts...)` | 添加二维码 |
 | `c.Barcode(data, opts...)` | 添加条形码（Code 128） |
+| `c.RichText(fn, opts...)` | 在一个段落中添加多种内联样式 |
 | `c.List(items, opts...)` | 添加无序列表 |
 | `c.OrderedList(items, opts...)` | 添加有序列表 |
 | `c.PageNumber(opts...)` | 添加当前页码 |
@@ -402,6 +602,12 @@ doc.Render(f)
 | `template.FitWidth(value)` | 按宽度缩放（保持宽高比） |
 | `template.FitHeight(value)` | 按高度缩放（保持宽高比） |
 
+### 列表选项
+
+| 选项 | 说明 |
+|---|---|
+| `template.ListIndent(value)` | 设置项目符号/编号缩进宽度 |
+
 ### 二维码选项
 
 | 选项 | 说明 |
@@ -433,6 +639,12 @@ doc.Render(f)
 | `template.Invoice(data)` | 生成专业发票 PDF |
 | `template.Report(data)` | 生成结构化报告 PDF |
 | `template.Letter(data)` | 生成商务信函 PDF |
+
+### 富文本构建器
+
+| 方法 | 说明 |
+|---|---|
+| `rt.Span(text, opts...)` | 添加带样式的内联文本片段 |
 
 ### 线条选项
 
@@ -500,6 +712,34 @@ pdf.Yellow, pdf.Cyan, pdf.Magenta
 ```bash
 cd _benchmark && go test -bench=. -benchmem -count=5
 ```
+
+## 高级：低级 API
+
+`template` 包（第 3 层）涵盖大多数使用场景。如需完全控制，可以直接使用低级包：
+
+| 包 | 层级 | 说明 |
+|---|---|---|
+| `template` | 3 | 声明式构建器 API、网格系统、组件 |
+| `document` | 2 | 节点树、盒模型、样式、布局引擎 |
+| `pdf` | 1 | PDF Writer、TrueType 字体解析、流、图片 |
+| `qrcode` | — | 独立二维码编码器（版本 1-40） |
+| `barcode` | — | 独立 Code 128 条形码编码器 |
+
+**第 2 层 (document)** 提供：
+- 带边距、内边距、边框（实线/虚线/点线）的盒模型
+- 分页控制（`BreakPolicy` — avoid、always、page）
+- 支持 `ColSpan` / `RowSpan` 的表格单元格
+- 图片适应模式（`FitContain`、`FitCover`、`FitStretch`、`FitOriginal`）
+- 垂直/水平布局方向
+
+**第 1 层 (pdf)** 提供：
+- 原始 PDF 对象写入（`Writer`）
+- TrueType 字体解析和子集化
+- JPEG/PNG 图片注册
+- Flate 流压缩
+- 内容流运算符
+
+详细 API 请参阅 [GoDoc](https://pkg.go.dev/github.com/gpdf-dev/gpdf)。
 
 ## 许可证
 
