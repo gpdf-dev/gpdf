@@ -154,6 +154,12 @@ func (c *converter) convertChildren(parent *html.Node, parentComputed css.Comput
 		}
 		if len(fragments) > 0 {
 			blockStyle := applyStyle(parentComputed)
+			// Clear box-model properties — they belong to the parent
+			// container (Box, TableCell), not the inline text content.
+			blockStyle.Border = document.BorderEdges{}
+			blockStyle.Margin = document.Edges{}
+			blockStyle.Padding = document.Edges{}
+			blockStyle.Background = nil
 			rt := wrapInlineAsRichText(fragments, blockStyle)
 			if rt != nil {
 				result = append(result, rt)
