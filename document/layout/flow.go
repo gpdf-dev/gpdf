@@ -229,11 +229,12 @@ func approximateLineBreak(text string, fontSize, maxWidth float64) []string {
 // textRun is a word-level unit for inline layout. Each run carries its
 // measured width and resolved style.
 type textRun struct {
-	text     string
-	style    document.Style
-	width    float64
-	fontSize float64
-	isSpace  bool
+	text      string
+	style     document.Style
+	width     float64
+	fontSize  float64
+	isSpace   bool
+	isNewline bool
 }
 
 // LayoutRichText lays out a RichText node, placing multiple styled
@@ -319,6 +320,15 @@ func fragmentsToRuns(fragments []document.RichTextFragment, blockStyle document.
 
 		words := splitIntoWordsAndSpaces(frag.Content)
 		for _, w := range words {
+			if w == "\n" {
+				runs = append(runs, textRun{
+					text:      w,
+					style:     style,
+					fontSize:  fontSize,
+					isNewline: true,
+				})
+				continue
+			}
 			isSpace := isAllSpaces(w)
 			width := measureRunWidth(w, style, fontSize, constraints)
 			runs = append(runs, textRun{
@@ -335,13 +345,18 @@ func fragmentsToRuns(fragments []document.RichTextFragment, blockStyle document.
 }
 
 // splitIntoWordsAndSpaces splits text into alternating word and space runs.
-// For example "Hello  world" → ["Hello", "  ", "world"].
+// Newline characters are emitted as separate "\n" tokens so that the
+// caller can insert forced line breaks (needed for <pre> and <br>).
+// For example "Hello  world\nfoo" → ["Hello", "  ", "world", "\n", "foo"].
 func splitIntoWordsAndSpaces(text string) []string {
 	var parts []string
 	runes := []rune(text)
 	i := 0
 	for i < len(runes) {
-		if runes[i] == ' ' {
+		if runes[i] == '\n' {
+			parts = append(parts, "\n")
+			i++
+		} else if runes[i] == ' ' {
 			j := i
 			for j < len(runes) && runes[j] == ' ' {
 				j++
@@ -350,7 +365,7 @@ func splitIntoWordsAndSpaces(text string) []string {
 			i = j
 		} else {
 			j := i
-			for j < len(runes) && runes[j] != ' ' {
+			for j < len(runes) && runes[j] != ' ' && runes[j] != '\n' {
 				j++
 			}
 			parts = append(parts, string(runes[i:j]))
@@ -389,7 +404,9 @@ func measureRunWidth(text string, style document.Style, fontSize float64, constr
 
 // fillLines distributes runs into lines using a greedy algorithm.
 // A line break is inserted at a space run when the next word would
-// exceed the available width. The first line width is reduced by indent.
+// exceed the available width. Newline runs force an unconditional
+// line break (used by <br> and <pre> blocks). The first line width
+// is reduced by indent.
 func fillLines(runs []textRun, availWidth, indent float64) [][]textRun {
 	if len(runs) == 0 {
 		return nil
@@ -400,14 +417,39 @@ func fillLines(runs []textRun, availWidth, indent float64) [][]textRun {
 	lineWidth := 0.0
 	lineNum := 0
 	maxWidth := availWidth - indent
+	afterForcedBreak := false
 
 	for _, run := range runs {
+		if run.isNewline {
+			// Force a line break. Emit the current line (even if empty,
+			// so that consecutive newlines produce blank lines).
+			if len(currentLine) > 0 {
+				currentLine = trimTrailingSpaces(currentLine)
+			}
+			lines = append(lines, currentLine)
+			currentLine = nil
+			lineWidth = 0
+			lineNum++
+			maxWidth = availWidth
+			afterForcedBreak = true
+			continue
+		}
+
 		if run.isSpace {
 			// If adding this space would not exceed width, keep it.
-			// Spaces at line start after a break are skipped.
+			// Spaces at line start after a soft wrap are skipped, but
+			// leading spaces after a forced break are preserved (e.g.
+			// indentation inside <pre> blocks).
 			if len(currentLine) == 0 {
-				continue // skip leading spaces on a new line
+				if afterForcedBreak {
+					currentLine = append(currentLine, run)
+					lineWidth += run.width
+					afterForcedBreak = false
+					continue
+				}
+				continue // skip leading spaces on a soft-wrapped line
 			}
+			afterForcedBreak = false
 			if lineWidth+run.width <= maxWidth {
 				currentLine = append(currentLine, run)
 				lineWidth += run.width
@@ -420,6 +462,7 @@ func fillLines(runs []textRun, availWidth, indent float64) [][]textRun {
 				maxWidth = availWidth
 			}
 		} else {
+			afterForcedBreak = false
 			if len(currentLine) == 0 {
 				// First word on line always fits.
 				currentLine = append(currentLine, run)
