@@ -1,0 +1,78 @@
+%PDF-1.7
+3 0 obj
+<< /BaseFont /Helvetica-Bold /Subtype /Type1 /Type /Font >>
+endobj
+4 0 obj
+<< /BaseFont /Helvetica /Subtype /Type1 /Type /Font >>
+endobj
+5 0 obj
+<< /Length 446 >>
+stream
+0 g
+BT
+/F1 24 Tf
+56.693 753.197 Td
+(Hello,) Tj
+ET
+0 g
+BT
+/F1 24 Tf
+140.69299999999998 753.197 Td
+(World!) Tj
+ET
+0 g
+BT
+/F2 12 Tf
+56.693 716.3969999999999 Td
+(Generated) Tj
+ET
+0 g
+BT
+/F2 12 Tf
+116.693 716.3969999999999 Td
+(from) Tj
+ET
+0 g
+BT
+/F2 12 Tf
+146.69299999999998 716.3969999999999 Td
+(HTML) Tj
+ET
+0 g
+BT
+/F2 12 Tf
+176.69299999999998 716.3969999999999 Td
+(using) Tj
+ET
+0 g
+BT
+/F2 12 Tf
+212.69299999999998 716.3969999999999 Td
+(gpdf.) Tj
+ET
+
+endstream
+endobj
+6 0 obj
+<< /Contents 5 0 R /MediaBox [0 0 595.28 841.89] /Parent 2 0 R /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Type /Page >>
+endobj
+2 0 obj
+<< /Count 1 /Kids [6 0 R] /Type /Pages >>
+endobj
+1 0 obj
+<< /Pages 2 0 R /Type /Catalog >>
+endobj
+xref
+0 7
+0000000000 65535 f 
+0000000850 00000 n 
+0000000793 00000 n 
+0000000009 00000 n 
+0000000084 00000 n 
+0000000154 00000 n 
+0000000651 00000 n 
+trailer
+<< /Root 1 0 R /Size 7 >>
+startxref
+899
+%%EOF
