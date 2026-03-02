@@ -32,8 +32,8 @@ func TestExample_34_ComponentLetter(t *testing.T) {
 				"the details of this proposal. Please feel free to contact me directly at " +
 				"ceo@acme.com or call our office at (415) 555-0100.",
 		},
-		Closing:    "Sincerely,",
-		Signature:  "Jane Doe",
+		Closing:     "Sincerely,",
+		Signature:   "Jane Doe",
 		SignerTitle: "Chief Executive Officer",
 	})
 

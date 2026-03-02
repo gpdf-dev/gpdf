@@ -21,8 +21,8 @@ func TestLetter_Generate(t *testing.T) {
 			"First paragraph of the letter.",
 			"Second paragraph with more details.",
 		},
-		Closing:    "Sincerely,",
-		Signature:  "Jane Doe",
+		Closing:     "Sincerely,",
+		Signature:   "Jane Doe",
 		SignerTitle: "CEO",
 	})
 
