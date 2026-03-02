@@ -212,6 +212,7 @@ func (pw *Writer) RegisterFont(name string, fontData []byte) (string, ObjectRef,
 			Name("Type"):     Name("Font"),
 			Name("Subtype"):  Name("Type1"),
 			Name("BaseFont"): Name(name),
+			Name("Encoding"): Name("WinAnsiEncoding"),
 		}
 		if err := pw.WriteObject(fontRef, fontDict); err != nil {
 			return "", ObjectRef{}, err
