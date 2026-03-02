@@ -42,7 +42,14 @@ func applyStyle(computed css.ComputedStyles) document.Style {
 		s.TextAlign = parseTextAlign(v)
 	}
 	if v, ok := computed["line-height"]; ok {
-		s.LineHeight = css.ParsePt(v, s.FontSize*1.2)
+		// Style.LineHeight is a multiplier (e.g., 1.2 = 120% of font-size).
+		// CSS line-height is resolved to absolute pt, so convert back to a ratio.
+		absLH := css.ParsePt(v, s.FontSize*1.2)
+		fontSize := s.FontSize
+		if fontSize <= 0 {
+			fontSize = 12
+		}
+		s.LineHeight = absLH / fontSize
 	}
 	if v, ok := computed["letter-spacing"]; ok && v != "normal" {
 		s.LetterSpacing = css.ParsePt(v, 0)
@@ -219,6 +226,17 @@ func parseTextDecoration(s string) document.TextDecoration {
 		d |= document.DecorationOverline
 	}
 	return d
+}
+
+func parseVerticalAlign(s string) document.VerticalAlign {
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "middle":
+		return document.VAlignMiddle
+	case "bottom":
+		return document.VAlignBottom
+	default:
+		return document.VAlignTop
+	}
 }
 
 func parseBorderStyle(s string) document.BorderStyle {

@@ -25,6 +25,7 @@ func calcSelectorSpecificity(parts []CompoundSelector) Specificity {
 			spec[0]++
 		}
 		spec[1] += len(p.Classes)
+		spec[1] += len(p.Attrs) // attribute selectors count as class-level specificity
 		if p.Tag != "" {
 			spec[2]++
 		}

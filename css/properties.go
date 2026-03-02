@@ -65,6 +65,12 @@ var PropertyTable = map[string]PropertyDef{
 
 	// List
 	"list-style-type": {Initial: "disc", Inherited: true},
+
+	// Table (Phase 4-B)
+	"border-collapse": {Initial: "separate", Inherited: true},
+	"border-spacing":  {Initial: "0", Inherited: true},
+	"caption-side":    {Initial: "top", Inherited: true},
+	"table-layout":    {Initial: "auto", Inherited: false},
 }
 
 // IsInherited reports whether the named property inherits by default.

@@ -92,7 +92,14 @@ func (bl *BlockLayout) resolveTableContext(tbl *document.Table, constraints Cons
 	}
 
 	numCols := tableColumnCount(tbl)
-	colWidths := resolveTableColumnWidths(tbl.Columns, numCols, cw, fontSize)
+
+	// Use content-based proportional widths when all columns are auto.
+	var colWidths []float64
+	if allColumnsAuto(tbl.Columns) {
+		colWidths = estimateAutoColumnWidths(tbl, numCols, cw)
+	} else {
+		colWidths = resolveTableColumnWidths(tbl.Columns, numCols, cw, fontSize)
+	}
 	colOffsets := make([]float64, numCols)
 	for i := 1; i < numCols; i++ {
 		colOffsets[i] = colOffsets[i-1] + colWidths[i-1]
@@ -314,4 +321,91 @@ func resolveTableColumnWidths(cols []document.TableColumn, numCols int, contentW
 	}
 
 	return widths
+}
+
+// allColumnsAuto reports whether every column in cols uses automatic width.
+// Returns false for empty slices (no explicit column definitions).
+func allColumnsAuto(cols []document.TableColumn) bool {
+	if len(cols) == 0 {
+		return false
+	}
+	for _, c := range cols {
+		if c.Width.Unit != document.UnitAuto {
+			return false
+		}
+	}
+	return true
+}
+
+// estimateAutoColumnWidths distributes the available width proportionally
+// based on the maximum text content length in each column. This produces
+// more natural-looking tables than equal distribution.
+func estimateAutoColumnWidths(tbl *document.Table, numCols int, contentWidth float64) []float64 {
+	maxLen := make([]float64, numCols)
+
+	allRows := make([]document.TableRow, 0, len(tbl.Header)+len(tbl.Body)+len(tbl.Footer))
+	allRows = append(allRows, tbl.Header...)
+	allRows = append(allRows, tbl.Body...)
+	allRows = append(allRows, tbl.Footer...)
+
+	for _, row := range allRows {
+		colIdx := 0
+		for _, cell := range row.Cells {
+			if colIdx >= numCols {
+				break
+			}
+			span := cell.ColSpan
+			if span < 1 {
+				span = 1
+			}
+			// Only use non-spanning cells for width estimation.
+			if span == 1 {
+				textLen := float64(textContentLength(cell.Content))
+				if textLen > maxLen[colIdx] {
+					maxLen[colIdx] = textLen
+				}
+			}
+			colIdx += span
+		}
+	}
+
+	totalLen := 0.0
+	for i, l := range maxLen {
+		if l < 1 {
+			maxLen[i] = 1
+			l = 1
+		}
+		totalLen += l
+	}
+
+	if totalLen == 0 {
+		w := contentWidth / float64(numCols)
+		widths := make([]float64, numCols)
+		for i := range widths {
+			widths[i] = w
+		}
+		return widths
+	}
+
+	widths := make([]float64, numCols)
+	for i, l := range maxLen {
+		widths[i] = contentWidth * l / totalLen
+	}
+	return widths
+}
+
+// textContentLength counts the total number of characters in a tree of
+// document nodes, used as a rough proxy for content width.
+func textContentLength(nodes []document.DocumentNode) int {
+	total := 0
+	for _, node := range nodes {
+		if node == nil {
+			continue
+		}
+		if text, ok := node.(*document.Text); ok {
+			total += len(text.Content)
+		}
+		total += textContentLength(node.Children())
+	}
+	return total
 }

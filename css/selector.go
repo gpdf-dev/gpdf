@@ -22,12 +22,33 @@ type Selector struct {
 	Spec  Specificity
 }
 
+// AttrMatcher specifies how an attribute selector matches.
+type AttrMatcher int
+
+const (
+	AttrExists   AttrMatcher = iota // [attr]
+	AttrEquals                      // [attr="val"]
+	AttrIncludes                    // [attr~="val"] (whitespace-separated word)
+	AttrDashMatch                   // [attr|="val"] (exact or prefix followed by '-')
+	AttrPrefix                      // [attr^="val"]
+	AttrSuffix                      // [attr$="val"]
+	AttrSubstring                   // [attr*="val"]
+)
+
+// AttrSelector represents a single attribute selector like [href="..."].
+type AttrSelector struct {
+	Name    string      // attribute name (lowercase)
+	Matcher AttrMatcher // match type
+	Value   string      // value to match against (empty for AttrExists)
+}
+
 // CompoundSelector represents a compound selector like "div.main#app".
 type CompoundSelector struct {
-	Tag        string   // element type (lowercase), "" means any
-	ID         string   // #id value, "" means no ID constraint
-	Classes    []string // .class values
-	Universal  bool     // true if '*' was explicitly specified
+	Tag        string         // element type (lowercase), "" means any
+	ID         string         // #id value, "" means no ID constraint
+	Classes    []string       // .class values
+	Attrs      []AttrSelector // attribute selectors
+	Universal  bool           // true if '*' was explicitly specified
 	Combinator Combinator
 }
 
@@ -149,8 +170,139 @@ func parseCompound(tok *Tokenizer) (CompoundSelector, bool) {
 			cs.Universal = true
 			matched = true
 
+		case peek.Type == TokenOpenBracket:
+			// Attribute selector [attr], [attr="val"], etc.
+			tok.Next() // consume '['
+			attr, ok := parseAttrSelector(tok)
+			if ok {
+				cs.Attrs = append(cs.Attrs, attr)
+				matched = true
+			}
+
 		default:
 			return cs, matched
+		}
+	}
+}
+
+// parseAttrSelector parses the contents inside [...] and consumes the closing ']'.
+func parseAttrSelector(tok *Tokenizer) (AttrSelector, bool) {
+	// Skip whitespace
+	for tok.Peek().Type == TokenWhitespace {
+		tok.Next()
+	}
+
+	// Expect attribute name (ident)
+	if tok.Peek().Type != TokenIdent {
+		// Skip to closing bracket
+		skipToCloseBracket(tok)
+		return AttrSelector{}, false
+	}
+	name := strings.ToLower(tok.Next().Value)
+
+	// Skip whitespace
+	for tok.Peek().Type == TokenWhitespace {
+		tok.Next()
+	}
+
+	// Check for closing bracket (existence selector) or matcher
+	if tok.Peek().Type == TokenCloseBracket {
+		tok.Next() // consume ']'
+		return AttrSelector{Name: name, Matcher: AttrExists}, true
+	}
+
+	// Determine matcher type
+	var matcher AttrMatcher
+	peek := tok.Peek()
+
+	switch {
+	case peek.Type == TokenDelim && peek.Value == "=":
+		tok.Next()
+		matcher = AttrEquals
+	case peek.Type == TokenDelim && peek.Value == "~":
+		tok.Next()
+		if tok.Peek().Type == TokenDelim && tok.Peek().Value == "=" {
+			tok.Next()
+			matcher = AttrIncludes
+		} else {
+			skipToCloseBracket(tok)
+			return AttrSelector{}, false
+		}
+	case peek.Type == TokenDelim && peek.Value == "|":
+		tok.Next()
+		if tok.Peek().Type == TokenDelim && tok.Peek().Value == "=" {
+			tok.Next()
+			matcher = AttrDashMatch
+		} else {
+			skipToCloseBracket(tok)
+			return AttrSelector{}, false
+		}
+	case peek.Type == TokenDelim && peek.Value == "^":
+		tok.Next()
+		if tok.Peek().Type == TokenDelim && tok.Peek().Value == "=" {
+			tok.Next()
+			matcher = AttrPrefix
+		} else {
+			skipToCloseBracket(tok)
+			return AttrSelector{}, false
+		}
+	case peek.Type == TokenDelim && peek.Value == "$":
+		tok.Next()
+		if tok.Peek().Type == TokenDelim && tok.Peek().Value == "=" {
+			tok.Next()
+			matcher = AttrSuffix
+		} else {
+			skipToCloseBracket(tok)
+			return AttrSelector{}, false
+		}
+	case peek.Type == TokenDelim && peek.Value == "*":
+		tok.Next()
+		if tok.Peek().Type == TokenDelim && tok.Peek().Value == "=" {
+			tok.Next()
+			matcher = AttrSubstring
+		} else {
+			skipToCloseBracket(tok)
+			return AttrSelector{}, false
+		}
+	default:
+		skipToCloseBracket(tok)
+		return AttrSelector{}, false
+	}
+
+	// Skip whitespace
+	for tok.Peek().Type == TokenWhitespace {
+		tok.Next()
+	}
+
+	// Parse value (ident or string)
+	var value string
+	switch tok.Peek().Type {
+	case TokenString:
+		value = tok.Next().Value
+	case TokenIdent:
+		value = tok.Next().Value
+	default:
+		skipToCloseBracket(tok)
+		return AttrSelector{}, false
+	}
+
+	// Skip whitespace and expect closing bracket
+	for tok.Peek().Type == TokenWhitespace {
+		tok.Next()
+	}
+	if tok.Peek().Type == TokenCloseBracket {
+		tok.Next()
+	}
+
+	return AttrSelector{Name: name, Matcher: matcher, Value: value}, true
+}
+
+// skipToCloseBracket advances the tokenizer past the next ']'.
+func skipToCloseBracket(tok *Tokenizer) {
+	for {
+		t := tok.Next()
+		if t.Type == TokenCloseBracket || t.Type == TokenEOF {
+			return
 		}
 	}
 }
@@ -233,7 +385,44 @@ func matchCompound(cs CompoundSelector, node Matchable) bool {
 		}
 	}
 
+	// Attribute selector check
+	for _, attr := range cs.Attrs {
+		val, exists := node.NodeAttr(attr.Name)
+		if !matchAttr(attr, val, exists) {
+			return false
+		}
+	}
+
 	return true
+}
+
+// matchAttr checks whether an attribute value satisfies an attribute selector.
+func matchAttr(sel AttrSelector, val string, exists bool) bool {
+	switch sel.Matcher {
+	case AttrExists:
+		return exists
+	case AttrEquals:
+		return exists && val == sel.Value
+	case AttrIncludes:
+		if !exists {
+			return false
+		}
+		for _, word := range strings.Fields(val) {
+			if word == sel.Value {
+				return true
+			}
+		}
+		return false
+	case AttrDashMatch:
+		return exists && (val == sel.Value || strings.HasPrefix(val, sel.Value+"-"))
+	case AttrPrefix:
+		return exists && strings.HasPrefix(val, sel.Value)
+	case AttrSuffix:
+		return exists && strings.HasSuffix(val, sel.Value)
+	case AttrSubstring:
+		return exists && strings.Contains(val, sel.Value)
+	}
+	return false
 }
 
 // splitSelectorGroup splits "h1, h2, h3" into ["h1", " h2", " h3"].

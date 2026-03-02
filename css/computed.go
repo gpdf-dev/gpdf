@@ -35,6 +35,11 @@ func ResolveComputed(styles ComputedStyles, parentFontSize, containerWidth float
 		}
 	}
 
+	// Resolve border-spacing
+	if val, ok := resolved["border-spacing"]; ok && val != "0" {
+		resolved["border-spacing"] = resolveLength(val, fontSize, containerWidth)
+	}
+
 	// Resolve line-height
 	if lh, ok := resolved["line-height"]; ok {
 		resolved["line-height"] = resolveLineHeight(lh, fontSize)

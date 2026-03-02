@@ -51,7 +51,14 @@ li                  { display: list-item; }
 blockquote          { display: block; margin-top: 12pt; margin-bottom: 12pt; margin-left: 40pt; }
 pre                 { display: block; margin-top: 12pt; margin-bottom: 12pt; }
 code                { font-family: monospace; }
-table               { display: block; }
+table               { display: table; border-collapse: separate; border-spacing: 2pt; }
+thead               { display: table-header-group; }
+tbody               { display: table-row-group; }
+tfoot               { display: table-footer-group; }
+tr                  { display: table-row; }
+th                  { display: table-cell; font-weight: bold; text-align: center; padding: 1pt 2pt; }
+td                  { display: table-cell; padding: 1pt 2pt; }
+caption             { display: block; text-align: center; }
 `
 
 // converter handles the HTML→DocumentNode conversion.
@@ -210,6 +217,8 @@ func (c *converter) convertElement(node *html.Node, computed css.ComputedStyles)
 		return mapImage(node, applyStyle(computed))
 	case "hr":
 		return mapHR(computed)
+	case "table":
+		return c.convertTable(node, computed)
 	}
 
 	// Recurse into children
@@ -244,6 +253,218 @@ func (c *converter) computeStyles(node *html.Node, parentComputed css.ComputedSt
 
 	c.styleCache[node] = computed
 	return computed
+}
+
+// convertTable converts a <table> HTML element into a document.Table.
+func (c *converter) convertTable(node *html.Node, computed css.ComputedStyles) document.DocumentNode {
+	tbl := &document.Table{}
+
+	// Apply table-level styles
+	boxStyle := applyBoxStyle(computed)
+	collapse := strings.EqualFold(strings.TrimSpace(computed["border-collapse"]), "collapse")
+	tbl.TableStyle = document.TableStyle{
+		BoxStyle:       boxStyle,
+		BorderCollapse: collapse,
+	}
+
+	// Walk <table> children to find thead/tbody/tfoot/tr/caption
+	var captionNode *html.Node
+	var directRows []*html.Node // <tr> directly under <table> (no explicit section)
+
+	for _, child := range node.Children {
+		if child.Type != html.ElementNode {
+			continue
+		}
+		childComputed := c.computeStyles(child, computed)
+		if isDisplayNone(childComputed) {
+			continue
+		}
+
+		switch child.Tag {
+		case "caption":
+			captionNode = child
+		case "thead":
+			tbl.Header = append(tbl.Header, c.convertTableSection(child, computed)...)
+		case "tfoot":
+			tbl.Footer = append(tbl.Footer, c.convertTableSection(child, computed)...)
+		case "tbody":
+			tbl.Body = append(tbl.Body, c.convertTableSection(child, computed)...)
+		case "tr":
+			directRows = append(directRows, child)
+		case "colgroup", "col":
+			// TODO: column width hints (Phase 4-B basic — ignore for now)
+		}
+	}
+
+	// Direct <tr> children (no explicit <tbody>) go into Body
+	for _, tr := range directRows {
+		trComputed := c.computeStyles(tr, computed)
+		row := c.convertTableRow(tr, trComputed)
+		tbl.Body = append(tbl.Body, row)
+	}
+
+	// Determine column count from the widest row
+	numCols := 0
+	allRows := append(append(tbl.Header, tbl.Body...), tbl.Footer...)
+	for _, row := range allRows {
+		cols := 0
+		for _, cell := range row.Cells {
+			span := cell.ColSpan
+			if span < 1 {
+				span = 1
+			}
+			cols += span
+		}
+		if cols > numCols {
+			numCols = cols
+		}
+	}
+
+	// Set auto columns if none defined
+	if len(tbl.Columns) == 0 && numCols > 0 {
+		tbl.Columns = make([]document.TableColumn, numCols)
+		for i := range tbl.Columns {
+			tbl.Columns[i] = document.TableColumn{Width: document.Auto}
+		}
+	}
+
+	// Apply border-collapse: remove duplicate borders between adjacent cells.
+	if collapse {
+		collapseCellBorders(tbl)
+	}
+
+	// If there's a caption, wrap table in a Box with caption + table
+	if captionNode != nil {
+		captionComputed := c.computeStyles(captionNode, computed)
+		captionChildren := c.convertChildren(captionNode, captionComputed)
+		captionStyle := applyBoxStyle(captionComputed)
+
+		captionBox := &document.Box{
+			Content:  captionChildren,
+			BoxStyle: captionStyle,
+		}
+
+		side := strings.ToLower(strings.TrimSpace(computed["caption-side"]))
+		var content []document.DocumentNode
+		if side == "bottom" {
+			content = []document.DocumentNode{tbl, captionBox}
+		} else {
+			content = []document.DocumentNode{captionBox, tbl}
+		}
+		return &document.Box{
+			Content:  content,
+			BoxStyle: document.BoxStyle{Direction: document.DirectionVertical},
+		}
+	}
+
+	return tbl
+}
+
+// convertTableSection converts a <thead>/<tbody>/<tfoot> into []TableRow.
+func (c *converter) convertTableSection(section *html.Node, tableComputed css.ComputedStyles) []document.TableRow {
+	var rows []document.TableRow
+	for _, child := range section.Children {
+		if child.Type != html.ElementNode || child.Tag != "tr" {
+			continue
+		}
+		trComputed := c.computeStyles(child, tableComputed)
+		rows = append(rows, c.convertTableRow(child, trComputed))
+	}
+	return rows
+}
+
+// convertTableRow converts a <tr> element into a document.TableRow.
+func (c *converter) convertTableRow(tr *html.Node, trComputed css.ComputedStyles) document.TableRow {
+	var cells []document.TableCell
+	for _, child := range tr.Children {
+		if child.Type != html.ElementNode {
+			continue
+		}
+		if child.Tag != "td" && child.Tag != "th" {
+			continue
+		}
+		cellComputed := c.computeStyles(child, trComputed)
+		cells = append(cells, c.convertTableCell(child, cellComputed))
+	}
+	return document.TableRow{Cells: cells}
+}
+
+// convertTableCell converts a <td> or <th> element into a document.TableCell.
+func (c *converter) convertTableCell(cell *html.Node, cellComputed css.ComputedStyles) document.TableCell {
+	// Convert cell content
+	children := c.convertChildren(cell, cellComputed)
+
+	// Parse colspan/rowspan attributes
+	colspan := parseIntAttr(cell, "colspan", 1)
+	rowspan := parseIntAttr(cell, "rowspan", 1)
+
+	// Build cell style
+	style := applyStyle(cellComputed)
+	style.VerticalAlign = parseVerticalAlign(cellComputed["vertical-align"])
+
+	return document.TableCell{
+		Content:   children,
+		ColSpan:   colspan,
+		RowSpan:   rowspan,
+		CellStyle: style,
+	}
+}
+
+// collapseCellBorders removes duplicate borders between adjacent cells when
+// border-collapse is enabled. For non-first rows, top borders are removed;
+// for non-first columns, left borders are removed.
+func collapseCellBorders(tbl *document.Table) {
+	rowIdx := 0
+	for i := range tbl.Header {
+		collapseBordersInRow(tbl.Header[i].Cells, rowIdx)
+		rowIdx++
+	}
+	for i := range tbl.Body {
+		collapseBordersInRow(tbl.Body[i].Cells, rowIdx)
+		rowIdx++
+	}
+	for i := range tbl.Footer {
+		collapseBordersInRow(tbl.Footer[i].Cells, rowIdx)
+		rowIdx++
+	}
+}
+
+// collapseBordersInRow removes duplicate borders within a single row.
+func collapseBordersInRow(cells []document.TableCell, rowIdx int) {
+	colIdx := 0
+	for i := range cells {
+		if rowIdx > 0 {
+			cells[i].CellStyle.Border.Top = document.BorderSide{}
+		}
+		if colIdx > 0 {
+			cells[i].CellStyle.Border.Left = document.BorderSide{}
+		}
+		span := cells[i].ColSpan
+		if span < 1 {
+			span = 1
+		}
+		colIdx += span
+	}
+}
+
+// parseIntAttr parses an integer HTML attribute, returning fallback if not present or invalid.
+func parseIntAttr(node *html.Node, name string, fallback int) int {
+	val, ok := node.Attr(name)
+	if !ok {
+		return fallback
+	}
+	n := 0
+	for _, ch := range val {
+		if ch >= '0' && ch <= '9' {
+			n = n*10 + int(ch-'0')
+		} else {
+			break
+		}
+	}
+	if n < 1 {
+		return fallback
+	}
+	return n
 }
 
 // findBody finds the <body> element in the DOM tree.
