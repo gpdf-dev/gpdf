@@ -89,6 +89,16 @@ var (
 	TemplateFuncMap = template.TemplateFuncMap
 )
 
+// Re-export reusable component constructors for convenience.
+var (
+	// NewInvoice creates a ready-to-generate invoice PDF from structured data.
+	NewInvoice = template.Invoice
+	// NewReport creates a ready-to-generate report PDF from structured data.
+	NewReport = template.Report
+	// NewLetter creates a ready-to-generate business letter PDF from structured data.
+	NewLetter = template.Letter
+)
+
 // NewDocumentFromJSON is an alias for FromJSON that creates a Document
 // from a JSON schema, optionally resolving Go template expressions with data.
 func NewDocumentFromJSON(schema []byte, data any, opts ...template.Option) (*template.Document, error) {

@@ -24,6 +24,7 @@
 - **テキスト装飾** — 下線、取り消し線、字間、字下げ
 - **ページ番号** — 自動ページ番号と総ページ数
 - **Goテンプレート統合** — GoテンプレートからPDF生成
+- **再利用可能コンポーネント** — 請求書・レポート・レターのプリセットテンプレート
 - **JSONスキーマ** — JSONのみでドキュメントを定義
 - **複数の単位** — pt, mm, cm, in, em, %
 - **カラースペース** — RGB、グレースケール、CMYK
@@ -342,6 +343,71 @@ tmpl, _ := gotemplate.New("doc").Funcs(template.TemplateFuncMap()).Parse(schemaS
 doc, err := template.FromTemplate(tmpl, data)
 ```
 
+### 再利用可能コンポーネント
+
+関数一つで一般的なドキュメントを生成:
+
+**請求書:**
+
+```go
+doc := template.Invoice(template.InvoiceData{
+	Number:  "#INV-2026-001",
+	Date:    "2026年3月1日",
+	DueDate: "2026年3月31日",
+	From:    template.InvoiceParty{Name: "ACME株式会社", Address: []string{"東京都渋谷区1-2-3"}},
+	To:      template.InvoiceParty{Name: "クライアント株式会社", Address: []string{"大阪府大阪市4-5-6"}},
+	Items: []template.InvoiceItem{
+		{Description: "Web開発", Quantity: "40時間", UnitPrice: 150, Amount: 6000},
+		{Description: "UI/UXデザイン", Quantity: "20時間", UnitPrice: 120, Amount: 2400},
+	},
+	TaxRate: 10,
+	Notes:   "ご利用ありがとうございます！",
+})
+data, _ := doc.Generate()
+```
+
+**レポート:**
+
+```go
+doc := template.Report(template.ReportData{
+	Title:    "四半期レポート",
+	Subtitle: "2026年 Q1",
+	Author:   "ACME株式会社",
+	Sections: []template.ReportSection{
+		{
+			Title:   "エグゼクティブサマリー",
+			Content: "売上は2025年Q4と比較して15%増加しました。",
+			Metrics: []template.ReportMetric{
+				{Label: "売上", Value: "¥12.5M", ColorHex: 0x2E7D32},
+				{Label: "成長率", Value: "+15%", ColorHex: 0x2E7D32},
+			},
+		},
+		{
+			Title: "売上内訳",
+			Table: &template.ReportTable{
+				Header: []string{"事業部", "2026 Q1", "変化"},
+				Rows:   [][]string{{"クラウド", "¥5.2M", "+26.8%"}, {"エンタープライズ", "¥3.8M", "+8.6%"}},
+			},
+		},
+	},
+})
+```
+
+**レター:**
+
+```go
+doc := template.Letter(template.LetterData{
+	From:     template.LetterParty{Name: "ACME株式会社", Address: []string{"東京都渋谷区1-2-3"}},
+	To:       template.LetterParty{Name: "田中太郎 様", Address: []string{"大阪府大阪市4-5-6"}},
+	Date:     "2026年3月1日",
+	Subject:  "業務提携のご提案",
+	Greeting: "田中様",
+	Body:     []string{"戦略的パートナーシップをご提案させていただきたく..."},
+	Closing:  "敬具",
+	Signature: "山田花子",
+})
+```
+
 ### ドキュメントメタデータ
 
 ```go
@@ -478,6 +544,14 @@ doc.Render(f)
 | `template.FromJSON(schema, data)` | JSONスキーマからドキュメントを生成 |
 | `template.FromTemplate(tmpl, data)` | Goテンプレートからドキュメントを生成 |
 | `template.TemplateFuncMap()` | テンプレートヘルパー関数を取得（`toJSON`を含む） |
+
+### 再利用可能コンポーネント
+
+| 関数 | 説明 |
+|---|---|
+| `template.Invoice(data)` | プロフェッショナルな請求書PDFを生成 |
+| `template.Report(data)` | 構造化されたレポートPDFを生成 |
+| `template.Letter(data)` | ビジネスレターPDFを生成 |
 
 ### 罫線オプション
 

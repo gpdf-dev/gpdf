@@ -24,6 +24,7 @@ Biblioteca de generación de PDF en Go puro, sin dependencias externas, con arqu
 - **Decoraciones de texto** — subrayado, tachado, espaciado de letras, sangría
 - **Números de página** — número de página automático y total de páginas
 - **Integración con Go templates** — generar PDFs desde plantillas Go
+- **Componentes reutilizables** — plantillas predefinidas de Factura, Informe y Carta
 - **Esquema JSON** — definir documentos completamente en JSON
 - **Múltiples unidades** — pt, mm, cm, in, em, %
 - **Espacios de color** — RGB, escala de grises, CMYK
@@ -220,6 +221,71 @@ doc.Footer(func(p *template.PageBuilder) {
 				template.FontSize(8), template.TextColor(pdf.Gray(0.5)))
 		})
 	})
+})
+```
+
+### Componentes reutilizables
+
+Genere tipos de documentos comunes con una sola llamada de función:
+
+**Factura:**
+
+```go
+doc := template.Invoice(template.InvoiceData{
+	Number:  "#INV-2026-001",
+	Date:    "1 de marzo de 2026",
+	DueDate: "31 de marzo de 2026",
+	From:    template.InvoiceParty{Name: "ACME Corp", Address: []string{"Calle Principal 123"}},
+	To:      template.InvoiceParty{Name: "Cliente S.A.", Address: []string{"Calle Secundaria 456"}},
+	Items: []template.InvoiceItem{
+		{Description: "Desarrollo Web", Quantity: "40 hrs", UnitPrice: 150, Amount: 6000},
+		{Description: "Diseño UI/UX", Quantity: "20 hrs", UnitPrice: 120, Amount: 2400},
+	},
+	TaxRate: 10,
+	Notes:   "¡Gracias por su preferencia!",
+})
+data, _ := doc.Generate()
+```
+
+**Informe:**
+
+```go
+doc := template.Report(template.ReportData{
+	Title:    "Informe Trimestral",
+	Subtitle: "Q1 2026",
+	Author:   "ACME Corp",
+	Sections: []template.ReportSection{
+		{
+			Title:   "Resumen Ejecutivo",
+			Content: "Los ingresos aumentaron un 15% en comparación con Q4 2025.",
+			Metrics: []template.ReportMetric{
+				{Label: "Ingresos", Value: "$12.5M", ColorHex: 0x2E7D32},
+				{Label: "Crecimiento", Value: "+15%", ColorHex: 0x2E7D32},
+			},
+		},
+		{
+			Title: "Desglose de Ingresos",
+			Table: &template.ReportTable{
+				Header: []string{"División", "Q1 2026", "Cambio"},
+				Rows:   [][]string{{"Nube", "$5.2M", "+26.8%"}, {"Empresa", "$3.8M", "+8.6%"}},
+			},
+		},
+	},
+})
+```
+
+**Carta:**
+
+```go
+doc := template.Letter(template.LetterData{
+	From:     template.LetterParty{Name: "ACME Corp", Address: []string{"Calle Principal 123"}},
+	To:       template.LetterParty{Name: "Sr. Juan García", Address: []string{"Calle Secundaria 456"}},
+	Date:     "1 de marzo de 2026",
+	Subject:  "Propuesta de Alianza",
+	Greeting: "Estimado Sr. García,",
+	Body:     []string{"Nos dirigimos a usted para proponer una alianza estratégica..."},
+	Closing:  "Atentamente,",
+	Signature: "María López",
 })
 ```
 

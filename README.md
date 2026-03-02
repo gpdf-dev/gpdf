@@ -2,7 +2,7 @@
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/gpdf-dev/gpdf.svg)](https://pkg.go.dev/github.com/gpdf-dev/gpdf)
 [![CI](https://github.com/gpdf-dev/gpdf/actions/workflows/check-code.yml/badge.svg)](https://github.com/gpdf-dev/gpdf/actions/workflows/check-code.yml)
-![coverage](https://img.shields.io/badge/coverage-88.8%25-green)
+![coverage](https://img.shields.io/badge/coverage-89.5%25-green)
 [![Go Report Card](https://goreportcard.com/badge/github.com/gpdf-dev/gpdf)](https://goreportcard.com/report/github.com/gpdf-dev/gpdf)
 [![Go Version](https://img.shields.io/badge/Go-%3E%3D1.22-blue)](https://go.dev/)
 
@@ -25,6 +25,7 @@ A pure Go, zero-dependency PDF generation library with a layered architecture an
 - **Text decorations** — underline, strikethrough, letter spacing, text indent
 - **Page numbers** — automatic page number and total page count
 - **Go template integration** — generate PDFs from Go templates
+- **Reusable components** — pre-built Invoice, Report, and Letter templates
 - **JSON schema** — define documents entirely in JSON
 - **Multiple units** — pt, mm, cm, in, em, %
 - **Color spaces** — RGB, Grayscale, CMYK
@@ -423,6 +424,71 @@ tmpl, _ := gotemplate.New("doc").Funcs(template.TemplateFuncMap()).Parse(schemaS
 doc, err := template.FromTemplate(tmpl, data)
 ```
 
+### Reusable Components
+
+Generate common document types with a single function call:
+
+**Invoice:**
+
+```go
+doc := template.Invoice(template.InvoiceData{
+	Number:  "#INV-2026-001",
+	Date:    "March 1, 2026",
+	DueDate: "March 31, 2026",
+	From:    template.InvoiceParty{Name: "ACME Corp", Address: []string{"123 Main St"}},
+	To:      template.InvoiceParty{Name: "Client Inc.", Address: []string{"456 Side St"}},
+	Items: []template.InvoiceItem{
+		{Description: "Web Development", Quantity: "40 hrs", UnitPrice: 150, Amount: 6000},
+		{Description: "UI/UX Design", Quantity: "20 hrs", UnitPrice: 120, Amount: 2400},
+	},
+	TaxRate: 10,
+	Notes:   "Thank you for your business!",
+})
+data, _ := doc.Generate()
+```
+
+**Report:**
+
+```go
+doc := template.Report(template.ReportData{
+	Title:    "Quarterly Report",
+	Subtitle: "Q1 2026",
+	Author:   "ACME Corp",
+	Sections: []template.ReportSection{
+		{
+			Title:   "Executive Summary",
+			Content: "Revenue increased by 15% compared to Q4 2025.",
+			Metrics: []template.ReportMetric{
+				{Label: "Revenue", Value: "$12.5M", ColorHex: 0x2E7D32},
+				{Label: "Growth", Value: "+15%", ColorHex: 0x2E7D32},
+			},
+		},
+		{
+			Title: "Revenue Breakdown",
+			Table: &template.ReportTable{
+				Header: []string{"Division", "Q1 2026", "Change"},
+				Rows:   [][]string{{"Cloud", "$5.2M", "+26.8%"}, {"Enterprise", "$3.8M", "+8.6%"}},
+			},
+		},
+	},
+})
+```
+
+**Letter:**
+
+```go
+doc := template.Letter(template.LetterData{
+	From:     template.LetterParty{Name: "ACME Corp", Address: []string{"123 Main St"}},
+	To:       template.LetterParty{Name: "Mr. John Smith", Address: []string{"456 Side St"}},
+	Date:     "March 1, 2026",
+	Subject:  "Partnership Proposal",
+	Greeting: "Dear Mr. Smith,",
+	Body:     []string{"We are writing to propose a strategic partnership..."},
+	Closing:  "Sincerely,",
+	Signature: "Jane Doe",
+})
+```
+
 ### Document Metadata
 
 ```go
@@ -559,6 +625,14 @@ doc.Render(f)
 | `template.FromJSON(schema, data)` | Generate document from JSON schema |
 | `template.FromTemplate(tmpl, data)` | Generate document from Go template |
 | `template.TemplateFuncMap()` | Get template helper functions (includes `toJSON`) |
+
+### Reusable Components
+
+| Function | Description |
+|---|---|
+| `template.Invoice(data)` | Generate a professional invoice PDF |
+| `template.Report(data)` | Generate a structured report PDF |
+| `template.Letter(data)` | Generate a business letter PDF |
 
 ### Line Options
 

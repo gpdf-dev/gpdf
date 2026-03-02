@@ -24,6 +24,7 @@
 - **텍스트 장식** — 밑줄, 취소선, 자간, 들여쓰기
 - **페이지 번호** — 자동 페이지 번호 및 전체 페이지 수
 - **Go 템플릿 통합** — Go 템플릿에서 PDF 생성
+- **재사용 가능 컴포넌트** — 송장, 보고서, 레터 프리셋 템플릿 내장
 - **JSON 스키마** — JSON으로만 문서 정의
 - **다양한 단위** — pt, mm, cm, in, em, %
 - **색상 공간** — RGB, 그레이스케일, CMYK
@@ -223,6 +224,71 @@ doc.Footer(func(p *template.PageBuilder) {
 })
 ```
 
+### 재사용 가능 컴포넌트
+
+함수 하나로 일반적인 문서 유형을 생성할 수 있습니다:
+
+**송장:**
+
+```go
+doc := template.Invoice(template.InvoiceData{
+	Number:  "#INV-2026-001",
+	Date:    "2026년 3월 1일",
+	DueDate: "2026년 3월 31일",
+	From:    template.InvoiceParty{Name: "ACME 주식회사", Address: []string{"서울시 강남구 123"}},
+	To:      template.InvoiceParty{Name: "클라이언트 주식회사", Address: []string{"부산시 해운대구 456"}},
+	Items: []template.InvoiceItem{
+		{Description: "웹 개발", Quantity: "40시간", UnitPrice: 150, Amount: 6000},
+		{Description: "UI/UX 디자인", Quantity: "20시간", UnitPrice: 120, Amount: 2400},
+	},
+	TaxRate: 10,
+	Notes:   "이용해 주셔서 감사합니다!",
+})
+data, _ := doc.Generate()
+```
+
+**보고서:**
+
+```go
+doc := template.Report(template.ReportData{
+	Title:    "분기 보고서",
+	Subtitle: "2026년 Q1",
+	Author:   "ACME 주식회사",
+	Sections: []template.ReportSection{
+		{
+			Title:   "경영진 요약",
+			Content: "2025년 Q4 대비 매출이 15% 증가했습니다.",
+			Metrics: []template.ReportMetric{
+				{Label: "매출", Value: "₩12.5M", ColorHex: 0x2E7D32},
+				{Label: "성장률", Value: "+15%", ColorHex: 0x2E7D32},
+			},
+		},
+		{
+			Title: "매출 내역",
+			Table: &template.ReportTable{
+				Header: []string{"사업부", "2026 Q1", "변화"},
+				Rows:   [][]string{{"클라우드", "₩5.2M", "+26.8%"}, {"엔터프라이즈", "₩3.8M", "+8.6%"}},
+			},
+		},
+	},
+})
+```
+
+**레터:**
+
+```go
+doc := template.Letter(template.LetterData{
+	From:     template.LetterParty{Name: "ACME 주식회사", Address: []string{"서울시 강남구 123"}},
+	To:       template.LetterParty{Name: "김철수 님", Address: []string{"부산시 해운대구 456"}},
+	Date:     "2026년 3월 1일",
+	Subject:  "파트너십 제안",
+	Greeting: "김철수 님께,",
+	Body:     []string{"전략적 파트너십을 제안드리고자 합니다..."},
+	Closing:  "감사합니다,",
+	Signature: "이영희",
+})
+```
+
 ### 문서 메타데이터
 
 ```go
@@ -359,6 +425,14 @@ doc.Render(f)
 | `template.FromJSON(schema, data)` | JSON 스키마에서 문서 생성 |
 | `template.FromTemplate(tmpl, data)` | Go 템플릿에서 문서 생성 |
 | `template.TemplateFuncMap()` | 템플릿 헬퍼 함수 가져오기 (`toJSON` 포함) |
+
+### 재사용 가능 컴포넌트
+
+| 함수 | 설명 |
+|---|---|
+| `template.Invoice(data)` | 전문적인 송장 PDF 생성 |
+| `template.Report(data)` | 구조화된 보고서 PDF 생성 |
+| `template.Letter(data)` | 비즈니스 레터 PDF 생성 |
 
 ### 선 옵션
 

@@ -24,6 +24,7 @@
 - **文本装饰** — 下划线、删除线、字间距、首行缩进
 - **页码** — 自动页码和总页数
 - **Go 模板集成** — 从 Go 模板生成 PDF
+- **可复用组件** — 内置发票、报告和信函预设模板
 - **JSON 模式** — 完全用 JSON 定义文档
 - **多种单位** — pt、mm、cm、in、em、%
 - **色彩空间** — RGB、灰度、CMYK
@@ -223,6 +224,71 @@ doc.Footer(func(p *template.PageBuilder) {
 })
 ```
 
+### 可复用组件
+
+一个函数调用即可生成常见文档类型：
+
+**发票：**
+
+```go
+doc := template.Invoice(template.InvoiceData{
+	Number:  "#INV-2026-001",
+	Date:    "2026年3月1日",
+	DueDate: "2026年3月31日",
+	From:    template.InvoiceParty{Name: "ACME公司", Address: []string{"北京市朝阳区123号"}},
+	To:      template.InvoiceParty{Name: "客户有限公司", Address: []string{"上海市浦东新区456号"}},
+	Items: []template.InvoiceItem{
+		{Description: "Web开发", Quantity: "40小时", UnitPrice: 150, Amount: 6000},
+		{Description: "UI/UX设计", Quantity: "20小时", UnitPrice: 120, Amount: 2400},
+	},
+	TaxRate: 10,
+	Notes:   "感谢您的惠顾！",
+})
+data, _ := doc.Generate()
+```
+
+**报告：**
+
+```go
+doc := template.Report(template.ReportData{
+	Title:    "季度报告",
+	Subtitle: "2026年 Q1",
+	Author:   "ACME公司",
+	Sections: []template.ReportSection{
+		{
+			Title:   "执行摘要",
+			Content: "与2025年Q4相比，收入增长了15%。",
+			Metrics: []template.ReportMetric{
+				{Label: "收入", Value: "¥12.5M", ColorHex: 0x2E7D32},
+				{Label: "增长", Value: "+15%", ColorHex: 0x2E7D32},
+			},
+		},
+		{
+			Title: "收入明细",
+			Table: &template.ReportTable{
+				Header: []string{"部门", "2026 Q1", "变化"},
+				Rows:   [][]string{{"云服务", "¥5.2M", "+26.8%"}, {"企业服务", "¥3.8M", "+8.6%"}},
+			},
+		},
+	},
+})
+```
+
+**信函：**
+
+```go
+doc := template.Letter(template.LetterData{
+	From:     template.LetterParty{Name: "ACME公司", Address: []string{"北京市朝阳区123号"}},
+	To:       template.LetterParty{Name: "张先生", Address: []string{"上海市浦东新区456号"}},
+	Date:     "2026年3月1日",
+	Subject:  "合作提案",
+	Greeting: "尊敬的张先生：",
+	Body:     []string{"我们希望向您提出战略合作伙伴关系的建议..."},
+	Closing:  "此致敬礼",
+	Signature: "李明",
+})
+```
+
 ### 文档元数据
 
 ```go
@@ -359,6 +425,14 @@ doc.Render(f)
 | `template.FromJSON(schema, data)` | 从 JSON 模式生成文档 |
 | `template.FromTemplate(tmpl, data)` | 从 Go 模板生成文档 |
 | `template.TemplateFuncMap()` | 获取模板辅助函数（包含 `toJSON`） |
+
+### 可复用组件
+
+| 函数 | 说明 |
+|---|---|
+| `template.Invoice(data)` | 生成专业发票 PDF |
+| `template.Report(data)` | 生成结构化报告 PDF |
+| `template.Letter(data)` | 生成商务信函 PDF |
 
 ### 线条选项
 
