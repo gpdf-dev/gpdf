@@ -353,17 +353,18 @@ func splitIntoWordsAndSpaces(text string) []string {
 	runes := []rune(text)
 	i := 0
 	for i < len(runes) {
-		if runes[i] == '\n' {
+		switch runes[i] {
+		case '\n':
 			parts = append(parts, "\n")
 			i++
-		} else if runes[i] == ' ' {
+		case ' ':
 			j := i
 			for j < len(runes) && runes[j] == ' ' {
 				j++
 			}
 			parts = append(parts, string(runes[i:j]))
 			i = j
-		} else {
+		default:
 			j := i
 			for j < len(runes) && runes[j] != ' ' && runes[j] != '\n' {
 				j++
