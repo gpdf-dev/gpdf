@@ -3,10 +3,10 @@ package builder_test
 import (
 	"testing"
 
+	"github.com/gpdf-dev/gpdf/_examples/testutil"
 	"github.com/gpdf-dev/gpdf/document"
 	"github.com/gpdf-dev/gpdf/pdf"
 	"github.com/gpdf-dev/gpdf/qrcode"
-	"github.com/gpdf-dev/gpdf/_examples/testutil"
 	"github.com/gpdf-dev/gpdf/template"
 )
 

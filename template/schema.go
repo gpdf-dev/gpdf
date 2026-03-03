@@ -32,11 +32,11 @@ import (
 //	  ]
 //	}
 type Schema struct {
-	Page     SchemaPage  `json:"page"`
-	Metadata *SchemaMeta `json:"metadata,omitempty"`
-	Header   []SchemaRow `json:"header,omitempty"`
-	Footer   []SchemaRow `json:"footer,omitempty"`
-	Body     []SchemaRow `json:"body,omitempty"`
+	Page     SchemaPage       `json:"page"`
+	Metadata *SchemaMeta      `json:"metadata,omitempty"`
+	Header   []SchemaRow      `json:"header,omitempty"`
+	Footer   []SchemaRow      `json:"footer,omitempty"`
+	Body     []SchemaRow      `json:"body,omitempty"`
 	Pages    []SchemaPageBody `json:"pages,omitempty"` // multiple explicit pages
 }
 

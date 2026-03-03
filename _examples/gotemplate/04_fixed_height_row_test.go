@@ -37,11 +37,11 @@ func TestTmpl_04_FixedHeightRow(t *testing.T) {
 	}`)
 
 	data := map[string]any{
-		"Title":    "Fixed-Height Row Examples",
-		"Row30mm":  "This row is 30mm tall",
-		"Left50mm": "Left: 50mm row",
+		"Title":     "Fixed-Height Row Examples",
+		"Row30mm":   "This row is 30mm tall",
+		"Left50mm":  "Left: 50mm row",
 		"Right50mm": "Right: 50mm row",
-		"AutoRow":  "This row has auto height (fits content)",
+		"AutoRow":   "This row has auto height (fits content)",
 	}
 
 	doc, err := template.FromJSON(schema, data)

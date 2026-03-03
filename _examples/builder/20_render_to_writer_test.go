@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/gpdf-dev/gpdf/document"
 	"github.com/gpdf-dev/gpdf/_examples/testutil"
+	"github.com/gpdf-dev/gpdf/document"
 	"github.com/gpdf-dev/gpdf/template"
 )
 

@@ -468,7 +468,7 @@ func TestIsFilePath(t *testing.T) {
 		{"../parent/path.png", true},
 		{"C:/windows/path.png", true},
 		{"D:\\data\\image.png", true},
-		{"iVBORw0KGgo=", false},  // base64 string
+		{"iVBORw0KGgo=", false},    // base64 string
 		{"data:image/png;", false}, // data URI (handled before isFilePath)
 		{"some-string", false},
 	}

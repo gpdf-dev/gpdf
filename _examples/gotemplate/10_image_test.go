@@ -60,16 +60,16 @@ func TestTmpl_10_Image(t *testing.T) {
 	}`)
 
 	data := map[string]any{
-		"Title":          "Image Examples",
-		"PngLabel":       "PNG image (blue):",
-		"JpegLabel":      "JPEG image (red):",
+		"Title":           "Image Examples",
+		"PngLabel":        "PNG image (blue):",
+		"JpegLabel":       "JPEG image (red):",
 		"SideBySideLabel": "Images side by side in grid columns:",
-		"GreenLabel":     "Green PNG",
-		"YellowLabel":    "Yellow PNG",
-		"PngB64":         base64.StdEncoding.EncodeToString(pngData),
-		"JpegB64":        base64.StdEncoding.EncodeToString(jpegData),
-		"GreenB64":       base64.StdEncoding.EncodeToString(greenImg),
-		"YellowB64":      base64.StdEncoding.EncodeToString(yellowImg),
+		"GreenLabel":      "Green PNG",
+		"YellowLabel":     "Yellow PNG",
+		"PngB64":          base64.StdEncoding.EncodeToString(pngData),
+		"JpegB64":         base64.StdEncoding.EncodeToString(jpegData),
+		"GreenB64":        base64.StdEncoding.EncodeToString(greenImg),
+		"YellowB64":       base64.StdEncoding.EncodeToString(yellowImg),
 	}
 
 	doc, err := template.FromJSON(schema, data)

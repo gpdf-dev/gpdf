@@ -523,7 +523,7 @@ func TestWriter_RegisterImage_WithSMask(t *testing.T) {
 	w.SetCompression(false)
 
 	imgData := bytes.Repeat([]byte{0xFF, 0x00, 0x00}, 4) // 4 red pixels
-	smaskData := []byte{128, 255, 0, 200}                 // alpha for 4 pixels
+	smaskData := []byte{128, 255, 0, 200}                // alpha for 4 pixels
 	resName, ref, err := w.RegisterImage("smask-img", imgData, 2, 2, "DeviceRGB", "", smaskData)
 	if err != nil {
 		t.Fatalf("RegisterImage error: %v", err)
