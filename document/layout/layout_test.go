@@ -1822,6 +1822,136 @@ func TestLayoutImage_NonImageNode(t *testing.T) {
 	}
 }
 
+func TestLayoutImage_FitCover(t *testing.T) {
+	bl := NewBlockLayout()
+	// 200x100 image (2:1), bounds 100x100 → cover uses max scale → 100x50
+	// but cover must fill both dimensions, so scale = max(100/200, 100/100) = 1.0
+	// display = 200x100, then clamped to available width 100 → 100x50? No.
+	// Actually: bounds 100x100, scaleW=100/200=0.5, scaleH=100/100=1.0
+	// scale = max(0.5, 1.0) = 1.0 → 200x100, clamped to width 100 → 100x50
+	img := &document.Image{
+		Source:  document.ImageSource{Width: 200, Height: 100},
+		FitMode: document.FitCover,
+	}
+	constraints := Constraints{
+		AvailableWidth:  100,
+		AvailableHeight: 100,
+	}
+	result := bl.layoutImage(img, constraints)
+	// FitCover scales to cover bounds (100x100). Scale = max(0.5, 1.0) = 1.0
+	// → 200x100, then clamped to available width 100 → 100x50.
+	if !approxEqual(result.Bounds.Width, 100, 0.1) {
+		t.Errorf("FitCover Width = %v, want 100", result.Bounds.Width)
+	}
+	if !approxEqual(result.Bounds.Height, 50, 0.1) {
+		t.Errorf("FitCover Height = %v, want 50", result.Bounds.Height)
+	}
+}
+
+func TestLayoutImage_FitCover_TallImage(t *testing.T) {
+	bl := NewBlockLayout()
+	// 100x200 image (0.5:1), bounds 100x100
+	// scaleW = 100/100 = 1.0, scaleH = 100/200 = 0.5
+	// scale = max(1.0, 0.5) = 1.0 → 100x200, clamped to height 100 → 50x100
+	img := &document.Image{
+		Source:  document.ImageSource{Width: 100, Height: 200},
+		FitMode: document.FitCover,
+	}
+	constraints := Constraints{
+		AvailableWidth:  100,
+		AvailableHeight: 100,
+	}
+	result := bl.layoutImage(img, constraints)
+	if !approxEqual(result.Bounds.Height, 100, 0.1) {
+		t.Errorf("FitCover Height = %v, want 100", result.Bounds.Height)
+	}
+	if !approxEqual(result.Bounds.Width, 50, 0.1) {
+		t.Errorf("FitCover Width = %v, want 50", result.Bounds.Width)
+	}
+}
+
+func TestLayoutImage_FitStretch(t *testing.T) {
+	bl := NewBlockLayout()
+	img := &document.Image{
+		Source:        document.ImageSource{Width: 200, Height: 100},
+		FitMode:       document.FitStretch,
+		DisplayWidth:  document.Pt(150),
+		DisplayHeight: document.Pt(200),
+	}
+	constraints := Constraints{
+		AvailableWidth:  500,
+		AvailableHeight: 700,
+	}
+	result := bl.layoutImage(img, constraints)
+	// Stretch ignores aspect ratio, uses explicit dimensions.
+	if !approxEqual(result.Bounds.Width, 150, 0.1) {
+		t.Errorf("FitStretch Width = %v, want 150", result.Bounds.Width)
+	}
+	if !approxEqual(result.Bounds.Height, 200, 0.1) {
+		t.Errorf("FitStretch Height = %v, want 200", result.Bounds.Height)
+	}
+}
+
+func TestLayoutImage_FitStretch_NoExplicit(t *testing.T) {
+	bl := NewBlockLayout()
+	img := &document.Image{
+		Source:  document.ImageSource{Width: 200, Height: 100},
+		FitMode: document.FitStretch,
+	}
+	constraints := Constraints{
+		AvailableWidth:  300,
+		AvailableHeight: 700,
+	}
+	result := bl.layoutImage(img, constraints)
+	// No explicit dimensions: fills available width, aspect ratio preserved.
+	if !approxEqual(result.Bounds.Width, 300, 0.1) {
+		t.Errorf("FitStretch Width = %v, want 300", result.Bounds.Width)
+	}
+	if !approxEqual(result.Bounds.Height, 150, 0.1) {
+		t.Errorf("FitStretch Height = %v, want 150", result.Bounds.Height)
+	}
+}
+
+func TestLayoutImage_FitOriginal(t *testing.T) {
+	bl := NewBlockLayout()
+	img := &document.Image{
+		Source:  document.ImageSource{Width: 200, Height: 100},
+		FitMode: document.FitOriginal,
+	}
+	constraints := Constraints{
+		AvailableWidth:  500,
+		AvailableHeight: 700,
+	}
+	result := bl.layoutImage(img, constraints)
+	// Original: intrinsic dimensions (200x100).
+	if !approxEqual(result.Bounds.Width, 200, 0.1) {
+		t.Errorf("FitOriginal Width = %v, want 200", result.Bounds.Width)
+	}
+	if !approxEqual(result.Bounds.Height, 100, 0.1) {
+		t.Errorf("FitOriginal Height = %v, want 100", result.Bounds.Height)
+	}
+}
+
+func TestLayoutImage_FitOriginal_Clamped(t *testing.T) {
+	bl := NewBlockLayout()
+	img := &document.Image{
+		Source:  document.ImageSource{Width: 1000, Height: 500},
+		FitMode: document.FitOriginal,
+	}
+	constraints := Constraints{
+		AvailableWidth:  200,
+		AvailableHeight: 700,
+	}
+	result := bl.layoutImage(img, constraints)
+	// Original 1000x500 clamped to available width 200 → 200x100.
+	if !approxEqual(result.Bounds.Width, 200, 0.1) {
+		t.Errorf("FitOriginal Width = %v, want 200", result.Bounds.Width)
+	}
+	if !approxEqual(result.Bounds.Height, 100, 0.1) {
+		t.Errorf("FitOriginal Height = %v, want 100", result.Bounds.Height)
+	}
+}
+
 // ---------------------------------------------------------------------------
 // layoutChild dispatch tests
 // ---------------------------------------------------------------------------

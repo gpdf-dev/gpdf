@@ -773,6 +773,173 @@ func TestImageKey(t *testing.T) {
 	}
 }
 
+func TestDecodePNGToRaw_OpaqueImage(t *testing.T) {
+	// Create a fully opaque 2x2 PNG.
+	img := image.NewRGBA(image.Rect(0, 0, 2, 2))
+	img.Set(0, 0, color.RGBA{R: 255, G: 0, B: 0, A: 255})
+	img.Set(1, 0, color.RGBA{R: 0, G: 255, B: 0, A: 255})
+	img.Set(0, 1, color.RGBA{R: 0, G: 0, B: 255, A: 255})
+	img.Set(1, 1, color.RGBA{R: 255, G: 255, B: 255, A: 255})
+
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, img); err != nil {
+		t.Fatal(err)
+	}
+
+	rgb, alpha, w, h, err := decodePNGToRaw(buf.Bytes())
+	if err != nil {
+		t.Fatalf("decodePNGToRaw error: %v", err)
+	}
+	if w != 2 || h != 2 {
+		t.Errorf("dimensions = %dx%d, want 2x2", w, h)
+	}
+	if len(rgb) != 2*2*3 {
+		t.Errorf("RGB data length = %d, want %d", len(rgb), 2*2*3)
+	}
+	if alpha != nil {
+		t.Error("fully opaque image should return nil alpha")
+	}
+}
+
+func TestDecodePNGToRaw_TransparentImage(t *testing.T) {
+	// Create a 2x2 PNG with alpha.
+	img := image.NewRGBA(image.Rect(0, 0, 2, 2))
+	img.Set(0, 0, color.RGBA{R: 255, G: 0, B: 0, A: 128})
+	img.Set(1, 0, color.RGBA{R: 0, G: 255, B: 0, A: 255})
+	img.Set(0, 1, color.RGBA{R: 0, G: 0, B: 255, A: 0})
+	img.Set(1, 1, color.RGBA{R: 255, G: 255, B: 255, A: 200})
+
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, img); err != nil {
+		t.Fatal(err)
+	}
+
+	rgb, alpha, w, h, err := decodePNGToRaw(buf.Bytes())
+	if err != nil {
+		t.Fatalf("decodePNGToRaw error: %v", err)
+	}
+	if w != 2 || h != 2 {
+		t.Errorf("dimensions = %dx%d, want 2x2", w, h)
+	}
+	if len(rgb) != 2*2*3 {
+		t.Errorf("RGB data length = %d, want %d", len(rgb), 2*2*3)
+	}
+	if alpha == nil {
+		t.Fatal("expected non-nil alpha for transparent image")
+	}
+	if len(alpha) != 2*2 {
+		t.Errorf("alpha data length = %d, want %d", len(alpha), 2*2)
+	}
+	// Check alpha values.
+	if alpha[0] != 128 {
+		t.Errorf("alpha[0] = %d, want 128", alpha[0])
+	}
+	if alpha[2] != 0 {
+		t.Errorf("alpha[2] = %d, want 0", alpha[2])
+	}
+}
+
+func TestEnsureImage_PNGWithAlpha(t *testing.T) {
+	r, buf := newTestRenderer(t)
+
+	// Create a small transparent PNG.
+	img := image.NewRGBA(image.Rect(0, 0, 4, 4))
+	for y := 0; y < 4; y++ {
+		for x := 0; x < 4; x++ {
+			img.Set(x, y, color.RGBA{R: 255, G: 0, B: 0, A: 128})
+		}
+	}
+	var pngBuf bytes.Buffer
+	if err := png.Encode(&pngBuf, img); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := r.BeginDocument(document.DocumentMetadata{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.BeginPage(document.A4); err != nil {
+		t.Fatal(err)
+	}
+
+	src := document.ImageSource{
+		Data:   pngBuf.Bytes(),
+		Format: document.ImagePNG,
+		Width:  4,
+		Height: 4,
+	}
+	resName, err := r.ensureImage("alpha-test", src)
+	if err != nil {
+		t.Fatalf("ensureImage error: %v", err)
+	}
+	if resName == "" {
+		t.Error("expected non-empty resource name")
+	}
+
+	if err := r.EndPage(); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.EndDocument(); err != nil {
+		t.Fatal(err)
+	}
+
+	output := buf.String()
+	// The output should contain an SMask reference.
+	if !strings.Contains(output, "/SMask") {
+		t.Error("expected /SMask in PDF output for transparent PNG")
+	}
+	// The output should contain DeviceGray (for the SMask image).
+	if !strings.Contains(output, "/DeviceGray") {
+		t.Error("expected /DeviceGray for SMask image in PDF output")
+	}
+}
+
+func TestEnsureImage_OpaquePN_NoSMask(t *testing.T) {
+	r, buf := newTestRenderer(t)
+
+	// Create a fully opaque PNG.
+	img := image.NewRGBA(image.Rect(0, 0, 4, 4))
+	for y := 0; y < 4; y++ {
+		for x := 0; x < 4; x++ {
+			img.Set(x, y, color.RGBA{R: 255, G: 0, B: 0, A: 255})
+		}
+	}
+	var pngBuf bytes.Buffer
+	if err := png.Encode(&pngBuf, img); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := r.BeginDocument(document.DocumentMetadata{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.BeginPage(document.A4); err != nil {
+		t.Fatal(err)
+	}
+
+	src := document.ImageSource{
+		Data:   pngBuf.Bytes(),
+		Format: document.ImagePNG,
+		Width:  4,
+		Height: 4,
+	}
+	_, err := r.ensureImage("opaque-test", src)
+	if err != nil {
+		t.Fatalf("ensureImage error: %v", err)
+	}
+
+	if err := r.EndPage(); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.EndDocument(); err != nil {
+		t.Fatal(err)
+	}
+
+	output := buf.String()
+	// Fully opaque PNG should NOT have SMask.
+	if strings.Contains(output, "/SMask") {
+		t.Error("opaque PNG should not have /SMask")
+	}
+}
+
 // renderPipelineTextPage renders a page with text and a filled rectangle.
 func renderPipelineTextPage(t *testing.T, r *PDFRenderer) {
 	t.Helper()

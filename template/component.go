@@ -86,6 +86,7 @@ type imageConfig struct {
 	width   document.Value
 	height  document.Value
 	fitMode document.ImageFitMode
+	align   document.TextAlign
 }
 
 // FitWidth sets the image to fit within the specified width.
@@ -101,6 +102,20 @@ func FitHeight(height document.Value) ImageOption {
 	return func(cfg *imageConfig) {
 		cfg.height = height
 		cfg.fitMode = document.FitContain
+	}
+}
+
+// WithFitMode sets the image fit mode.
+func WithFitMode(mode document.ImageFitMode) ImageOption {
+	return func(cfg *imageConfig) {
+		cfg.fitMode = mode
+	}
+}
+
+// WithAlign sets the horizontal alignment of the image within its column.
+func WithAlign(align document.TextAlign) ImageOption {
+	return func(cfg *imageConfig) {
+		cfg.align = align
 	}
 }
 

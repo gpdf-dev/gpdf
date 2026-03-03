@@ -457,7 +457,7 @@ func TestWriter_RegisterImage(t *testing.T) {
 	w.SetCompression(false)
 
 	imgData := bytes.Repeat([]byte{0xFF, 0x00, 0x00}, 10) // fake red pixel data
-	resName, ref, err := w.RegisterImage("testimg", imgData, 10, 1, "DeviceRGB", "")
+	resName, ref, err := w.RegisterImage("testimg", imgData, 10, 1, "DeviceRGB", "", nil)
 	if err != nil {
 		t.Fatalf("RegisterImage error: %v", err)
 	}
@@ -488,11 +488,11 @@ func TestWriter_RegisterImage_Duplicate(t *testing.T) {
 	w.SetCompression(false)
 
 	imgData := []byte{0x01, 0x02, 0x03}
-	_, ref1, err := w.RegisterImage("img1", imgData, 1, 1, "DeviceGray", "")
+	_, ref1, err := w.RegisterImage("img1", imgData, 1, 1, "DeviceGray", "", nil)
 	if err != nil {
 		t.Fatalf("first RegisterImage error: %v", err)
 	}
-	_, ref2, err := w.RegisterImage("img1", imgData, 1, 1, "DeviceGray", "")
+	_, ref2, err := w.RegisterImage("img1", imgData, 1, 1, "DeviceGray", "", nil)
 	if err != nil {
 		t.Fatalf("second RegisterImage error: %v", err)
 	}
@@ -507,13 +507,55 @@ func TestWriter_RegisterImage_Compressed(t *testing.T) {
 	// compression is enabled by default
 
 	imgData := bytes.Repeat([]byte{0xAA}, 100)
-	_, _, err := w.RegisterImage("cimg", imgData, 10, 10, "DeviceGray", "")
+	_, _, err := w.RegisterImage("cimg", imgData, 10, 10, "DeviceGray", "", nil)
 	if err != nil {
 		t.Fatalf("RegisterImage error: %v", err)
 	}
 	got := buf.String()
 	if !strings.Contains(got, "/FlateDecode") {
 		t.Errorf("expected FlateDecode filter when compression enabled: %q", got)
+	}
+}
+
+func TestWriter_RegisterImage_WithSMask(t *testing.T) {
+	var buf bytes.Buffer
+	w := pdf.NewWriter(&buf)
+	w.SetCompression(false)
+
+	imgData := bytes.Repeat([]byte{0xFF, 0x00, 0x00}, 4) // 4 red pixels
+	smaskData := []byte{128, 255, 0, 200}                 // alpha for 4 pixels
+	resName, ref, err := w.RegisterImage("smask-img", imgData, 2, 2, "DeviceRGB", "", smaskData)
+	if err != nil {
+		t.Fatalf("RegisterImage error: %v", err)
+	}
+	if resName != "Im1" {
+		t.Errorf("resource name = %q, want %q", resName, "Im1")
+	}
+	if ref.Number == 0 {
+		t.Errorf("ref.Number = 0, want > 0")
+	}
+	got := buf.String()
+	if !strings.Contains(got, "/SMask") {
+		t.Errorf("expected /SMask in output: %q", got)
+	}
+	if !strings.Contains(got, "/DeviceGray") {
+		t.Errorf("expected /DeviceGray for SMask: %q", got)
+	}
+}
+
+func TestWriter_RegisterImage_NoSMask(t *testing.T) {
+	var buf bytes.Buffer
+	w := pdf.NewWriter(&buf)
+	w.SetCompression(false)
+
+	imgData := bytes.Repeat([]byte{0xFF, 0x00, 0x00}, 4)
+	_, _, err := w.RegisterImage("no-smask", imgData, 2, 2, "DeviceRGB", "", nil)
+	if err != nil {
+		t.Fatalf("RegisterImage error: %v", err)
+	}
+	got := buf.String()
+	if strings.Contains(got, "/SMask") {
+		t.Errorf("no smask data should not produce /SMask: %q", got)
 	}
 }
 
@@ -769,7 +811,7 @@ func TestWriter_FullPDFGeneration(t *testing.T) {
 
 	// Register an image.
 	imgData := bytes.Repeat([]byte{0xFF}, 30) // 10 white pixels (RGB)
-	imgResName, imgRef, err := w.RegisterImage("test.png", imgData, 10, 1, "DeviceRGB", "")
+	imgResName, imgRef, err := w.RegisterImage("test.png", imgData, 10, 1, "DeviceRGB", "", nil)
 	if err != nil {
 		t.Fatalf("RegisterImage error: %v", err)
 	}

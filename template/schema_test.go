@@ -1,6 +1,7 @@
 package template
 
 import (
+	"os"
 	"testing"
 
 	"github.com/gpdf-dev/gpdf/document"
@@ -397,5 +398,144 @@ func TestBuildFromSchema_InvalidMargins(t *testing.T) {
 	}
 	if _, err := buildFromSchema(schema, nil); err == nil {
 		t.Error("expected error for invalid margins")
+	}
+}
+
+func TestParseFitMode(t *testing.T) {
+	tests := []struct {
+		input string
+		want  document.ImageFitMode
+		ok    bool
+	}{
+		{"contain", document.FitContain, true},
+		{"cover", document.FitCover, true},
+		{"stretch", document.FitStretch, true},
+		{"original", document.FitOriginal, true},
+		{"Contain", document.FitContain, true},
+		{"COVER", document.FitCover, true},
+		{"invalid", document.FitContain, false},
+		{"", document.FitContain, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			got, ok := parseFitMode(tt.input)
+			if ok != tt.ok {
+				t.Errorf("parseFitMode(%q) ok = %v, want %v", tt.input, ok, tt.ok)
+			}
+			if ok && got != tt.want {
+				t.Errorf("parseFitMode(%q) = %v, want %v", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestParseImageAlign(t *testing.T) {
+	tests := []struct {
+		input string
+		want  document.TextAlign
+		ok    bool
+	}{
+		{"left", document.AlignLeft, true},
+		{"center", document.AlignCenter, true},
+		{"right", document.AlignRight, true},
+		{"Center", document.AlignCenter, true},
+		{"invalid", document.AlignLeft, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			got, ok := parseImageAlign(tt.input)
+			if ok != tt.ok {
+				t.Errorf("parseImageAlign(%q) ok = %v, want %v", tt.input, ok, tt.ok)
+			}
+			if ok && got != tt.want {
+				t.Errorf("parseImageAlign(%q) = %v, want %v", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestIsFilePath(t *testing.T) {
+	tests := []struct {
+		input string
+		want  bool
+	}{
+		{"/absolute/path.png", true},
+		{"./relative/path.png", true},
+		{"../parent/path.png", true},
+		{"C:/windows/path.png", true},
+		{"D:\\data\\image.png", true},
+		{"iVBORw0KGgo=", false},  // base64 string
+		{"data:image/png;", false}, // data URI (handled before isFilePath)
+		{"some-string", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			if got := isFilePath(tt.input); got != tt.want {
+				t.Errorf("isFilePath(%q) = %v, want %v", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestLoadImageData_FilePath(t *testing.T) {
+	// Write a temporary file and load it.
+	tmpDir := t.TempDir()
+	testData := []byte{0x89, 'P', 'N', 'G', 1, 2, 3}
+	path := tmpDir + "/test.png"
+	if err := os.WriteFile(path, testData, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Absolute path
+	got, err := loadImageData(path)
+	if err != nil {
+		t.Fatalf("loadImageData(%q) error: %v", path, err)
+	}
+	if len(got) != len(testData) {
+		t.Errorf("loadImageData returned %d bytes, want %d", len(got), len(testData))
+	}
+
+	// file:// URI
+	got, err = loadImageData("file://" + path)
+	if err != nil {
+		t.Fatalf("loadImageData(file://) error: %v", err)
+	}
+	if len(got) != len(testData) {
+		t.Errorf("file:// loadImageData returned %d bytes, want %d", len(got), len(testData))
+	}
+}
+
+func TestLoadImageData_DataURI(t *testing.T) {
+	// data URI with valid base64
+	data, err := loadImageData("data:image/png;base64,AQID")
+	if err != nil {
+		t.Fatalf("loadImageData(data URI) error: %v", err)
+	}
+	if len(data) != 3 || data[0] != 1 || data[1] != 2 || data[2] != 3 {
+		t.Errorf("unexpected data: %v", data)
+	}
+}
+
+func TestLoadImageData_RawBase64(t *testing.T) {
+	data, err := loadImageData("AQID")
+	if err != nil {
+		t.Fatalf("loadImageData(raw base64) error: %v", err)
+	}
+	if len(data) != 3 {
+		t.Errorf("expected 3 bytes, got %d", len(data))
+	}
+}
+
+func TestSchemaImage_FitAndAlign(t *testing.T) {
+	img := SchemaImage{
+		Src:   "AQID",
+		Fit:   "cover",
+		Align: "center",
+	}
+	if img.Fit != "cover" {
+		t.Errorf("Fit = %q, want %q", img.Fit, "cover")
+	}
+	if img.Align != "center" {
+		t.Errorf("Align = %q, want %q", img.Align, "center")
 	}
 }

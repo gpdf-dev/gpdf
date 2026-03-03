@@ -3,6 +3,7 @@ package template
 import (
 	"encoding/base64"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 
@@ -116,9 +117,11 @@ type SchemaStyle struct {
 
 // SchemaImage defines an image element.
 type SchemaImage struct {
-	Src    string `json:"src"`              // base64 or data URI
+	Src    string `json:"src"`              // base64, data URI, or file path
 	Width  string `json:"width,omitempty"`  // dimension
 	Height string `json:"height,omitempty"` // dimension
+	Fit    string `json:"fit,omitempty"`    // "contain"|"cover"|"stretch"|"original"
+	Align  string `json:"align,omitempty"`  // "left"|"center"|"right"
 }
 
 // SchemaTable defines a table element.
@@ -325,6 +328,38 @@ func decodeBase64Image(s string) ([]byte, error) {
 	return base64.StdEncoding.DecodeString(s)
 }
 
+// loadImageData resolves the image source string to raw image bytes.
+// It supports data URIs, file:// URIs, file paths, and raw base64 strings.
+func loadImageData(src string) ([]byte, error) {
+	// data URI
+	if strings.HasPrefix(src, "data:") {
+		return decodeBase64Image(src)
+	}
+	// file URI
+	if strings.HasPrefix(src, "file://") {
+		return os.ReadFile(strings.TrimPrefix(src, "file://"))
+	}
+	// absolute/relative file path
+	if isFilePath(src) {
+		return os.ReadFile(src)
+	}
+	// fallback: raw base64
+	return decodeBase64Image(src)
+}
+
+// isFilePath returns true if the string looks like a file system path
+// rather than a base64-encoded string.
+func isFilePath(s string) bool {
+	if strings.HasPrefix(s, "/") || strings.HasPrefix(s, "./") || strings.HasPrefix(s, "../") {
+		return true
+	}
+	// Windows drive letter (e.g., "C:\...")
+	if len(s) >= 3 && s[1] == ':' && (s[2] == '/' || s[2] == '\\') {
+		return true
+	}
+	return false
+}
+
 // ---------------------------------------------------------------------------
 // Schema → Document builder
 // ---------------------------------------------------------------------------
@@ -492,7 +527,7 @@ func buildSchemaImage(c *ColBuilder, img *SchemaImage) {
 	if img == nil {
 		return
 	}
-	data, err := decodeBase64Image(img.Src)
+	data, err := loadImageData(img.Src)
 	if err != nil {
 		return // silently skip, consistent with builder API pattern
 	}
@@ -507,7 +542,47 @@ func buildSchemaImage(c *ColBuilder, img *SchemaImage) {
 			opts = append(opts, FitHeight(v))
 		}
 	}
+	if img.Fit != "" {
+		if mode, ok := parseFitMode(img.Fit); ok {
+			opts = append(opts, WithFitMode(mode))
+		}
+	}
+	if img.Align != "" {
+		if align, ok := parseImageAlign(img.Align); ok {
+			opts = append(opts, WithAlign(align))
+		}
+	}
 	c.Image(data, opts...)
+}
+
+// parseFitMode converts a fit mode string to an ImageFitMode constant.
+func parseFitMode(s string) (document.ImageFitMode, bool) {
+	switch strings.ToLower(s) {
+	case "contain":
+		return document.FitContain, true
+	case "cover":
+		return document.FitCover, true
+	case "stretch":
+		return document.FitStretch, true
+	case "original":
+		return document.FitOriginal, true
+	default:
+		return document.FitContain, false
+	}
+}
+
+// parseImageAlign converts an alignment string to a TextAlign constant.
+func parseImageAlign(s string) (document.TextAlign, bool) {
+	switch strings.ToLower(s) {
+	case "left":
+		return document.AlignLeft, true
+	case "center":
+		return document.AlignCenter, true
+	case "right":
+		return document.AlignRight, true
+	default:
+		return document.AlignLeft, false
+	}
 }
 
 func buildSchemaTable(c *ColBuilder, tbl *SchemaTable) {

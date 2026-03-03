@@ -226,7 +226,9 @@ func (pw *Writer) RegisterFont(name string, fontData []byte) (string, ObjectRef,
 // (e.g., "Im1") and the object reference. The filter parameter selects
 // the PDF stream filter: "DCTDecode" for JPEG data (stored as-is) or
 // empty for raw pixel data (compressed with FlateDecode).
-func (pw *Writer) RegisterImage(name string, data []byte, width, height int, colorSpace, filter string) (string, ObjectRef, error) {
+// If smaskData is non-nil, an SMask (soft mask) image object is created
+// for the alpha channel and referenced from the main image.
+func (pw *Writer) RegisterImage(name string, data []byte, width, height int, colorSpace, filter string, smaskData []byte) (string, ObjectRef, error) {
 	if ref, ok := pw.images[name]; ok {
 		idx := 1
 		for k := range pw.images {
@@ -236,6 +238,36 @@ func (pw *Writer) RegisterImage(name string, data []byte, width, height int, col
 			idx++
 		}
 		return fmt.Sprintf("Im%d", idx), ref, nil
+	}
+
+	// Write SMask object first if alpha data is provided.
+	var smaskRef ObjectRef
+	if len(smaskData) > 0 {
+		smaskRef = pw.AllocObject()
+		smaskDict := Dict{
+			Name("Type"):             Name("XObject"),
+			Name("Subtype"):          Name("Image"),
+			Name("Width"):            Integer(width),
+			Name("Height"):           Integer(height),
+			Name("ColorSpace"):       Name("DeviceGray"),
+			Name("BitsPerComponent"): Integer(8),
+		}
+		smaskContent := smaskData
+		if pw.compress {
+			compressed, err := CompressFlate(smaskData)
+			if err != nil {
+				return "", ObjectRef{}, fmt.Errorf("pdf: failed to compress smask data: %w", err)
+			}
+			smaskDict[Name("Filter")] = Name("FlateDecode")
+			smaskContent = compressed
+		}
+		smaskStream := Stream{
+			Dict:    smaskDict,
+			Content: smaskContent,
+		}
+		if err := pw.WriteObject(smaskRef, smaskStream); err != nil {
+			return "", ObjectRef{}, err
+		}
 	}
 
 	imgRef := pw.AllocObject()
@@ -248,6 +280,10 @@ func (pw *Writer) RegisterImage(name string, data []byte, width, height int, col
 		Name("Height"):           Integer(height),
 		Name("ColorSpace"):       Name(colorSpace),
 		Name("BitsPerComponent"): Integer(8),
+	}
+
+	if smaskRef.Number > 0 {
+		imgDict[Name("SMask")] = smaskRef
 	}
 
 	content := data

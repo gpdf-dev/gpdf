@@ -580,12 +580,14 @@ func (r *PDFRenderer) ensureFont(family string) (string, error) {
 // ensureImage ensures an image is registered and returns its resource name.
 // It handles format-specific processing: JPEG data is stored with DCTDecode,
 // PNG data is decoded to raw RGB pixels and stored with FlateDecode.
+// For PNGs with transparency, an SMask image object is created for the alpha channel.
 func (r *PDFRenderer) ensureImage(key string, src document.ImageSource) (string, error) {
 	if resName, ok := r.imageMap[key]; ok {
 		return resName, nil
 	}
 
 	var data []byte
+	var smaskData []byte
 	var w, h int
 	var colorSpace, filter string
 
@@ -597,11 +599,12 @@ func (r *PDFRenderer) ensureImage(key string, src document.ImageSource) (string,
 		colorSpace = "DeviceRGB"
 		filter = "DCTDecode"
 	case document.ImagePNG:
-		raw, pw, ph, err := decodePNGToRaw(src.Data)
+		raw, alpha, pw, ph, err := decodePNGToRaw(src.Data)
 		if err != nil {
 			return "", fmt.Errorf("render: failed to decode PNG: %w", err)
 		}
 		data = raw
+		smaskData = alpha
 		w = pw
 		h = ph
 		colorSpace = "DeviceRGB"
@@ -614,7 +617,7 @@ func (r *PDFRenderer) ensureImage(key string, src document.ImageSource) (string,
 		filter = ""
 	}
 
-	resName, ref, err := r.writer.RegisterImage(key, data, w, h, colorSpace, filter)
+	resName, ref, err := r.writer.RegisterImage(key, data, w, h, colorSpace, filter, smaskData)
 	if err != nil {
 		return "", fmt.Errorf("render: failed to register image: %w", err)
 	}
@@ -624,28 +627,43 @@ func (r *PDFRenderer) ensureImage(key string, src document.ImageSource) (string,
 	return resName, nil
 }
 
-// decodePNGToRaw decodes PNG binary data into raw RGB byte data.
-func decodePNGToRaw(data []byte) ([]byte, int, int, error) {
+// decodePNGToRaw decodes PNG binary data into raw RGB byte data and an
+// optional alpha channel. If the image is fully opaque, alpha is nil.
+func decodePNGToRaw(data []byte) (rgb []byte, alpha []byte, w, h int, err error) {
 	img, err := png.Decode(bytes.NewReader(data))
 	if err != nil {
-		return nil, 0, 0, err
+		return nil, nil, 0, 0, err
 	}
 	bounds := img.Bounds()
-	w := bounds.Dx()
-	h := bounds.Dy()
+	w = bounds.Dx()
+	h = bounds.Dy()
 
-	raw := make([]byte, w*h*3)
-	idx := 0
+	rgb = make([]byte, w*h*3)
+	alphaData := make([]byte, w*h)
+	rgbIdx := 0
+	alphaIdx := 0
+	hasAlpha := false
+
 	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
 		for x := bounds.Min.X; x < bounds.Max.X; x++ {
-			r, g, b, _ := img.At(x, y).RGBA()
-			raw[idx] = byte(r >> 8)
-			raw[idx+1] = byte(g >> 8)
-			raw[idx+2] = byte(b >> 8)
-			idx += 3
+			r, g, b, a := img.At(x, y).RGBA()
+			rgb[rgbIdx] = byte(r >> 8)
+			rgb[rgbIdx+1] = byte(g >> 8)
+			rgb[rgbIdx+2] = byte(b >> 8)
+			rgbIdx += 3
+			ab := byte(a >> 8)
+			alphaData[alphaIdx] = ab
+			alphaIdx++
+			if ab != 0xFF {
+				hasAlpha = true
+			}
 		}
 	}
-	return raw, w, h, nil
+
+	if hasAlpha {
+		return rgb, alphaData, w, h, nil
+	}
+	return rgb, nil, w, h, nil
 }
 
 // imageKey returns a hex-encoded SHA-256 hash of the image data, used

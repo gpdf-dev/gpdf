@@ -97,6 +97,59 @@ func TestImagePNG(t *testing.T, w, h int, c color.Color) []byte {
 	return buf.Bytes()
 }
 
+// TestImagePNGAlpha creates a test PNG image with a checkerboard alpha pattern.
+// Even-column pixels use the given color with full opacity; odd-column pixels
+// use the color with 50% transparency.
+func TestImagePNGAlpha(t *testing.T, w, h int, c color.Color) []byte {
+	t.Helper()
+	r0, g0, b0, _ := c.RGBA()
+	img := image.NewRGBA(image.Rect(0, 0, w, h))
+	for y := range h {
+		for x := range w {
+			if (x+y)%2 == 0 {
+				img.Set(x, y, color.RGBA{R: uint8(r0 >> 8), G: uint8(g0 >> 8), B: uint8(b0 >> 8), A: 255})
+			} else {
+				img.Set(x, y, color.RGBA{R: uint8(r0 >> 8), G: uint8(g0 >> 8), B: uint8(b0 >> 8), A: 128})
+			}
+		}
+	}
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, img); err != nil {
+		t.Fatalf("Failed to create test alpha PNG: %v", err)
+	}
+	return buf.Bytes()
+}
+
+// TestImagePNGGradientAlpha creates a test PNG image with a horizontal alpha gradient.
+// The left edge is fully transparent (A=0) and the right edge is fully opaque (A=255).
+func TestImagePNGGradientAlpha(t *testing.T, w, h int, c color.Color) []byte {
+	t.Helper()
+	r0, g0, b0, _ := c.RGBA()
+	img := image.NewRGBA(image.Rect(0, 0, w, h))
+	for y := range h {
+		for x := range w {
+			a := uint8(255 * x / (w - 1))
+			img.Set(x, y, color.RGBA{R: uint8(r0 >> 8), G: uint8(g0 >> 8), B: uint8(b0 >> 8), A: a})
+		}
+	}
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, img); err != nil {
+		t.Fatalf("Failed to create gradient alpha PNG: %v", err)
+	}
+	return buf.Bytes()
+}
+
+// WriteTestImageFile writes image data to a temporary file and returns the path.
+func WriteTestImageFile(t *testing.T, data []byte, name string) string {
+	t.Helper()
+	dir := t.TempDir()
+	path := dir + "/" + name
+	if err := os.WriteFile(path, data, 0644); err != nil {
+		t.Fatalf("Failed to write test image file: %v", err)
+	}
+	return path
+}
+
 // TestImageJPEG creates a small test JPEG image (colored rectangle).
 func TestImageJPEG(t *testing.T, w, h int, c color.Color) []byte {
 	t.Helper()

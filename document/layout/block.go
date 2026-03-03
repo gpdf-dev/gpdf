@@ -383,7 +383,7 @@ func (bl *BlockLayout) layoutChild(child document.DocumentNode, constraints Cons
 }
 
 // layoutImage computes the display dimensions for an image node,
-// respecting explicit size constraints and preserving aspect ratio.
+// respecting explicit size constraints, fit mode, and aspect ratio.
 func (bl *BlockLayout) layoutImage(child document.DocumentNode, constraints Constraints) Result {
 	img, ok := child.(*document.Image)
 	if !ok {
@@ -405,34 +405,86 @@ func (bl *BlockLayout) layoutImage(child document.DocumentNode, constraints Cons
 	var displayW, displayH float64
 	const defaultFontSize = 12.0
 
-	switch {
-	case hasExplicitW && hasExplicitH:
-		displayW = img.DisplayWidth.Resolve(constraints.AvailableWidth, defaultFontSize)
-		displayH = img.DisplayHeight.Resolve(constraints.AvailableHeight, defaultFontSize)
-	case hasExplicitW:
-		displayW = img.DisplayWidth.Resolve(constraints.AvailableWidth, defaultFontSize)
-		displayH = displayW / aspectRatio
-	case hasExplicitH:
-		displayH = img.DisplayHeight.Resolve(constraints.AvailableHeight, defaultFontSize)
-		displayW = displayH * aspectRatio
-	default:
-		// Use intrinsic dimensions, scaled to fit available width.
+	switch img.FitMode {
+	case document.FitOriginal:
+		// Use intrinsic dimensions without scaling.
 		displayW = intrinsicW
 		displayH = intrinsicH
+
+	case document.FitStretch:
+		// Fill the explicit bounds exactly, ignoring aspect ratio.
+		switch {
+		case hasExplicitW && hasExplicitH:
+			displayW = img.DisplayWidth.Resolve(constraints.AvailableWidth, defaultFontSize)
+			displayH = img.DisplayHeight.Resolve(constraints.AvailableHeight, defaultFontSize)
+		case hasExplicitW:
+			displayW = img.DisplayWidth.Resolve(constraints.AvailableWidth, defaultFontSize)
+			displayH = displayW / aspectRatio
+		case hasExplicitH:
+			displayH = img.DisplayHeight.Resolve(constraints.AvailableHeight, defaultFontSize)
+			displayW = displayH * aspectRatio
+		default:
+			displayW = constraints.AvailableWidth
+			displayH = displayW / aspectRatio
+		}
+
+	case document.FitCover:
+		// Scale to cover the bounds completely (may exceed bounds).
+		boundsW := constraints.AvailableWidth
+		boundsH := constraints.AvailableHeight
+		if hasExplicitW {
+			boundsW = img.DisplayWidth.Resolve(constraints.AvailableWidth, defaultFontSize)
+		}
+		if hasExplicitH {
+			boundsH = img.DisplayHeight.Resolve(constraints.AvailableHeight, defaultFontSize)
+		}
+		scaleW := boundsW / intrinsicW
+		scaleH := boundsH / intrinsicH
+		scale := scaleW
+		if scaleH > scaleW {
+			scale = scaleH
+		}
+		displayW = intrinsicW * scale
+		displayH = intrinsicH * scale
+
+	default: // FitContain
+		switch {
+		case hasExplicitW && hasExplicitH:
+			displayW = img.DisplayWidth.Resolve(constraints.AvailableWidth, defaultFontSize)
+			displayH = img.DisplayHeight.Resolve(constraints.AvailableHeight, defaultFontSize)
+		case hasExplicitW:
+			displayW = img.DisplayWidth.Resolve(constraints.AvailableWidth, defaultFontSize)
+			displayH = displayW / aspectRatio
+		case hasExplicitH:
+			displayH = img.DisplayHeight.Resolve(constraints.AvailableHeight, defaultFontSize)
+			displayW = displayH * aspectRatio
+		default:
+			displayW = intrinsicW
+			displayH = intrinsicH
+			if displayW > constraints.AvailableWidth {
+				displayW = constraints.AvailableWidth
+				displayH = displayW / aspectRatio
+			}
+		}
+	}
+
+	// Clamp to available space (except for FitStretch which respects exact dimensions).
+	if img.FitMode != document.FitStretch {
 		if displayW > constraints.AvailableWidth {
 			displayW = constraints.AvailableWidth
 			displayH = displayW / aspectRatio
 		}
-	}
-
-	// Clamp to available space.
-	if displayW > constraints.AvailableWidth {
-		displayW = constraints.AvailableWidth
-		displayH = displayW / aspectRatio
-	}
-	if displayH > constraints.AvailableHeight {
-		displayH = constraints.AvailableHeight
-		displayW = displayH * aspectRatio
+		if displayH > constraints.AvailableHeight {
+			displayH = constraints.AvailableHeight
+			displayW = displayH * aspectRatio
+		}
+	} else {
+		if displayW > constraints.AvailableWidth {
+			displayW = constraints.AvailableWidth
+		}
+		if displayH > constraints.AvailableHeight {
+			displayH = constraints.AvailableHeight
+		}
 	}
 
 	return Result{

@@ -140,6 +140,10 @@ func (c *ColBuilder) Image(src []byte, opts ...ImageOption) {
 		FitMode: imgCfg.fitMode,
 	}
 
+	if imgCfg.align != document.AlignLeft {
+		imgNode.ImgStyle.TextAlign = imgCfg.align
+	}
+
 	if imgCfg.width.Amount > 0 {
 		imgNode.DisplayWidth = imgCfg.width
 	}
