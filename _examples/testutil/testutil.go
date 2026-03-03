@@ -14,8 +14,9 @@ import (
 )
 
 const (
-	OutputDir = "_output"
-	GoldenDir = "testdata/golden"
+	OutputDir       = "_output"
+	GoldenDir       = "testdata/golden"
+	SharedGoldenDir = "../testdata/golden"
 )
 
 var UpdateGolden = os.Getenv("UPDATE_GOLDEN") != ""
@@ -79,6 +80,45 @@ func GeneratePDF(t *testing.T, filename string, doc *template.Document) {
 	AssertValidPDF(t, data)
 	WritePDF(t, filename, data)
 	AssertMatchesGolden(t, filename, data)
+}
+
+// AssertMatchesSharedGolden compares data against the shared golden file.
+// When UPDATE_GOLDEN=1, it updates the shared golden file.
+func AssertMatchesSharedGolden(t *testing.T, filename string, data []byte) {
+	t.Helper()
+	goldenPath := SharedGoldenDir + "/" + filename
+
+	if UpdateGolden {
+		if err := os.MkdirAll(SharedGoldenDir, 0755); err != nil {
+			t.Fatalf("Failed to create shared golden dir: %v", err)
+		}
+		if err := os.WriteFile(goldenPath, data, 0644); err != nil {
+			t.Fatalf("Failed to update shared golden file %s: %v", goldenPath, err)
+		}
+		t.Logf("Updated shared golden file %s (%d bytes)", goldenPath, len(data))
+		return
+	}
+
+	golden, err := os.ReadFile(goldenPath)
+	if err != nil {
+		t.Fatalf("Failed to read shared golden file %s (run with UPDATE_GOLDEN=1 to create): %v", goldenPath, err)
+	}
+	if !bytes.Equal(data, golden) {
+		t.Errorf("Output does not match shared golden file %s (got %d bytes, want %d bytes; run with UPDATE_GOLDEN=1 to update)", goldenPath, len(data), len(golden))
+	}
+}
+
+// GeneratePDFSharedGolden calls Generate, validates the output, writes the file,
+// and compares against the shared golden file in _examples/testdata/golden/.
+func GeneratePDFSharedGolden(t *testing.T, filename string, doc *template.Document) {
+	t.Helper()
+	data, err := doc.Generate()
+	if err != nil {
+		t.Fatalf("Generate failed: %v", err)
+	}
+	AssertValidPDF(t, data)
+	WritePDF(t, filename, data)
+	AssertMatchesSharedGolden(t, filename, data)
 }
 
 // TestImagePNG creates a small test PNG image (colored rectangle).

@@ -46,5 +46,5 @@ func TestExample_06_Spacer(t *testing.T) {
 		})
 	})
 
-	testutil.GeneratePDF(t, "06_spacer.pdf", doc)
+	testutil.GeneratePDFSharedGolden(t, "06_spacer.pdf", doc)
 }

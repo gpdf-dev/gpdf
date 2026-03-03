@@ -199,5 +199,5 @@ func TestExample_19_Report(t *testing.T) {
 		})
 	})
 
-	testutil.GeneratePDF(t, "19_report.pdf", doc)
+	testutil.GeneratePDFSharedGolden(t, "19_report.pdf", doc)
 }

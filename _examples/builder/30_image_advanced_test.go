@@ -168,7 +168,7 @@ func TestExample_30_ImageAdvanced(t *testing.T) {
 
 	// Write image to temp file and load via file path
 	fileImgData := testutil.TestImagePNG(t, 150, 100, color.RGBA{R: 251, G: 188, B: 4, A: 255})
-	filePath := testutil.WriteTestImageFile(t, fileImgData, "yellow.png")
+	_ = testutil.WriteTestImageFile(t, fileImgData, "yellow.png")
 
 	page.AutoRow(func(r *template.RowBuilder) {
 		r.Col(12, func(c *template.ColBuilder) {
@@ -176,10 +176,8 @@ func TestExample_30_ImageAdvanced(t *testing.T) {
 			c.Spacer(document.Mm(1))
 			// Read the file back and use it
 			c.Image(fileImgData, template.FitWidth(document.Mm(50)))
-			c.Spacer(document.Mm(1))
-			c.Text("(File path used: "+filePath+")", template.FontSize(7))
 		})
 	})
 
-	testutil.GeneratePDF(t, "30_image_advanced.pdf", doc)
+	testutil.GeneratePDFSharedGolden(t, "30_image_advanced.pdf", doc)
 }

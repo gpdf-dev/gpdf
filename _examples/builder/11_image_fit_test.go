@@ -55,5 +55,5 @@ func TestExample_11_ImageFit(t *testing.T) {
 		})
 	})
 
-	testutil.GeneratePDF(t, "11_image_fit.pdf", doc)
+	testutil.GeneratePDFSharedGolden(t, "11_image_fit.pdf", doc)
 }

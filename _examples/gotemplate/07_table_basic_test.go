@@ -12,10 +12,10 @@ func TestTmpl_07_TableBasic(t *testing.T) {
 		"page": {"size": "A4", "margins": "15mm"},
 		"body": [
 			{"row": {"cols": [
-				{"span": 12, "text": "{{.Title}}", "style": {"size": 18, "bold": true}}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "spacer": "5mm"}
+				{"span": 12, "elements": [
+					{"type": "text", "content": "{{.Title}}", "style": {"size": 18, "bold": true}},
+					{"type": "spacer", "height": "5mm"}
+				]}
 			]}},
 			{"row": {"cols": [
 				{"span": 12, "table": {
@@ -40,5 +40,5 @@ func TestTmpl_07_TableBasic(t *testing.T) {
 	if err != nil {
 		t.Fatalf("FromJSON error: %v", err)
 	}
-	testutil.GeneratePDF(t, "07_table_basic.pdf", doc)
+	testutil.GeneratePDFSharedGolden(t, "07_table_basic.pdf", doc)
 }

@@ -36,5 +36,5 @@ func TestExample_12_MultiPage(t *testing.T) {
 		}
 	}
 
-	testutil.GeneratePDF(t, "12_multi_page.pdf", doc)
+	testutil.GeneratePDFSharedGolden(t, "12_multi_page.pdf", doc)
 }

@@ -15,9 +15,9 @@ func TestJSON_29_QRBarcodeInvoice(t *testing.T) {
 			{"row": {"cols": [
 				{"span": 8, "elements": [
 					{"type": "text", "content": "ACME Corporation", "style": {"size": 22, "bold": true, "color": "#1A237E"}},
-					{"type": "text", "content": "Invoice #INV-2026-042", "style": {"size": 12, "color": "#666666"}}
+					{"type": "text", "content": "Invoice #INV-2026-042", "style": {"size": 12, "color": "gray(0.4)"}}
 				]},
-				{"span": 4, "qrcode": {"data": "https://pay.acme.com/inv/2026-042", "size": "30mm"}}
+				{"span": 4, "qrcode": {"data": "https://pay.acme.com/inv/2026-042", "size": "30mm", "errorCorrection": "H"}}
 			]}},
 			{"row": {"cols": [
 				{"span": 12, "elements": [
@@ -28,7 +28,7 @@ func TestJSON_29_QRBarcodeInvoice(t *testing.T) {
 			]}},
 			{"row": {"cols": [
 				{"span": 6, "elements": [
-					{"type": "text", "content": "Bill To:", "style": {"bold": true, "color": "#666666"}},
+					{"type": "text", "content": "Bill To:", "style": {"bold": true, "color": "gray(0.4)"}},
 					{"type": "spacer", "height": "2mm"},
 					{"type": "text", "content": "Jane Doe", "style": {"bold": true}},
 					{"type": "text", "content": "Tech Solutions Inc."},
@@ -57,26 +57,26 @@ func TestJSON_29_QRBarcodeInvoice(t *testing.T) {
 				}}
 			]}},
 			{"row": {"cols": [
-				{"span": 8, "text": ""},
+				{"span": 8},
 				{"span": 4, "elements": [
 					{"type": "spacer", "height": "3mm"},
-					{"type": "text", "content": "Total: $9,900.00", "style": {"align": "right", "bold": true, "size": 14}}
+					{"type": "text", "content": "Total:  $9,900.00", "style": {"align": "right", "bold": true, "size": 14}}
 				]}
 			]}},
 			{"row": {"cols": [
 				{"span": 12, "elements": [
 					{"type": "spacer", "height": "10mm"},
-					{"type": "line", "line": {"color": "#CCCCCC"}},
+					{"type": "line", "line": {"color": "gray(0.8)"}},
 					{"type": "spacer", "height": "5mm"}
 				]}
 			]}},
 			{"row": {"cols": [
 				{"span": 12, "elements": [
-					{"type": "text", "content": "Order Reference:", "style": {"size": 9, "color": "#666666"}},
+					{"type": "text", "content": "Order Reference:", "style": {"size": 9, "color": "gray(0.4)"}},
 					{"type": "spacer", "height": "2mm"},
-					{"type": "barcode", "barcode": {"data": "INV-2026-042", "width": "100mm", "height": "15mm", "format": "code128"}},
+					{"type": "barcode", "barcode": {"data": "INV-2026-042", "width": "100mm", "height": "15mm"}},
 					{"type": "spacer", "height": "5mm"},
-					{"type": "text", "content": "Scan QR code to pay online", "style": {"align": "center", "italic": true, "size": 9, "color": "#808080"}}
+					{"type": "text", "content": "Scan QR code to pay online", "style": {"align": "center", "italic": true, "size": 9, "color": "gray(0.5)"}}
 				]}
 			]}}
 		]
@@ -86,5 +86,5 @@ func TestJSON_29_QRBarcodeInvoice(t *testing.T) {
 	if err != nil {
 		t.Fatalf("FromJSON error: %v", err)
 	}
-	testutil.GeneratePDF(t, "29_qr_barcode_invoice.pdf", doc)
+	testutil.GeneratePDFSharedGolden(t, "29_qr_barcode_invoice.pdf", doc)
 }

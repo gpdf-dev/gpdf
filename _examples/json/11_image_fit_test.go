@@ -53,5 +53,5 @@ func TestJSON_11_ImageFit(t *testing.T) {
 	if err != nil {
 		t.Fatalf("FromJSON error: %v", err)
 	}
-	testutil.GeneratePDF(t, "11_image_fit.pdf", doc)
+	testutil.GeneratePDFSharedGolden(t, "11_image_fit.pdf", doc)
 }

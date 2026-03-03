@@ -20,13 +20,13 @@ func TestTmpl_10_Image(t *testing.T) {
 		"body": [
 			{"row": {"cols": [
 				{"span": 12, "elements": [
-					{"type": "text", "content": "Image Examples", "style": {"size": 18, "bold": true}},
+					{"type": "text", "content": "{{.Title}}", "style": {"size": 18, "bold": true}},
 					{"type": "spacer", "height": "5mm"}
 				]}
 			]}},
 			{"row": {"cols": [
 				{"span": 12, "elements": [
-					{"type": "text", "content": "PNG image (blue):"},
+					{"type": "text", "content": "{{.PngLabel}}"},
 					{"type": "spacer", "height": "2mm"},
 					{"type": "image", "image": {"src": "{{.PngB64}}"}},
 					{"type": "spacer", "height": "5mm"}
@@ -34,7 +34,7 @@ func TestTmpl_10_Image(t *testing.T) {
 			]}},
 			{"row": {"cols": [
 				{"span": 12, "elements": [
-					{"type": "text", "content": "JPEG image (red):"},
+					{"type": "text", "content": "{{.JpegLabel}}"},
 					{"type": "spacer", "height": "2mm"},
 					{"type": "image", "image": {"src": "{{.JpegB64}}"}},
 					{"type": "spacer", "height": "5mm"}
@@ -42,17 +42,17 @@ func TestTmpl_10_Image(t *testing.T) {
 			]}},
 			{"row": {"cols": [
 				{"span": 12, "elements": [
-					{"type": "text", "content": "Images side by side in grid columns:"},
+					{"type": "text", "content": "{{.SideBySideLabel}}"},
 					{"type": "spacer", "height": "2mm"}
 				]}
 			]}},
 			{"row": {"cols": [
 				{"span": 6, "elements": [
-					{"type": "text", "content": "Green PNG"},
+					{"type": "text", "content": "{{.GreenLabel}}"},
 					{"type": "image", "image": {"src": "{{.GreenB64}}"}}
 				]},
 				{"span": 6, "elements": [
-					{"type": "text", "content": "Yellow PNG"},
+					{"type": "text", "content": "{{.YellowLabel}}"},
 					{"type": "image", "image": {"src": "{{.YellowB64}}"}}
 				]}
 			]}}
@@ -60,15 +60,21 @@ func TestTmpl_10_Image(t *testing.T) {
 	}`)
 
 	data := map[string]any{
-		"PngB64":    base64.StdEncoding.EncodeToString(pngData),
-		"JpegB64":   base64.StdEncoding.EncodeToString(jpegData),
-		"GreenB64":  base64.StdEncoding.EncodeToString(greenImg),
-		"YellowB64": base64.StdEncoding.EncodeToString(yellowImg),
+		"Title":          "Image Examples",
+		"PngLabel":       "PNG image (blue):",
+		"JpegLabel":      "JPEG image (red):",
+		"SideBySideLabel": "Images side by side in grid columns:",
+		"GreenLabel":     "Green PNG",
+		"YellowLabel":    "Yellow PNG",
+		"PngB64":         base64.StdEncoding.EncodeToString(pngData),
+		"JpegB64":        base64.StdEncoding.EncodeToString(jpegData),
+		"GreenB64":       base64.StdEncoding.EncodeToString(greenImg),
+		"YellowB64":      base64.StdEncoding.EncodeToString(yellowImg),
 	}
 
 	doc, err := template.FromJSON(schema, data)
 	if err != nil {
 		t.Fatalf("FromJSON error: %v", err)
 	}
-	testutil.GeneratePDF(t, "10_image.pdf", doc)
+	testutil.GeneratePDFSharedGolden(t, "10_image.pdf", doc)
 }

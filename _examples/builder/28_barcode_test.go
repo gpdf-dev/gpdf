@@ -85,5 +85,5 @@ func TestExample_28_Barcode(t *testing.T) {
 		})
 	})
 
-	testutil.GeneratePDF(t, "28_barcode.pdf", doc)
+	testutil.GeneratePDFSharedGolden(t, "28_barcode.pdf", doc)
 }

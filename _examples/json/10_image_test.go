@@ -11,7 +11,6 @@ import (
 )
 
 func TestJSON_10_Image(t *testing.T) {
-	// Create test images and encode as base64.
 	pngData := testutil.TestImagePNG(t, 200, 100, color.RGBA{R: 66, G: 133, B: 244, A: 255})
 	pngB64 := base64.StdEncoding.EncodeToString(pngData)
 
@@ -72,5 +71,5 @@ func TestJSON_10_Image(t *testing.T) {
 	if err != nil {
 		t.Fatalf("FromJSON error: %v", err)
 	}
-	testutil.GeneratePDF(t, "10_image.pdf", doc)
+	testutil.GeneratePDFSharedGolden(t, "10_image.pdf", doc)
 }

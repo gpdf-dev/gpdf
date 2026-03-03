@@ -84,6 +84,10 @@ func TestParseColor(t *testing.T) {
 		{"red", pdf.Red},
 		{"#FF0000", pdf.RGBHex(0xFF0000)},
 		{"#1A237E", pdf.RGBHex(0x1A237E)},
+		{"gray(0)", pdf.Gray(0)},
+		{"gray(0.4)", pdf.Gray(0.4)},
+		{"gray(1)", pdf.Gray(1)},
+		{"Gray(0.5)", pdf.Gray(0.5)},
 	}
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
@@ -97,7 +101,7 @@ func TestParseColor(t *testing.T) {
 		})
 	}
 
-	badColors := []string{"#GG0000", "unknown", "#FFF"}
+	badColors := []string{"#GG0000", "unknown", "#FFF", "gray(bad)"}
 	for _, s := range badColors {
 		if _, err := parseColor(s); err == nil {
 			t.Errorf("parseColor(%q) expected error, got nil", s)

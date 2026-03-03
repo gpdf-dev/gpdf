@@ -12,54 +12,60 @@ func TestJSON_17_Colors(t *testing.T) {
 		"page": {"size": "A4", "margins": "20mm"},
 		"body": [
 			{"row": {"cols": [
-				{"span": 12, "text": "Color System Examples", "style": {"size": 18, "bold": true}}
+				{"span": 12, "elements": [
+					{"type": "text", "content": "Color System Examples", "style": {"size": 18, "bold": true}},
+					{"type": "spacer", "height": "5mm"}
+				]}
 			]}},
 			{"row": {"cols": [
-				{"span": 12, "spacer": "5mm"}
+				{"span": 12, "elements": [
+					{"type": "text", "content": "Predefined Colors:", "style": {"bold": true}},
+					{"type": "text", "content": "Red", "style": {"color": "red"}},
+					{"type": "text", "content": "Green", "style": {"color": "green"}},
+					{"type": "text", "content": "Blue", "style": {"color": "blue"}},
+					{"type": "text", "content": "Yellow", "style": {"color": "yellow"}},
+					{"type": "text", "content": "Cyan", "style": {"color": "cyan"}},
+					{"type": "text", "content": "Magenta", "style": {"color": "magenta"}},
+					{"type": "spacer", "height": "5mm"}
+				]}
 			]}},
 			{"row": {"cols": [
-				{"span": 12, "text": "Predefined Colors:", "style": {"bold": true}}
+				{"span": 12, "elements": [
+					{"type": "text", "content": "RGB Colors (float):", "style": {"bold": true}},
+					{"type": "text", "content": "RGB(1.0, 0.5, 0.0) - Orange", "style": {"color": "rgb(1.0, 0.5, 0.0)"}},
+					{"type": "text", "content": "RGB(0.5, 0.0, 0.5) - Purple", "style": {"color": "rgb(0.5, 0.0, 0.5)"}},
+					{"type": "text", "content": "RGB(0.0, 0.5, 0.5) - Teal", "style": {"color": "rgb(0.0, 0.5, 0.5)"}},
+					{"type": "spacer", "height": "5mm"}
+				]}
 			]}},
 			{"row": {"cols": [
-				{"span": 12, "spacer": "3mm"}
+				{"span": 12, "elements": [
+					{"type": "text", "content": "Hex Colors:", "style": {"bold": true}},
+					{"type": "text", "content": "#FF6B6B - Coral", "style": {"color": "#FF6B6B"}},
+					{"type": "text", "content": "#4ECDC4 - Turquoise", "style": {"color": "#4ECDC4"}},
+					{"type": "text", "content": "#45B7D1 - Sky Blue", "style": {"color": "#45B7D1"}},
+					{"type": "text", "content": "#96CEB4 - Sage", "style": {"color": "#96CEB4"}},
+					{"type": "spacer", "height": "5mm"}
+				]}
 			]}},
 			{"row": {"cols": [
-				{"span": 2, "text": "Red", "style": {"color": "#FF0000"}},
-				{"span": 2, "text": "Green", "style": {"color": "#008000"}},
-				{"span": 2, "text": "Blue", "style": {"color": "#0000FF"}},
-				{"span": 2, "text": "Yellow", "style": {"color": "#FFD700"}},
-				{"span": 2, "text": "Cyan", "style": {"color": "#00FFFF"}},
-				{"span": 2, "text": "Magenta", "style": {"color": "#FF00FF"}}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "spacer": "10mm"}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "text": "Hex Colors:", "style": {"bold": true}}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "spacer": "3mm"}
-			]}},
-			{"row": {"cols": [
-				{"span": 3, "text": "#FF6B6B Coral", "style": {"color": "#FF6B6B"}},
-				{"span": 3, "text": "#4ECDC4 Turquoise", "style": {"color": "#4ECDC4"}},
-				{"span": 3, "text": "#45B7D1 Sky Blue", "style": {"color": "#45B7D1"}},
-				{"span": 3, "text": "#96CEB4 Sage", "style": {"color": "#96CEB4"}}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "spacer": "10mm"}
+				{"span": 12, "elements": [
+					{"type": "text", "content": "Grayscale:", "style": {"bold": true}},
+					{"type": "text", "content": "Gray(0.0) - Black", "style": {"color": "gray(0.0)"}},
+					{"type": "text", "content": "Gray(0.3) - Dark gray", "style": {"color": "gray(0.3)"}},
+					{"type": "text", "content": "Gray(0.5) - Medium gray", "style": {"color": "gray(0.5)"}},
+					{"type": "text", "content": "Gray(0.7) - Light gray", "style": {"color": "gray(0.7)"}},
+					{"type": "spacer", "height": "5mm"}
+				]}
 			]}},
 			{"row": {"cols": [
 				{"span": 12, "text": "Background Color Swatches:", "style": {"bold": true}}
 			]}},
 			{"row": {"cols": [
-				{"span": 12, "spacer": "3mm"}
-			]}},
-			{"row": {"cols": [
-				{"span": 3, "text": "Red Background", "style": {"color": "#FFFFFF", "background": "#FF0000"}},
-				{"span": 3, "text": "Green Background", "style": {"color": "#FFFFFF", "background": "#008000"}},
-				{"span": 3, "text": "Blue Background", "style": {"color": "#FFFFFF", "background": "#0000FF"}},
-				{"span": 3, "text": "Yellow Background", "style": {"color": "#000000", "background": "#FFD700"}}
+				{"span": 3, "text": " Red ", "style": {"color": "white", "background": "red"}},
+				{"span": 3, "text": " Green ", "style": {"color": "white", "background": "green"}},
+				{"span": 3, "text": " Blue ", "style": {"color": "white", "background": "blue"}},
+				{"span": 3, "text": " Yellow ", "style": {"background": "yellow"}}
 			]}}
 		]
 	}`)
@@ -68,5 +74,5 @@ func TestJSON_17_Colors(t *testing.T) {
 	if err != nil {
 		t.Fatalf("FromJSON error: %v", err)
 	}
-	testutil.GeneratePDF(t, "17_colors.pdf", doc)
+	testutil.GeneratePDFSharedGolden(t, "17_colors.pdf", doc)
 }

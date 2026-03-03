@@ -13,75 +13,57 @@ func TestTmpl_28_Barcode(t *testing.T) {
 		"metadata": {"title": "{{.Title}}", "author": "gpdf"},
 		"body": [
 			{"row": {"cols": [
-				{"span": 12, "text": "{{.Title}}", "style": {"size": 18, "bold": true}}
+				{"span": 12, "elements": [
+					{"type": "text", "content": "{{.Title}}", "style": {"size": 18, "bold": true}},
+					{"type": "spacer", "height": "5mm"}
+				]}
 			]}},
 			{"row": {"cols": [
-				{"span": 12, "spacer": "5mm"}
+				{"span": 12, "elements": [
+					{"type": "text", "content": "{{.Code128Label}}"},
+					{"type": "spacer", "height": "2mm"},
+					{"type": "barcode", "barcode": {"data": "{{.Code1}}"}},
+					{"type": "spacer", "height": "5mm"}
+				]}
 			]}},
 			{"row": {"cols": [
-				{"span": 12, "text": "{{.Code128Label}}"}
+				{"span": 12, "elements": [
+					{"type": "text", "content": "{{.WidthLabel}}"},
+					{"type": "spacer", "height": "2mm"},
+					{"type": "barcode", "barcode": {"data": "{{.Code2}}", "width": "80mm"}},
+					{"type": "spacer", "height": "5mm"}
+				]}
 			]}},
 			{"row": {"cols": [
-				{"span": 12, "spacer": "2mm"}
+				{"span": 12, "elements": [
+					{"type": "text", "content": "{{.HeightLabel}}"},
+					{"type": "spacer", "height": "2mm"},
+					{"type": "barcode", "barcode": {"data": "{{.Code3}}", "height": "10mm"}},
+					{"type": "spacer", "height": "5mm"}
+				]}
 			]}},
 			{"row": {"cols": [
-				{"span": 12, "barcode": {"data": "{{.Code1}}", "format": "code128"}}
+				{"span": 12, "elements": [
+					{"type": "text", "content": "{{.NumericLabel}}"},
+					{"type": "spacer", "height": "2mm"},
+					{"type": "barcode", "barcode": {"data": "{{.NumericCode}}"}},
+					{"type": "spacer", "height": "5mm"}
+				]}
 			]}},
 			{"row": {"cols": [
-				{"span": 12, "spacer": "5mm"}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "text": "{{.WidthLabel}}"}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "spacer": "2mm"}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "barcode": {"data": "{{.Code2}}", "width": "80mm", "format": "code128"}}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "spacer": "5mm"}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "text": "{{.HeightLabel}}"}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "spacer": "2mm"}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "barcode": {"data": "{{.Code3}}", "height": "10mm", "format": "code128"}}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "spacer": "5mm"}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "text": "{{.NumericLabel}}"}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "spacer": "2mm"}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "barcode": {"data": "{{.NumericCode}}", "format": "code128"}}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "spacer": "5mm"}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "text": "{{.ColumnsLabel}}"}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "spacer": "2mm"}
+				{"span": 12, "elements": [
+					{"type": "text", "content": "{{.ColumnsLabel}}"},
+					{"type": "spacer", "height": "2mm"}
+				]}
 			]}},
 			{"row": {"cols": [
 				{"span": 6, "elements": [
-					{"type": "text", "content": "{{.ItemALabel}}", "style": {"bold": true}},
-					{"type": "spacer", "height": "2mm"},
-					{"type": "barcode", "barcode": {"data": "{{.ItemA}}", "width": "60mm", "format": "code128"}}
+					{"type": "text", "content": "{{.ItemALabel}}", "style": {"size": 9}},
+					{"type": "barcode", "barcode": {"data": "{{.ItemA}}", "width": "60mm"}}
 				]},
 				{"span": 6, "elements": [
-					{"type": "text", "content": "{{.ItemBLabel}}", "style": {"bold": true}},
-					{"type": "spacer", "height": "2mm"},
-					{"type": "barcode", "barcode": {"data": "{{.ItemB}}", "width": "60mm", "format": "code128"}}
+					{"type": "text", "content": "{{.ItemBLabel}}", "style": {"size": 9}},
+					{"type": "barcode", "barcode": {"data": "{{.ItemB}}", "width": "60mm"}}
 				]}
 			]}}
 		]
@@ -108,5 +90,5 @@ func TestTmpl_28_Barcode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("FromJSON error: %v", err)
 	}
-	testutil.GeneratePDF(t, "28_barcode.pdf", doc)
+	testutil.GeneratePDFSharedGolden(t, "28_barcode.pdf", doc)
 }

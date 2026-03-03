@@ -95,5 +95,5 @@ func TestExample_17_Colors(t *testing.T) {
 		})
 	})
 
-	testutil.GeneratePDF(t, "17_colors.pdf", doc)
+	testutil.GeneratePDFSharedGolden(t, "17_colors.pdf", doc)
 }

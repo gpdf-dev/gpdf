@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/gpdf-dev/gpdf/_examples/testutil"
+	"github.com/gpdf-dev/gpdf/document"
 	"github.com/gpdf-dev/gpdf/template"
 )
 
@@ -12,38 +13,29 @@ func TestJSON_16_Margins(t *testing.T) {
 		"page": {"size": "A4", "margins": "20mm"},
 		"body": [
 			{"row": {"cols": [
-				{"span": 12, "text": "Custom Margins", "style": {"size": 18, "bold": true}}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "spacer": "5mm"}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "text": "This document demonstrates page margins in JSON schema-based PDF generation. The current margins are set to 20mm on all sides using the uniform margin value."}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "spacer": "5mm"}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "text": "Margins define the printable area of the page. Content is constrained within the margin boundaries, ensuring consistent spacing from the page edges."}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "spacer": "5mm"}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "line": {"color": "#333333", "thickness": "1pt"}}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "spacer": "5mm"}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "text": "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur."}
+				{"span": 12, "elements": [
+					{"type": "text", "content": "Custom Margins", "style": {"size": 18, "bold": true}},
+					{"type": "spacer", "height": "5mm"},
+					{"type": "text", "content": "This page has asymmetric margins: 10mm top/bottom, 40mm left/right. The wide side margins create a narrower text area, similar to a book layout."},
+					{"type": "spacer", "height": "5mm"},
+					{"type": "line"},
+					{"type": "spacer", "height": "5mm"},
+					{"type": "text", "content": "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris."}
+				]}
 			]}}
 		]
 	}`)
 
-	doc, err := template.FromJSON(schema, nil)
+	// The builder uses asymmetric margins: 10mm top/bottom, 40mm left/right.
+	// JSON schema only supports uniform margins, so we override with options.
+	doc, err := template.FromJSON(schema, nil, template.WithMargins(document.Edges{
+		Top:    document.Mm(10),
+		Right:  document.Mm(40),
+		Bottom: document.Mm(10),
+		Left:   document.Mm(40),
+	}))
 	if err != nil {
 		t.Fatalf("FromJSON error: %v", err)
 	}
-	testutil.GeneratePDF(t, "16_margins.pdf", doc)
+	testutil.GeneratePDFSharedGolden(t, "16_margins.pdf", doc)
 }

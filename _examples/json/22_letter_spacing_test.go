@@ -12,37 +12,19 @@ func TestJSON_22_LetterSpacing(t *testing.T) {
 		"page": {"size": "A4", "margins": "20mm"},
 		"body": [
 			{"row": {"cols": [
-				{"span": 12, "text": "Letter Spacing Demo", "style": {"size": 20, "bold": true}}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "spacer": "8mm"}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "text": "Normal spacing (0pt)"}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "spacer": "3mm"}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "text": "Letter spacing 1pt", "style": {"letterSpacing": 1}}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "spacer": "3mm"}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "text": "Letter spacing 3pt", "style": {"letterSpacing": 3}}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "spacer": "3mm"}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "text": "WIDE HEADER", "style": {"size": 16, "bold": true, "letterSpacing": 5}}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "spacer": "3mm"}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "text": "Tight spacing -0.5pt", "style": {"letterSpacing": -0.5}}
+				{"span": 12, "elements": [
+					{"type": "text", "content": "Letter Spacing Demo", "style": {"size": 20, "bold": true}},
+					{"type": "spacer", "height": "8mm"},
+					{"type": "text", "content": "Normal spacing (0pt)"},
+					{"type": "spacer", "height": "3mm"},
+					{"type": "text", "content": "Letter spacing 1pt", "style": {"letterSpacing": 1}},
+					{"type": "spacer", "height": "3mm"},
+					{"type": "text", "content": "Letter spacing 3pt", "style": {"letterSpacing": 3}},
+					{"type": "spacer", "height": "3mm"},
+					{"type": "text", "content": "WIDE HEADER", "style": {"size": 16, "bold": true, "letterSpacing": 5}},
+					{"type": "spacer", "height": "3mm"},
+					{"type": "text", "content": "Tight spacing -0.5pt", "style": {"letterSpacing": -0.5}}
+				]}
 			]}}
 		]
 	}`)
@@ -51,5 +33,5 @@ func TestJSON_22_LetterSpacing(t *testing.T) {
 	if err != nil {
 		t.Fatalf("FromJSON error: %v", err)
 	}
-	testutil.GeneratePDF(t, "22_letter_spacing.pdf", doc)
+	testutil.GeneratePDFSharedGolden(t, "22_letter_spacing.pdf", doc)
 }

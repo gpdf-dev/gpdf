@@ -15,40 +15,25 @@ func TestTmpl_06_Spacer(t *testing.T) {
 				{"span": 12, "text": "{{.Title}}", "style": {"size": 18, "bold": true}}
 			]}},
 			{"row": {"cols": [
-				{"span": 12, "spacer": "5mm"}
+				{"span": 12, "elements": [
+					{"type": "text", "content": "{{.Before5mm}}"},
+					{"type": "spacer", "height": "5mm"},
+					{"type": "text", "content": "{{.After5mm}}"}
+				]}
 			]}},
 			{"row": {"cols": [
-				{"span": 12, "text": "{{.Before5mm}}"}
+				{"span": 12, "elements": [
+					{"type": "text", "content": "{{.Before15mm}}"},
+					{"type": "spacer", "height": "15mm"},
+					{"type": "text", "content": "{{.After15mm}}"}
+				]}
 			]}},
 			{"row": {"cols": [
-				{"span": 12, "spacer": "5mm"}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "text": "{{.After5mm}}"}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "spacer": "5mm"}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "text": "{{.Before15mm}}"}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "spacer": "15mm"}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "text": "{{.After15mm}}"}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "spacer": "5mm"}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "text": "{{.Before30mm}}"}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "spacer": "30mm"}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "text": "{{.After30mm}}"}
+				{"span": 12, "elements": [
+					{"type": "text", "content": "{{.Before30mm}}"},
+					{"type": "spacer", "height": "30mm"},
+					{"type": "text", "content": "{{.After30mm}}"}
+				]}
 			]}}
 		]
 	}`)
@@ -67,5 +52,5 @@ func TestTmpl_06_Spacer(t *testing.T) {
 	if err != nil {
 		t.Fatalf("FromJSON error: %v", err)
 	}
-	testutil.GeneratePDF(t, "06_spacer.pdf", doc)
+	testutil.GeneratePDFSharedGolden(t, "06_spacer.pdf", doc)
 }

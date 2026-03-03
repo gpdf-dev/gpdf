@@ -12,88 +12,52 @@ func TestJSON_05_Line(t *testing.T) {
 		"page": {"size": "A4", "margins": "20mm"},
 		"body": [
 			{"row": {"cols": [
-				{"span": 12, "text": "Line / Horizontal Rule Examples", "style": {"size": 18, "bold": true}}
+				{"span": 12, "elements": [
+					{"type": "text", "content": "Line / Horizontal Rule Examples", "style": {"size": 18, "bold": true}},
+					{"type": "spacer", "height": "5mm"}
+				]}
 			]}},
 			{"row": {"cols": [
-				{"span": 12, "spacer": "5mm"}
+				{"span": 12, "elements": [
+					{"type": "text", "content": "Default line (gray, 1pt):"},
+					{"type": "line"},
+					{"type": "spacer", "height": "5mm"}
+				]}
 			]}},
 			{"row": {"cols": [
-				{"span": 12, "text": "Default line:"}
+				{"span": 12, "elements": [
+					{"type": "text", "content": "Red line:"},
+					{"type": "line", "line": {"color": "red"}},
+					{"type": "spacer", "height": "3mm"},
+					{"type": "text", "content": "Blue line:"},
+					{"type": "line", "line": {"color": "blue"}},
+					{"type": "spacer", "height": "3mm"},
+					{"type": "text", "content": "Green line:"},
+					{"type": "line", "line": {"color": "green"}},
+					{"type": "spacer", "height": "5mm"}
+				]}
 			]}},
 			{"row": {"cols": [
-				{"span": 12, "line": {}}
+				{"span": 12, "elements": [
+					{"type": "text", "content": "Thin line (0.5pt):"},
+					{"type": "line", "line": {"thickness": "0.5pt"}},
+					{"type": "spacer", "height": "3mm"},
+					{"type": "text", "content": "Medium line (2pt):"},
+					{"type": "line", "line": {"thickness": "2pt"}},
+					{"type": "spacer", "height": "3mm"},
+					{"type": "text", "content": "Thick line (5pt):"},
+					{"type": "line", "line": {"thickness": "5pt"}},
+					{"type": "spacer", "height": "5mm"}
+				]}
 			]}},
 			{"row": {"cols": [
-				{"span": 12, "spacer": "5mm"}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "text": "Red line:", "style": {"color": "#FF0000"}}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "line": {"color": "#FF0000"}}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "spacer": "3mm"}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "text": "Blue line:", "style": {"color": "#0000FF"}}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "line": {"color": "#0000FF"}}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "spacer": "3mm"}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "text": "Green line:", "style": {"color": "#008000"}}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "line": {"color": "#008000"}}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "spacer": "5mm"}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "text": "Thickness 0.5pt:"}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "line": {"thickness": "0.5pt"}}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "spacer": "3mm"}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "text": "Thickness 2pt:"}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "line": {"thickness": "2pt"}}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "spacer": "3mm"}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "text": "Thickness 5pt:"}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "line": {"thickness": "5pt"}}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "spacer": "5mm"}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "text": "Red 3pt:"}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "line": {"color": "#FF0000", "thickness": "3pt"}}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "spacer": "3mm"}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "text": "Blue 4pt:"}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "line": {"color": "#0000FF", "thickness": "4pt"}}
+				{"span": 12, "elements": [
+					{"type": "text", "content": "Thick red line (3pt):"},
+					{"type": "line", "line": {"color": "red", "thickness": "3pt"}},
+					{"type": "spacer", "height": "3mm"},
+					{"type": "text", "content": "Thick blue line (4pt):"},
+					{"type": "line", "line": {"color": "blue", "thickness": "4pt"}}
+				]}
 			]}}
 		]
 	}`)
@@ -102,5 +66,5 @@ func TestJSON_05_Line(t *testing.T) {
 	if err != nil {
 		t.Fatalf("FromJSON error: %v", err)
 	}
-	testutil.GeneratePDF(t, "05_line.pdf", doc)
+	testutil.GeneratePDFSharedGolden(t, "05_line.pdf", doc)
 }

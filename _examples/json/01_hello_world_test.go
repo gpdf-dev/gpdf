@@ -21,5 +21,5 @@ func TestJSON_01_HelloWorld(t *testing.T) {
 	if err != nil {
 		t.Fatalf("FromJSON error: %v", err)
 	}
-	testutil.GeneratePDF(t, "01_hello_world.pdf", doc)
+	testutil.GeneratePDFSharedGolden(t, "01_hello_world.pdf", doc)
 }

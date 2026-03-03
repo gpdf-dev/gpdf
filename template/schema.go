@@ -10,6 +10,7 @@ import (
 	"github.com/gpdf-dev/gpdf/barcode"
 	"github.com/gpdf-dev/gpdf/document"
 	"github.com/gpdf-dev/gpdf/pdf"
+	"github.com/gpdf-dev/gpdf/qrcode"
 )
 
 // ---------------------------------------------------------------------------
@@ -35,7 +36,13 @@ type Schema struct {
 	Metadata *SchemaMeta `json:"metadata,omitempty"`
 	Header   []SchemaRow `json:"header,omitempty"`
 	Footer   []SchemaRow `json:"footer,omitempty"`
-	Body     []SchemaRow `json:"body"`
+	Body     []SchemaRow `json:"body,omitempty"`
+	Pages    []SchemaPageBody `json:"pages,omitempty"` // multiple explicit pages
+}
+
+// SchemaPageBody defines the body content for a single page.
+type SchemaPageBody struct {
+	Body []SchemaRow `json:"body"`
 }
 
 // SchemaPage defines page-level settings.
@@ -147,8 +154,9 @@ type SchemaLine struct {
 
 // SchemaQRCode defines a QR code element.
 type SchemaQRCode struct {
-	Data string `json:"data"`
-	Size string `json:"size,omitempty"`
+	Data            string `json:"data"`
+	Size            string `json:"size,omitempty"`
+	ErrorCorrection string `json:"errorCorrection,omitempty"` // "L", "M", "Q", "H"
 }
 
 // SchemaBarcode defines a barcode element.
@@ -248,6 +256,39 @@ func parseColor(s string) (pdf.Color, error) {
 		return pdf.Magenta, nil
 	}
 
+	// gray(N) format: grayscale color.
+	lower := strings.ToLower(s)
+	if strings.HasPrefix(lower, "gray(") && strings.HasSuffix(lower, ")") {
+		valStr := lower[5 : len(lower)-1]
+		val, err := strconv.ParseFloat(valStr, 64)
+		if err != nil {
+			return pdf.Color{}, fmt.Errorf("invalid gray color %q: %w", s, err)
+		}
+		return pdf.Gray(val), nil
+	}
+
+	// rgb(r, g, b) format: float RGB color (0.0-1.0).
+	if strings.HasPrefix(lower, "rgb(") && strings.HasSuffix(lower, ")") {
+		inner := lower[4 : len(lower)-1]
+		parts := strings.Split(inner, ",")
+		if len(parts) != 3 {
+			return pdf.Color{}, fmt.Errorf("invalid rgb color %q: expected 3 components", s)
+		}
+		r, err := strconv.ParseFloat(strings.TrimSpace(parts[0]), 64)
+		if err != nil {
+			return pdf.Color{}, fmt.Errorf("invalid rgb color %q: %w", s, err)
+		}
+		g, err := strconv.ParseFloat(strings.TrimSpace(parts[1]), 64)
+		if err != nil {
+			return pdf.Color{}, fmt.Errorf("invalid rgb color %q: %w", s, err)
+		}
+		b, err := strconv.ParseFloat(strings.TrimSpace(parts[2]), 64)
+		if err != nil {
+			return pdf.Color{}, fmt.Errorf("invalid rgb color %q: %w", s, err)
+		}
+		return pdf.RGB(r, g, b), nil
+	}
+
 	// Hex color: #RRGGBB.
 	if strings.HasPrefix(s, "#") && len(s) == 7 {
 		hex, err := strconv.ParseUint(s[1:], 16, 32)
@@ -339,9 +380,22 @@ func loadImageData(src string) ([]byte, error) {
 	if strings.HasPrefix(src, "file://") {
 		return os.ReadFile(strings.TrimPrefix(src, "file://"))
 	}
-	// absolute/relative file path
-	if isFilePath(src) {
+	// relative file path (unambiguous)
+	if strings.HasPrefix(src, "./") || strings.HasPrefix(src, "../") {
 		return os.ReadFile(src)
+	}
+	// Windows drive letter (e.g., "C:\...")
+	if len(src) >= 3 && src[1] == ':' && (src[2] == '/' || src[2] == '\\') {
+		return os.ReadFile(src)
+	}
+	// For absolute paths starting with /, try file first, then base64.
+	// This handles JPEG base64 strings that start with "/9j/...".
+	if strings.HasPrefix(src, "/") {
+		if data, err := os.ReadFile(src); err == nil {
+			return data, nil
+		}
+		// Not a valid file path, try base64.
+		return decodeBase64Image(src)
 	}
 	// fallback: raw base64
 	return decodeBase64Image(src)
@@ -415,6 +469,11 @@ func buildFromSchema(schema *Schema, opts []Option) (*Document, error) {
 	if len(schema.Body) > 0 {
 		page := doc.AddPage()
 		buildSchemaRows(page, schema.Body)
+	}
+
+	for _, p := range schema.Pages {
+		page := doc.AddPage()
+		buildSchemaRows(page, p.Body)
 	}
 
 	return doc, nil
@@ -645,7 +704,28 @@ func buildSchemaQRCode(c *ColBuilder, qr *SchemaQRCode) {
 			opts = append(opts, QRSize(v))
 		}
 	}
+	if qr.ErrorCorrection != "" {
+		if level, ok := parseQRErrorCorrection(qr.ErrorCorrection); ok {
+			opts = append(opts, QRErrorCorrection(level))
+		}
+	}
 	c.QRCode(qr.Data, opts...)
+}
+
+// parseQRErrorCorrection converts an error correction string to a qrcode level.
+func parseQRErrorCorrection(s string) (qrcode.ErrorCorrectionLevel, bool) {
+	switch strings.ToUpper(strings.TrimSpace(s)) {
+	case "L":
+		return qrcode.LevelL, true
+	case "M":
+		return qrcode.LevelM, true
+	case "Q":
+		return qrcode.LevelQ, true
+	case "H":
+		return qrcode.LevelH, true
+	default:
+		return qrcode.LevelM, false
+	}
 }
 
 func buildSchemaBarcode(c *ColBuilder, bc *SchemaBarcode) {

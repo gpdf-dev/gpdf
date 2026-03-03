@@ -12,60 +12,54 @@ func TestJSON_02_TextStyling(t *testing.T) {
 		"page": {"size": "A4", "margins": "20mm"},
 		"body": [
 			{"row": {"cols": [
-				{"span": 12, "text": "Text Styling Examples", "style": {"size": 20, "bold": true}}
+				{"span": 12, "elements": [
+					{"type": "text", "content": "Text Styling Examples", "style": {"size": 20, "bold": true}},
+					{"type": "spacer", "height": "5mm"}
+				]}
 			]}},
 			{"row": {"cols": [
-				{"span": 12, "spacer": "5mm"}
+				{"span": 12, "elements": [
+					{"type": "text", "content": "Font Size 8pt", "style": {"size": 8}},
+					{"type": "text", "content": "Font Size 12pt (default)", "style": {"size": 12}},
+					{"type": "text", "content": "Font Size 18pt", "style": {"size": 18}},
+					{"type": "text", "content": "Font Size 24pt", "style": {"size": 24}},
+					{"type": "text", "content": "Font Size 36pt", "style": {"size": 36}},
+					{"type": "spacer", "height": "5mm"}
+				]}
 			]}},
 			{"row": {"cols": [
-				{"span": 12, "text": "Size 8", "style": {"size": 8}}
+				{"span": 12, "elements": [
+					{"type": "text", "content": "Normal text"},
+					{"type": "text", "content": "Bold text", "style": {"bold": true}},
+					{"type": "text", "content": "Italic text", "style": {"italic": true}},
+					{"type": "text", "content": "Bold + Italic text", "style": {"bold": true, "italic": true}},
+					{"type": "spacer", "height": "5mm"}
+				]}
 			]}},
 			{"row": {"cols": [
-				{"span": 12, "text": "Size 12", "style": {"size": 12}}
+				{"span": 12, "elements": [
+					{"type": "text", "content": "Red text", "style": {"color": "red"}},
+					{"type": "text", "content": "Green text", "style": {"color": "green"}},
+					{"type": "text", "content": "Blue text", "style": {"color": "blue"}},
+					{"type": "text", "content": "Custom color (orange)", "style": {"color": "rgb(1.0, 0.5, 0.0)"}},
+					{"type": "text", "content": "Hex color (#336699)", "style": {"color": "#336699"}},
+					{"type": "spacer", "height": "5mm"}
+				]}
 			]}},
 			{"row": {"cols": [
-				{"span": 12, "text": "Size 18", "style": {"size": 18}}
+				{"span": 12, "elements": [
+					{"type": "text", "content": "Yellow background", "style": {"background": "yellow"}},
+					{"type": "text", "content": "Cyan background", "style": {"background": "cyan"}},
+					{"type": "text", "content": "White text on dark background", "style": {"color": "white", "background": "#333333"}},
+					{"type": "spacer", "height": "5mm"}
+				]}
 			]}},
 			{"row": {"cols": [
-				{"span": 12, "text": "Size 24", "style": {"size": 24}}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "text": "Size 36", "style": {"size": 36}}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "spacer": "5mm"}
-			]}},
-			{"row": {"cols": [
-				{"span": 3, "text": "Normal"},
-				{"span": 3, "text": "Bold", "style": {"bold": true}},
-				{"span": 3, "text": "Italic", "style": {"italic": true}},
-				{"span": 3, "text": "Bold+Italic", "style": {"bold": true, "italic": true}}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "spacer": "5mm"}
-			]}},
-			{"row": {"cols": [
-				{"span": 2, "text": "Red", "style": {"color": "#FF0000"}},
-				{"span": 2, "text": "Green", "style": {"color": "#008000"}},
-				{"span": 2, "text": "Blue", "style": {"color": "#0000FF"}},
-				{"span": 3, "text": "Orange", "style": {"color": "#FF8000"}},
-				{"span": 3, "text": "Custom", "style": {"color": "#336699"}}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "spacer": "5mm"}
-			]}},
-			{"row": {"cols": [
-				{"span": 4, "text": "Yellow background", "style": {"background": "#FFFF00"}},
-				{"span": 4, "text": "Cyan background", "style": {"background": "#00FFFF"}},
-				{"span": 4, "text": "White on dark", "style": {"color": "#FFFFFF", "background": "#333333"}}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "spacer": "5mm"}
-			]}},
-			{"row": {"cols": [
-				{"span": 4, "text": "Left aligned", "style": {"align": "left"}},
-				{"span": 4, "text": "Center aligned", "style": {"align": "center"}},
-				{"span": 4, "text": "Right aligned", "style": {"align": "right"}}
+				{"span": 12, "elements": [
+					{"type": "text", "content": "Left aligned (default)", "style": {"align": "left"}},
+					{"type": "text", "content": "Center aligned", "style": {"align": "center"}},
+					{"type": "text", "content": "Right aligned", "style": {"align": "right"}}
+				]}
 			]}}
 		]
 	}`)
@@ -74,5 +68,5 @@ func TestJSON_02_TextStyling(t *testing.T) {
 	if err != nil {
 		t.Fatalf("FromJSON error: %v", err)
 	}
-	testutil.GeneratePDF(t, "02_text_styling.pdf", doc)
+	testutil.GeneratePDFSharedGolden(t, "02_text_styling.pdf", doc)
 }

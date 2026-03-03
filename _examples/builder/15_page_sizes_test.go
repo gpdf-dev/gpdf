@@ -36,7 +36,7 @@ func TestExample_15_PageSizes(t *testing.T) {
 				})
 			})
 
-			testutil.GeneratePDF(t, s.file, doc)
+			testutil.GeneratePDFSharedGolden(t, s.file, doc)
 		})
 	}
 }

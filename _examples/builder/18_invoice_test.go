@@ -131,5 +131,5 @@ func TestExample_18_Invoice(t *testing.T) {
 		})
 	})
 
-	testutil.GeneratePDF(t, "18_invoice.pdf", doc)
+	testutil.GeneratePDFSharedGolden(t, "18_invoice.pdf", doc)
 }

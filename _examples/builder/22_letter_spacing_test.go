@@ -37,5 +37,5 @@ func TestExample_22_LetterSpacing(t *testing.T) {
 		})
 	})
 
-	testutil.GeneratePDF(t, "22_letter_spacing.pdf", doc)
+	testutil.GeneratePDFSharedGolden(t, "22_letter_spacing.pdf", doc)
 }

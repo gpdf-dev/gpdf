@@ -70,5 +70,5 @@ func TestExample_10_Image(t *testing.T) {
 		})
 	})
 
-	testutil.GeneratePDF(t, "10_image.pdf", doc)
+	testutil.GeneratePDFSharedGolden(t, "10_image.pdf", doc)
 }

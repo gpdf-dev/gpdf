@@ -68,5 +68,5 @@ func TestExample_13_HeaderFooter(t *testing.T) {
 		})
 	}
 
-	testutil.GeneratePDF(t, "13_header_footer.pdf", doc)
+	testutil.GeneratePDFSharedGolden(t, "13_header_footer.pdf", doc)
 }

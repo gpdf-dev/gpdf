@@ -120,5 +120,5 @@ func TestExample_29_QRBarcode_Invoice(t *testing.T) {
 		})
 	})
 
-	testutil.GeneratePDF(t, "29_qr_barcode_invoice.pdf", doc)
+	testutil.GeneratePDFSharedGolden(t, "29_qr_barcode_invoice.pdf", doc)
 }

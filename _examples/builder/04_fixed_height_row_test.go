@@ -60,5 +60,5 @@ func TestExample_04_FixedHeightRow(t *testing.T) {
 		})
 	})
 
-	testutil.GeneratePDF(t, "04_fixed_height_row.pdf", doc)
+	testutil.GeneratePDFSharedGolden(t, "04_fixed_height_row.pdf", doc)
 }

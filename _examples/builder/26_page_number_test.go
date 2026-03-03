@@ -80,5 +80,5 @@ func TestExample_26_PageNumber(t *testing.T) {
 		})
 	}
 
-	testutil.GeneratePDF(t, "26_page_number.pdf", doc)
+	testutil.GeneratePDFSharedGolden(t, "26_page_number.pdf", doc)
 }

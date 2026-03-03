@@ -45,5 +45,5 @@ func TestExample_24_TextDecoration(t *testing.T) {
 		})
 	})
 
-	testutil.GeneratePDF(t, "24_text_decoration.pdf", doc)
+	testutil.GeneratePDFSharedGolden(t, "24_text_decoration.pdf", doc)
 }

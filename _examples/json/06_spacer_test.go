@@ -15,40 +15,25 @@ func TestJSON_06_Spacer(t *testing.T) {
 				{"span": 12, "text": "Spacer Examples", "style": {"size": 18, "bold": true}}
 			]}},
 			{"row": {"cols": [
-				{"span": 12, "spacer": "5mm"}
+				{"span": 12, "elements": [
+					{"type": "text", "content": "Text before 5mm spacer"},
+					{"type": "spacer", "height": "5mm"},
+					{"type": "text", "content": "Text after 5mm spacer"}
+				]}
 			]}},
 			{"row": {"cols": [
-				{"span": 12, "text": "Text before 5mm spacer"}
+				{"span": 12, "elements": [
+					{"type": "text", "content": "Text before 15mm spacer"},
+					{"type": "spacer", "height": "15mm"},
+					{"type": "text", "content": "Text after 15mm spacer"}
+				]}
 			]}},
 			{"row": {"cols": [
-				{"span": 12, "spacer": "5mm"}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "text": "Text after 5mm spacer"}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "spacer": "5mm"}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "text": "Text before 15mm spacer"}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "spacer": "15mm"}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "text": "Text after 15mm spacer"}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "spacer": "5mm"}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "text": "Text before 30mm spacer"}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "spacer": "30mm"}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "text": "Text after 30mm spacer"}
+				{"span": 12, "elements": [
+					{"type": "text", "content": "Text before 30mm spacer"},
+					{"type": "spacer", "height": "30mm"},
+					{"type": "text", "content": "Text after 30mm spacer"}
+				]}
 			]}}
 		]
 	}`)
@@ -57,5 +42,5 @@ func TestJSON_06_Spacer(t *testing.T) {
 	if err != nil {
 		t.Fatalf("FromJSON error: %v", err)
 	}
-	testutil.GeneratePDF(t, "06_spacer.pdf", doc)
+	testutil.GeneratePDFSharedGolden(t, "06_spacer.pdf", doc)
 }

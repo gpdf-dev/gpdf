@@ -35,5 +35,5 @@ func TestExample_16_Margins(t *testing.T) {
 		})
 	})
 
-	testutil.GeneratePDF(t, "16_margins.pdf", doc)
+	testutil.GeneratePDFSharedGolden(t, "16_margins.pdf", doc)
 }

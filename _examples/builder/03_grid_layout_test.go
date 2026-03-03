@@ -141,5 +141,5 @@ func TestExample_03_GridLayout(t *testing.T) {
 		})
 	})
 
-	testutil.GeneratePDF(t, "03_grid_layout.pdf", doc)
+	testutil.GeneratePDFSharedGolden(t, "03_grid_layout.pdf", doc)
 }

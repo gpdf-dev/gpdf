@@ -18,34 +18,19 @@ func TestJSON_14_Metadata(t *testing.T) {
 		},
 		"body": [
 			{"row": {"cols": [
-				{"span": 12, "text": "Document with Metadata", "style": {"size": 20, "bold": true}}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "spacer": "5mm"}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "text": "This PDF document has the following metadata properties set:"}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "spacer": "3mm"}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "text": "Title: Annual Report 2026", "style": {"bold": true}}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "text": "Author: gpdf Library", "style": {"bold": true}}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "text": "Subject: Example of document metadata", "style": {"bold": true}}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "text": "Creator: gpdf example_test.go", "style": {"bold": true}}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "spacer": "5mm"}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "text": "You can verify these metadata fields by opening the PDF in a viewer and checking the document properties (File > Properties or Ctrl+D in most PDF viewers).", "style": {"italic": true}}
+				{"span": 12, "elements": [
+					{"type": "text", "content": "Document with Metadata", "style": {"size": 20, "bold": true}},
+					{"type": "spacer", "height": "5mm"},
+					{"type": "text", "content": "This PDF has the following metadata set:"},
+					{"type": "spacer", "height": "3mm"},
+					{"type": "text", "content": "Title: Annual Report 2026"},
+					{"type": "text", "content": "Author: gpdf Library"},
+					{"type": "text", "content": "Subject: Example of document metadata"},
+					{"type": "text", "content": "Creator: gpdf example_test.go"},
+					{"type": "text", "content": "Producer: gpdf (set automatically)"},
+					{"type": "spacer", "height": "5mm"},
+					{"type": "text", "content": "Open the PDF properties in your viewer to verify.", "style": {"italic": true}}
+				]}
 			]}}
 		]
 	}`)
@@ -54,5 +39,5 @@ func TestJSON_14_Metadata(t *testing.T) {
 	if err != nil {
 		t.Fatalf("FromJSON error: %v", err)
 	}
-	testutil.GeneratePDF(t, "14_metadata.pdf", doc)
+	testutil.GeneratePDFSharedGolden(t, "14_metadata.pdf", doc)
 }

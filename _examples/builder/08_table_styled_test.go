@@ -49,5 +49,5 @@ func TestExample_08_TableStyled(t *testing.T) {
 		})
 	})
 
-	testutil.GeneratePDF(t, "08_table_styled.pdf", doc)
+	testutil.GeneratePDFSharedGolden(t, "08_table_styled.pdf", doc)
 }

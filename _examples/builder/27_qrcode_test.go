@@ -114,5 +114,5 @@ func TestExample_27_QRCode(t *testing.T) {
 		})
 	})
 
-	testutil.GeneratePDF(t, "27_qrcode.pdf", doc)
+	testutil.GeneratePDFSharedGolden(t, "27_qrcode.pdf", doc)
 }

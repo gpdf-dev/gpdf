@@ -74,5 +74,5 @@ func TestExample_05_Line(t *testing.T) {
 		})
 	})
 
-	testutil.GeneratePDF(t, "05_line.pdf", doc)
+	testutil.GeneratePDFSharedGolden(t, "05_line.pdf", doc)
 }

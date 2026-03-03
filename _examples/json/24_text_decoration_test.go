@@ -12,43 +12,21 @@ func TestJSON_24_TextDecoration(t *testing.T) {
 		"page": {"size": "A4", "margins": "20mm"},
 		"body": [
 			{"row": {"cols": [
-				{"span": 12, "text": "Text Decoration Demo", "style": {"size": 20, "bold": true}}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "spacer": "8mm"}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "text": "Normal text without decoration"}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "spacer": "4mm"}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "text": "Underlined text for emphasis", "style": {"underline": true}}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "spacer": "4mm"}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "text": "Strikethrough text for deletions", "style": {"strikethrough": true}}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "spacer": "4mm"}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "text": "Combined underline and strikethrough", "style": {"underline": true, "strikethrough": true}}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "spacer": "4mm"}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "text": "Colored underlined text", "style": {"underline": true, "color": "#1565C0", "size": 14}}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "spacer": "4mm"}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "text": "Bold underlined heading", "style": {"bold": true, "underline": true, "size": 16}}
+				{"span": 12, "elements": [
+					{"type": "text", "content": "Text Decoration Demo", "style": {"size": 20, "bold": true}},
+					{"type": "spacer", "height": "8mm"},
+					{"type": "text", "content": "Normal text without decoration"},
+					{"type": "spacer", "height": "4mm"},
+					{"type": "text", "content": "Underlined text for emphasis", "style": {"underline": true}},
+					{"type": "spacer", "height": "4mm"},
+					{"type": "text", "content": "Strikethrough text for deletions", "style": {"strikethrough": true}},
+					{"type": "spacer", "height": "4mm"},
+					{"type": "text", "content": "Combined underline and strikethrough", "style": {"underline": true, "strikethrough": true}},
+					{"type": "spacer", "height": "4mm"},
+					{"type": "text", "content": "Colored underlined text", "style": {"underline": true, "color": "#1565C0", "size": 14}},
+					{"type": "spacer", "height": "4mm"},
+					{"type": "text", "content": "Bold underlined heading", "style": {"bold": true, "underline": true, "size": 16}}
+				]}
 			]}}
 		]
 	}`)
@@ -57,5 +35,5 @@ func TestJSON_24_TextDecoration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("FromJSON error: %v", err)
 	}
-	testutil.GeneratePDF(t, "24_text_decoration.pdf", doc)
+	testutil.GeneratePDFSharedGolden(t, "24_text_decoration.pdf", doc)
 }

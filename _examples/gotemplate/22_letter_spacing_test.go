@@ -12,37 +12,19 @@ func TestTmpl_22_LetterSpacing(t *testing.T) {
 		"page": {"size": "A4", "margins": "20mm"},
 		"body": [
 			{"row": {"cols": [
-				{"span": 12, "text": "{{.Title}}", "style": {"size": 20, "bold": true}}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "spacer": "8mm"}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "text": "{{.Normal}}"}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "spacer": "3mm"}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "text": "{{.Spacing1}}", "style": {"letterSpacing": 1}}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "spacer": "3mm"}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "text": "{{.Spacing3}}", "style": {"letterSpacing": 3}}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "spacer": "3mm"}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "text": "{{.WideHeader}}", "style": {"size": 16, "bold": true, "letterSpacing": 5}}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "spacer": "3mm"}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "text": "{{.Tight}}", "style": {"letterSpacing": -0.5}}
+				{"span": 12, "elements": [
+					{"type": "text", "content": "{{.Title}}", "style": {"size": 20, "bold": true}},
+					{"type": "spacer", "height": "8mm"},
+					{"type": "text", "content": "{{.Normal}}"},
+					{"type": "spacer", "height": "3mm"},
+					{"type": "text", "content": "{{.Spacing1}}", "style": {"letterSpacing": 1}},
+					{"type": "spacer", "height": "3mm"},
+					{"type": "text", "content": "{{.Spacing3}}", "style": {"letterSpacing": 3}},
+					{"type": "spacer", "height": "3mm"},
+					{"type": "text", "content": "{{.WideHeader}}", "style": {"size": 16, "bold": true, "letterSpacing": 5}},
+					{"type": "spacer", "height": "3mm"},
+					{"type": "text", "content": "{{.Tight}}", "style": {"letterSpacing": -0.5}}
+				]}
 			]}}
 		]
 	}`)
@@ -60,5 +42,5 @@ func TestTmpl_22_LetterSpacing(t *testing.T) {
 	if err != nil {
 		t.Fatalf("FromJSON error: %v", err)
 	}
-	testutil.GeneratePDF(t, "22_letter_spacing.pdf", doc)
+	testutil.GeneratePDFSharedGolden(t, "22_letter_spacing.pdf", doc)
 }

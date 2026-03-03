@@ -37,5 +37,5 @@ func TestExample_07_TableBasic(t *testing.T) {
 		})
 	})
 
-	testutil.GeneratePDF(t, "07_table_basic.pdf", doc)
+	testutil.GeneratePDFSharedGolden(t, "07_table_basic.pdf", doc)
 }

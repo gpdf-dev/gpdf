@@ -82,5 +82,5 @@ func TestExample_02_TextStyling(t *testing.T) {
 		})
 	})
 
-	testutil.GeneratePDF(t, "02_text_styling.pdf", doc)
+	testutil.GeneratePDFSharedGolden(t, "02_text_styling.pdf", doc)
 }

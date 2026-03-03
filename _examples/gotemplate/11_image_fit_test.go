@@ -17,13 +17,13 @@ func TestTmpl_11_ImageFit(t *testing.T) {
 		"body": [
 			{"row": {"cols": [
 				{"span": 12, "elements": [
-					{"type": "text", "content": "Image Fit Options", "style": {"size": 18, "bold": true}},
+					{"type": "text", "content": "{{.Title}}", "style": {"size": 18, "bold": true}},
 					{"type": "spacer", "height": "5mm"}
 				]}
 			]}},
 			{"row": {"cols": [
 				{"span": 12, "elements": [
-					{"type": "text", "content": "FitWidth(80mm):"},
+					{"type": "text", "content": "{{.FitWidthLabel}}"},
 					{"type": "spacer", "height": "2mm"},
 					{"type": "image", "image": {"src": "{{.ImgB64}}", "width": "80mm"}},
 					{"type": "spacer", "height": "5mm"}
@@ -31,7 +31,7 @@ func TestTmpl_11_ImageFit(t *testing.T) {
 			]}},
 			{"row": {"cols": [
 				{"span": 12, "elements": [
-					{"type": "text", "content": "FitHeight(30mm):"},
+					{"type": "text", "content": "{{.FitHeightLabel}}"},
 					{"type": "spacer", "height": "2mm"},
 					{"type": "image", "image": {"src": "{{.ImgB64}}", "height": "30mm"}},
 					{"type": "spacer", "height": "5mm"}
@@ -39,7 +39,7 @@ func TestTmpl_11_ImageFit(t *testing.T) {
 			]}},
 			{"row": {"cols": [
 				{"span": 12, "elements": [
-					{"type": "text", "content": "Default (no fit options):"},
+					{"type": "text", "content": "{{.DefaultLabel}}"},
 					{"type": "spacer", "height": "2mm"},
 					{"type": "image", "image": {"src": "{{.ImgB64}}"}}
 				]}
@@ -48,12 +48,16 @@ func TestTmpl_11_ImageFit(t *testing.T) {
 	}`)
 
 	data := map[string]any{
-		"ImgB64": base64.StdEncoding.EncodeToString(imgData),
+		"Title":          "Image Fit Options",
+		"FitWidthLabel":  "FitWidth(80mm):",
+		"FitHeightLabel": "FitHeight(30mm):",
+		"DefaultLabel":   "Default (no fit options):",
+		"ImgB64":         base64.StdEncoding.EncodeToString(imgData),
 	}
 
 	doc, err := template.FromJSON(schema, data)
 	if err != nil {
 		t.Fatalf("FromJSON error: %v", err)
 	}
-	testutil.GeneratePDF(t, "11_image_fit.pdf", doc)
+	testutil.GeneratePDFSharedGolden(t, "11_image_fit.pdf", doc)
 }

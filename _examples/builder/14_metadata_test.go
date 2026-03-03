@@ -37,5 +37,5 @@ func TestExample_14_Metadata(t *testing.T) {
 		})
 	})
 
-	testutil.GeneratePDF(t, "14_metadata.pdf", doc)
+	testutil.GeneratePDFSharedGolden(t, "14_metadata.pdf", doc)
 }

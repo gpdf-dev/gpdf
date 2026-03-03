@@ -21,5 +21,5 @@ func TestExample_01_HelloWorld(t *testing.T) {
 		})
 	})
 
-	testutil.GeneratePDF(t, "01_hello_world.pdf", doc)
+	testutil.GeneratePDFSharedGolden(t, "01_hello_world.pdf", doc)
 }

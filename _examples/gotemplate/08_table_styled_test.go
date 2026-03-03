@@ -12,17 +12,17 @@ func TestTmpl_08_TableStyled(t *testing.T) {
 		"page": {"size": "A4", "margins": "15mm"},
 		"body": [
 			{"row": {"cols": [
-				{"span": 12, "text": "{{.Title}}", "style": {"size": 18, "bold": true}}
-			]}},
-			{"row": {"cols": [
-				{"span": 12, "spacer": "5mm"}
+				{"span": 12, "elements": [
+					{"type": "text", "content": "{{.Title}}", "style": {"size": 18, "bold": true}},
+					{"type": "spacer", "height": "5mm"}
+				]}
 			]}},
 			{"row": {"cols": [
 				{"span": 12, "table": {
 					"header": ["Product", "Category", "Qty", "Unit Price", "Total"],
 					"rows": {{toJSON .Rows}},
 					"columnWidths": [30, 20, 10, 20, 20],
-					"headerStyle": {"bold": true, "color": "white", "background": "#1A237E"},
+					"headerStyle": {"color": "white", "background": "#1A237E"},
 					"stripeColor": "#F5F5F5"
 				}}
 			]}}
@@ -45,5 +45,5 @@ func TestTmpl_08_TableStyled(t *testing.T) {
 	if err != nil {
 		t.Fatalf("FromJSON error: %v", err)
 	}
-	testutil.GeneratePDF(t, "08_table_styled.pdf", doc)
+	testutil.GeneratePDFSharedGolden(t, "08_table_styled.pdf", doc)
 }

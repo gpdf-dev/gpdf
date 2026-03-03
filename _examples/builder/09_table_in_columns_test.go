@@ -52,5 +52,5 @@ func TestExample_09_TableInColumns(t *testing.T) {
 		})
 	})
 
-	testutil.GeneratePDF(t, "09_table_in_columns.pdf", doc)
+	testutil.GeneratePDFSharedGolden(t, "09_table_in_columns.pdf", doc)
 }
