@@ -94,6 +94,11 @@ type CellNode struct {
 	Cell *TableCell
 }
 
-func (cn *CellNode) NodeType() NodeType       { return NodeTableCell }
+// NodeType returns NodeTableCell.
+func (cn *CellNode) NodeType() NodeType { return NodeTableCell }
+
+// Children returns the content nodes inside this cell.
 func (cn *CellNode) Children() []DocumentNode { return cn.Cell.Content }
-func (cn *CellNode) Style() Style             { return cn.Cell.CellStyle }
+
+// Style returns the cell's visual style.
+func (cn *CellNode) Style() Style { return cn.Cell.CellStyle }

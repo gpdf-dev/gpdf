@@ -1,7 +1,3 @@
-// Package pdf provides low-level PDF object types and binary output facilities.
-//
-// Each type implements the Object interface, producing valid PDF syntax
-// when serialized through WriteTo.
 package pdf
 
 import (

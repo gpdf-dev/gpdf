@@ -1,4 +1,3 @@
-// Package barcode implements barcode encoding and rendering.
 package barcode
 
 import "fmt"

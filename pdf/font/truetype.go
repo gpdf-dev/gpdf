@@ -121,7 +121,13 @@ type hmtxTable struct {
 	leftSideBearings []int16
 }
 
-// TrueTypeFont is a parsed TrueType font file that implements the Font interface.
+// TrueTypeFont is a parsed TrueType (.ttf) font that implements the [Font]
+// interface. It provides glyph metrics, Unicode-to-GID mapping (via cmap
+// format 4 and 12), horizontal advance widths, PDF text encoding, and font
+// subsetting for embedding. CJK (Chinese, Japanese, Korean) characters are
+// fully supported through format 12 cmap tables.
+//
+// Create a TrueTypeFont by calling [ParseTrueType] with the raw font file data.
 type TrueTypeFont struct {
 	name       string
 	data       []byte // original font file data

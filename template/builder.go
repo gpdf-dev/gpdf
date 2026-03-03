@@ -1,7 +1,3 @@
-// Package template provides a declarative, builder-pattern API for
-// constructing PDF documents. It sits on top of the document model
-// (Layer 2) and provides high-level constructs such as grids, headers,
-// footers, and reusable components.
 package template
 
 import (
@@ -27,7 +23,9 @@ type Document struct {
 	fontResolver *builtinFontResolver
 }
 
-// Config holds document-level configuration.
+// Config holds document-level configuration such as page size, margins,
+// default font settings, and metadata. It is populated by [Option] functions
+// passed to [New].
 type Config struct {
 	PageSize    document.Size
 	Margins     document.Edges
