@@ -33,5 +33,5 @@ func TestExample_20_RenderToWriter(t *testing.T) {
 	data := buf.Bytes()
 	testutil.AssertValidPDF(t, data)
 	testutil.WritePDF(t, "20_render_to_writer.pdf", data)
-	testutil.AssertMatchesGolden(t, "20_render_to_writer.pdf", data)
+	testutil.AssertMatchesSharedGolden(t, "20_render_to_writer.pdf", data)
 }

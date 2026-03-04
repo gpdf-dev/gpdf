@@ -490,7 +490,7 @@ endobj
 << /Count 1 /Kids [7 0 R] /Type /Pages >>
 endobj
 8 0 obj
-<< /Author (ACME Corporation) /Producer (gpdf/0.5.0) /Title (Invoice #INV-2026-001) >>
+<< /Author (ACME Corporation) /Producer (gpdf) /Title (Invoice #INV-2026-001) >>
 endobj
 1 0 obj
 << /Pages 2 0 R /Type /Catalog >>
@@ -498,7 +498,7 @@ endobj
 xref
 0 9
 0000000000 65535 f 
-0000007794 00000 n 
+0000007788 00000 n 
 0000007635 00000 n 
 0000000009 00000 n 
 0000000084 00000 n 
@@ -509,5 +509,5 @@ xref
 trailer
 << /Info 8 0 R /Root 1 0 R /Size 9 >>
 startxref
-7843
+7837
 %%EOF

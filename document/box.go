@@ -37,6 +37,7 @@ type BoxStyle struct {
 	Border     BorderEdges
 	Background *pdf.Color
 	Direction  Direction
+	Position   Position
 }
 
 // NodeType returns NodeBox.

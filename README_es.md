@@ -29,19 +29,56 @@ Biblioteca de generación de PDF en Go puro, sin dependencias externas, con arqu
 - **Múltiples unidades** — pt, mm, cm, in, em, %
 - **Espacios de color** — RGB, escala de grises, CMYK
 - **Imágenes** — incrustación de JPEG y PNG con opciones de ajuste
+- **Posicionamiento absoluto** — colocar elementos en coordenadas XY exactas en la página
 - **Metadatos del documento** — título, autor, asunto, creador
+
+## Benchmark
+
+Comparación con [go-pdf/fpdf](https://github.com/go-pdf/fpdf), [signintech/gopdf](https://github.com/signintech/gopdf) y [maroto v2](https://github.com/johnfercher/maroto).
+Mediana de 5 ejecuciones, 100 iteraciones cada una. Apple M1, Go 1.25.
+
+**Tiempo de ejecución** (menor es mejor):
+
+| Benchmark | gpdf | fpdf | gopdf | maroto v2 |
+|---|--:|--:|--:|--:|
+| Página única | **13 µs** | 132 µs | 423 µs | 237 µs |
+| Tabla (4x10) | **108 µs** | 241 µs | 835 µs | 8.6 ms |
+| 100 páginas | **683 µs** | 11.7 ms | 8.6 ms | 19.8 ms |
+| Documento complejo | **133 µs** | 254 µs | 997 µs | 10.4 ms |
+
+**Uso de memoria** (menor es mejor):
+
+| Benchmark | gpdf | fpdf | gopdf | maroto v2 |
+|---|--:|--:|--:|--:|
+| Página única | **16 KB** | 1.2 MB | 1.8 MB | 61 KB |
+| Tabla (4x10) | **209 KB** | 1.3 MB | 1.9 MB | 1.6 MB |
+| 100 páginas | **909 KB** | 121 MB | 83 MB | 4.0 MB |
+| Documento complejo | **246 KB** | 1.3 MB | 2.0 MB | 2.0 MB |
+
+### ¿Por qué gpdf es rápido?
+
+- **Página única** — Pipeline de un solo paso: construir→componer→renderizar, sin estructuras de datos intermedias. Usa tipos struct concretos (sin boxing de `interface{}`), construyendo el árbol del documento con asignaciones de heap mínimas.
+- **Tabla** — El contenido de las celdas se escribe directamente como comandos de flujo de contenido PDF a través de un buffer `strings.Builder` reutilizable. Sin envoltura de objetos por celda ni búsquedas de fuentes repetidas; la fuente se resuelve una vez por documento.
+- **100 páginas** — El layout escala linealmente O(n). La paginación por desbordamiento pasa los nodos restantes por referencia de slice (sin copias profundas). La fuente se parsea una vez y se comparte entre todas las páginas.
+- **Documento complejo** — El layout de un solo paso sin re-medición combina todas las ventajas anteriores. El subsetting de fuentes incrusta solo los glifos utilizados, y la compresión Flate se aplica por defecto, manteniendo pequeños tanto la memoria como el tamaño de salida.
+
+Ejecutar benchmarks:
+
+```bash
+cd _benchmark && go test -bench=. -benchmem -count=5
+```
 
 ## Arquitectura
 
 ```
 ┌─────────────────────────────────────┐
-│  gpdf (punto de entrada)            │
+│  gpdf (entry point)                 │
 ├─────────────────────────────────────┤
-│  template  — API Builder, Cuadrícula│  Capa 3
+│  template  — Builder API, Grid      │  Layer 3
 ├─────────────────────────────────────┤
-│  document  — Nodos, Estilos, Layout │  Capa 2
+│  document  — Nodes, Style, Layout   │  Layer 2
 ├─────────────────────────────────────┤
-│  pdf       — Writer, Fuentes, Flujos│  Capa 1
+│  pdf       — Writer, Fonts, Streams │  Layer 1
 └─────────────────────────────────────┘
 ```
 
@@ -368,6 +405,22 @@ doc.Render(f)
 | `c.Line(opts...)` | Agregar una línea horizontal |
 | `c.Spacer(height)` | Agregar espacio vertical |
 
+### Contenido a nivel de página
+
+| Método | Descripción |
+|---|---|
+| `page.AutoRow(fn)` | Agregar una fila de altura automática |
+| `page.Row(height, fn)` | Agregar una fila de altura fija |
+| `page.Absolute(x, y, fn, opts...)` | Colocar contenido en coordenadas XY exactas |
+
+#### Opciones de posicionamiento absoluto
+
+| Opción | Descripción |
+|---|---|
+| `gpdf.AbsoluteWidth(value)` | Establecer ancho explícito (predeterminado: espacio restante) |
+| `gpdf.AbsoluteHeight(value)` | Establecer altura explícita (predeterminado: espacio restante) |
+| `gpdf.AbsoluteOriginPage()` | Usar esquina de página como origen en lugar del área de contenido |
+
 ### Opciones de texto
 
 | Opción | Descripción |
@@ -455,42 +508,6 @@ pdf.CMYK(0, 0.5, 1, 0)   // CMYK
 // Colores predefinidos
 pdf.Black, pdf.White, pdf.Red, pdf.Green, pdf.Blue
 pdf.Yellow, pdf.Cyan, pdf.Magenta
-```
-
-## Benchmark
-
-Comparación con [go-pdf/fpdf](https://github.com/go-pdf/fpdf), [signintech/gopdf](https://github.com/signintech/gopdf) y [maroto v2](https://github.com/johnfercher/maroto).
-Mediana de 5 ejecuciones, 100 iteraciones cada una. Apple M1, Go 1.25.
-
-**Tiempo de ejecución** (menor es mejor):
-
-| Benchmark | gpdf | fpdf | gopdf | maroto v2 |
-|---|--:|--:|--:|--:|
-| Página única | **13 µs** | 132 µs | 423 µs | 237 µs |
-| Tabla (4x10) | **108 µs** | 241 µs | 835 µs | 8.6 ms |
-| 100 páginas | **683 µs** | 11.7 ms | 8.6 ms | 19.8 ms |
-| Documento complejo | **133 µs** | 254 µs | 997 µs | 10.4 ms |
-
-**Uso de memoria** (menor es mejor):
-
-| Benchmark | gpdf | fpdf | gopdf | maroto v2 |
-|---|--:|--:|--:|--:|
-| Página única | **16 KB** | 1.2 MB | 1.8 MB | 61 KB |
-| Tabla (4x10) | **209 KB** | 1.3 MB | 1.9 MB | 1.6 MB |
-| 100 páginas | **909 KB** | 121 MB | 83 MB | 4.0 MB |
-| Documento complejo | **246 KB** | 1.3 MB | 2.0 MB | 2.0 MB |
-
-### ¿Por qué gpdf es rápido?
-
-- **Página única** — Pipeline de un solo paso: construir→componer→renderizar, sin estructuras de datos intermedias. Usa tipos struct concretos (sin boxing de `interface{}`), construyendo el árbol del documento con asignaciones de heap mínimas.
-- **Tabla** — El contenido de las celdas se escribe directamente como comandos de flujo de contenido PDF a través de un buffer `strings.Builder` reutilizable. Sin envoltura de objetos por celda ni búsquedas de fuentes repetidas; la fuente se resuelve una vez por documento.
-- **100 páginas** — El layout escala linealmente O(n). La paginación por desbordamiento pasa los nodos restantes por referencia de slice (sin copias profundas). La fuente se parsea una vez y se comparte entre todas las páginas.
-- **Documento complejo** — El layout de un solo paso sin re-medición combina todas las ventajas anteriores. El subsetting de fuentes incrusta solo los glifos utilizados, y la compresión Flate se aplica por defecto, manteniendo pequeños tanto la memoria como el tamaño de salida.
-
-Ejecutar benchmarks:
-
-```bash
-cd _benchmark && go test -bench=. -benchmem -count=5
 ```
 
 ## Licencia

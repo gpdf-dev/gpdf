@@ -597,7 +597,7 @@ endobj
 << /Count 1 /Kids [6 0 R] /Type /Pages >>
 endobj
 7 0 obj
-<< /Author (ACME Corporation) /Producer (gpdf/0.5.0) /Subject (Q1 2026 - Financial Summary) /Title (Quarterly Report) >>
+<< /Author (ACME Corporation) /Producer (gpdf) /Subject (Q1 2026 - Financial Summary) /Title (Quarterly Report) >>
 endobj
 1 0 obj
 << /Pages 2 0 R /Type /Catalog >>
@@ -605,7 +605,7 @@ endobj
 xref
 0 8
 0000000000 65535 f 
-0000010380 00000 n 
+0000010374 00000 n 
 0000010187 00000 n 
 0000000009 00000 n 
 0000000084 00000 n 
@@ -615,5 +615,5 @@ xref
 trailer
 << /Info 7 0 R /Root 1 0 R /Size 8 >>
 startxref
-10429
+10423
 %%EOF

@@ -237,6 +237,99 @@ func TestPatternStartsAndEndsWithBar(t *testing.T) {
 	}
 }
 
+func TestEncodeCode128ControlCharacters(t *testing.T) {
+	// String starting with a control character should use Code A.
+	// \x01 is a control char (< 32), so chooseStartCode returns StartA.
+	bc, err := Encode("\x01", Code128)
+	if err != nil {
+		t.Fatalf("Encode(ctrl) error: %v", err)
+	}
+	if len(bc.Pattern) == 0 {
+		t.Error("Pattern is empty")
+	}
+}
+
+func TestEncodeSetA_PrintableASCII(t *testing.T) {
+	// Control char followed by printable ASCII in Code A range (32-95).
+	// \x01 starts in Code A, then 'A' (65) stays in A.
+	bc, err := Encode("\x01A", Code128)
+	if err != nil {
+		t.Fatalf("Encode error: %v", err)
+	}
+	if len(bc.Pattern) == 0 {
+		t.Error("Pattern is empty")
+	}
+}
+
+func TestEncodeSetA_SwitchToB(t *testing.T) {
+	// Control char followed by lowercase (>95) forces switch A→B.
+	bc, err := Encode("\x01a", Code128)
+	if err != nil {
+		t.Fatalf("Encode error: %v", err)
+	}
+	if len(bc.Pattern) == 0 {
+		t.Error("Pattern is empty")
+	}
+}
+
+func TestEncodeSetA_SwitchToC(t *testing.T) {
+	// Control char followed by 4+ digits forces switch A→C.
+	bc, err := Encode("\x011234", Code128)
+	if err != nil {
+		t.Fatalf("Encode error: %v", err)
+	}
+	if len(bc.Pattern) == 0 {
+		t.Error("Pattern is empty")
+	}
+}
+
+func TestEncodeSetB_ControlCharPath(t *testing.T) {
+	// Code B with a control character triggers temporary switch to A.
+	// "A\x01B" starts in B, 'A' in B, \x01 switches to A and back, 'B' in B.
+	symbols, err := encodeCode128("A\x01B")
+	if err != nil {
+		t.Fatalf("encodeCode128 error: %v", err)
+	}
+	// Should contain SwitchA and SwitchB symbols.
+	foundSwitchA := false
+	foundSwitchB := false
+	for _, s := range symbols {
+		if s == code128SwitchA {
+			foundSwitchA = true
+		}
+		if s == code128SwitchB {
+			foundSwitchB = true
+		}
+	}
+	if !foundSwitchA {
+		t.Error("expected SwitchA symbol for control char in Code B")
+	}
+	if !foundSwitchB {
+		t.Error("expected SwitchB symbol after control char")
+	}
+}
+
+func TestChooseStartCode_ControlChar(t *testing.T) {
+	start, set := chooseStartCode("\x01ABC")
+	if start != code128StartA {
+		t.Errorf("start = %d, want %d (StartA)", start, code128StartA)
+	}
+	if set != 'A' {
+		t.Errorf("set = %c, want A", set)
+	}
+}
+
+func TestEncodeSetA_MultipleControlChars(t *testing.T) {
+	// Multiple control characters stay in Code A.
+	bc, err := Encode("\x01\x02\x03", Code128)
+	if err != nil {
+		t.Fatalf("Encode error: %v", err)
+	}
+	if len(bc.Pattern) == 0 {
+		t.Error("Pattern is empty")
+	}
+}
+
 func TestCountDigits(t *testing.T) {
 	tests := []struct {
 		data string

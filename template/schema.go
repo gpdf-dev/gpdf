@@ -38,11 +38,13 @@ type Schema struct {
 	Footer   []SchemaRow      `json:"footer,omitempty"`
 	Body     []SchemaRow      `json:"body,omitempty"`
 	Pages    []SchemaPageBody `json:"pages,omitempty"` // multiple explicit pages
+	Absolute []SchemaAbsolute `json:"absolute,omitempty"`
 }
 
 // SchemaPageBody defines the body content for a single page.
 type SchemaPageBody struct {
-	Body []SchemaRow `json:"body"`
+	Body     []SchemaRow      `json:"body"`
+	Absolute []SchemaAbsolute `json:"absolute,omitempty"`
 }
 
 // SchemaPage defines page-level settings.
@@ -120,6 +122,7 @@ type SchemaStyle struct {
 	Underline     bool    `json:"underline,omitempty"`
 	Strikethrough bool    `json:"strikethrough,omitempty"`
 	LetterSpacing float64 `json:"letterSpacing,omitempty"`
+	TextIndent    string  `json:"textIndent,omitempty"` // e.g. "24pt", "10mm"
 }
 
 // SchemaImage defines an image element.
@@ -138,6 +141,7 @@ type SchemaTable struct {
 	ColumnWidths []float64    `json:"columnWidths,omitempty"`
 	HeaderStyle  *SchemaStyle `json:"headerStyle,omitempty"`
 	StripeColor  string       `json:"stripeColor,omitempty"`
+	CellVAlign   string       `json:"cellVAlign,omitempty"` // "top", "middle", "bottom"
 }
 
 // SchemaList defines a list element.
@@ -165,6 +169,17 @@ type SchemaBarcode struct {
 	Width  string `json:"width,omitempty"`
 	Height string `json:"height,omitempty"`
 	Format string `json:"format,omitempty"` // "code128" (default)
+}
+
+// SchemaAbsolute defines an absolute-positioned element placed at
+// fixed XY coordinates on the page.
+type SchemaAbsolute struct {
+	X        string          `json:"x"`
+	Y        string          `json:"y"`
+	Width    string          `json:"width,omitempty"`
+	Height   string          `json:"height,omitempty"`
+	Origin   string          `json:"origin,omitempty"` // "content" (default) or "page"
+	Elements []SchemaElement `json:"elements"`
 }
 
 // ---------------------------------------------------------------------------
@@ -332,16 +347,8 @@ func applySchemaStyle(ss *SchemaStyle) []TextOption {
 	if ss.Align != "" {
 		opts = append(opts, parseAlignOption(ss.Align))
 	}
-	if ss.Color != "" {
-		if c, err := parseColor(ss.Color); err == nil {
-			opts = append(opts, TextColor(c))
-		}
-	}
-	if ss.Background != "" {
-		if c, err := parseColor(ss.Background); err == nil {
-			opts = append(opts, BgColor(c))
-		}
-	}
+	opts = appendColorOpt(opts, ss.Color, TextColor)
+	opts = appendColorOpt(opts, ss.Background, BgColor)
 	if ss.FontFamily != "" {
 		opts = append(opts, FontFamily(ss.FontFamily))
 	}
@@ -353,6 +360,22 @@ func applySchemaStyle(ss *SchemaStyle) []TextOption {
 	}
 	if ss.LetterSpacing != 0 {
 		opts = append(opts, LetterSpacing(ss.LetterSpacing))
+	}
+	if ss.TextIndent != "" {
+		if v, err := parseValue(ss.TextIndent); err == nil {
+			opts = append(opts, TextIndent(v))
+		}
+	}
+	return opts
+}
+
+// appendColorOpt parses a color string and appends the resulting option if valid.
+func appendColorOpt(opts []TextOption, s string, fn func(pdf.Color) TextOption) []TextOption {
+	if s == "" {
+		return opts
+	}
+	if c, err := parseColor(s); err == nil {
+		opts = append(opts, fn(c))
 	}
 	return opts
 }
@@ -470,11 +493,13 @@ func buildFromSchema(schema *Schema, opts []Option) (*Document, error) {
 	if len(schema.Body) > 0 {
 		page := doc.AddPage()
 		buildSchemaRows(page, schema.Body)
+		buildSchemaAbsolutes(page, schema.Absolute)
 	}
 
 	for _, p := range schema.Pages {
 		page := doc.AddPage()
 		buildSchemaRows(page, p.Body)
+		buildSchemaAbsolutes(page, p.Absolute)
 	}
 
 	return doc, nil
@@ -631,6 +656,20 @@ func parseFitMode(s string) (document.ImageFitMode, bool) {
 	}
 }
 
+// parseVerticalAlign converts a vertical alignment string to a VerticalAlign constant.
+func parseVerticalAlign(s string) (document.VerticalAlign, bool) {
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "top":
+		return document.VAlignTop, true
+	case "middle":
+		return document.VAlignMiddle, true
+	case "bottom":
+		return document.VAlignBottom, true
+	default:
+		return document.VAlignTop, false
+	}
+}
+
 // parseImageAlign converts an alignment string to a TextAlign constant.
 func parseImageAlign(s string) (document.TextAlign, bool) {
 	switch strings.ToLower(s) {
@@ -660,6 +699,11 @@ func buildSchemaTable(c *ColBuilder, tbl *SchemaTable) {
 	if tbl.StripeColor != "" {
 		if clr, err := parseColor(tbl.StripeColor); err == nil {
 			opts = append(opts, TableStripe(clr))
+		}
+	}
+	if tbl.CellVAlign != "" {
+		if align, ok := parseVerticalAlign(tbl.CellVAlign); ok {
+			opts = append(opts, TableCellVAlign(align))
 		}
 	}
 	c.Table(tbl.Header, tbl.Rows, opts...)
@@ -751,4 +795,40 @@ func buildSchemaBarcode(c *ColBuilder, bc *SchemaBarcode) {
 		}
 	}
 	c.Barcode(bc.Data, opts...)
+}
+
+// buildSchemaAbsolutes adds absolute-positioned elements to a page.
+func buildSchemaAbsolutes(p *PageBuilder, absolutes []SchemaAbsolute) {
+	for _, abs := range absolutes {
+		xVal, err := parseValue(abs.X)
+		if err != nil {
+			continue
+		}
+		yVal, err := parseValue(abs.Y)
+		if err != nil {
+			continue
+		}
+
+		var opts []AbsoluteOption
+		if abs.Width != "" {
+			if v, err := parseValue(abs.Width); err == nil {
+				opts = append(opts, AbsoluteWidth(v))
+			}
+		}
+		if abs.Height != "" {
+			if v, err := parseValue(abs.Height); err == nil {
+				opts = append(opts, AbsoluteHeight(v))
+			}
+		}
+		if strings.ToLower(abs.Origin) == "page" {
+			opts = append(opts, AbsoluteOriginPage())
+		}
+
+		elements := abs.Elements // capture for closure
+		p.Absolute(xVal, yVal, func(c *ColBuilder) {
+			for _, elem := range elements {
+				buildSchemaElement(c, elem)
+			}
+		}, opts...)
+	}
 }

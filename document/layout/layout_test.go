@@ -3378,3 +3378,76 @@ func TestLayoutRichText_BlockDispatch(t *testing.T) {
 		t.Fatal("expected placed children from block layout with RichText")
 	}
 }
+
+func TestEffectiveFontSize_Positive(t *testing.T) {
+	if got := effectiveFontSize(14); got != 14 {
+		t.Errorf("effectiveFontSize(14) = %g, want 14", got)
+	}
+}
+
+func TestEffectiveFontSize_Zero(t *testing.T) {
+	if got := effectiveFontSize(0); got != 12 {
+		t.Errorf("effectiveFontSize(0) = %g, want 12", got)
+	}
+}
+
+func TestEffectiveFontSize_Negative(t *testing.T) {
+	if got := effectiveFontSize(-5); got != 12 {
+		t.Errorf("effectiveFontSize(-5) = %g, want 12", got)
+	}
+}
+
+func TestMeasureRunWidth_NilResolver(t *testing.T) {
+	style := document.Style{FontSize: 10}
+	constraints := Constraints{FontResolver: nil}
+	w := measureRunWidth("Hello", style, 10, constraints)
+	// Without resolver: len("Hello")=5, 5*10*0.5 = 25
+	if !approxEqual(w, 25, 0.1) {
+		t.Errorf("measureRunWidth(nil resolver) = %g, want 25", w)
+	}
+}
+
+func TestMeasureRunWidth_WithResolver(t *testing.T) {
+	style := document.Style{FontSize: 10, FontFamily: "Test"}
+	constraints := Constraints{FontResolver: &mockFontResolver{}}
+	w := measureRunWidth("Hello", style, 10, constraints)
+	// With mock resolver: 5 chars * 10 * 0.5 = 25
+	if !approxEqual(w, 25, 0.1) {
+		t.Errorf("measureRunWidth(mock resolver) = %g, want 25", w)
+	}
+}
+
+func TestMeasureRunWidth_WithLetterSpacing(t *testing.T) {
+	style := document.Style{FontSize: 10, FontFamily: "Test", LetterSpacing: 2.0}
+	constraints := Constraints{FontResolver: &mockFontResolver{}}
+	w := measureRunWidth("Hello", style, 10, constraints)
+	// Mock: 5*10*0.5=25, plus letter spacing: 2.0 * (5-1) = 8 → total 33
+	if !approxEqual(w, 33, 0.1) {
+		t.Errorf("measureRunWidth(letter spacing) = %g, want 33", w)
+	}
+}
+
+func TestListItemNode_StyleViaList(t *testing.T) {
+	// Test ListItemNode Style fallback via List.Children().
+	lst := &document.List{
+		ListStyle: document.Style{FontSize: 12},
+		Items: []document.ListItem{
+			{ItemStyle: document.Style{}},             // No font size → falls back to list
+			{ItemStyle: document.Style{FontSize: 16}}, // Has font size → overrides
+		},
+	}
+	children := lst.Children()
+	if len(children) != 2 {
+		t.Fatalf("expected 2 children, got %d", len(children))
+	}
+	// First item falls back to list style.
+	s0 := children[0].Style()
+	if s0.FontSize != 12 {
+		t.Errorf("item 0: expected list style fallback (12), got FontSize=%g", s0.FontSize)
+	}
+	// Second item overrides with its own style.
+	s1 := children[1].Style()
+	if s1.FontSize != 16 {
+		t.Errorf("item 1: expected item style override (16), got FontSize=%g", s1.FontSize)
+	}
+}

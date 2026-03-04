@@ -1,6 +1,3 @@
-// Package font provides font parsing, metrics, and subsetting facilities
-// for PDF generation. It supports TrueType fonts and implements glyph width
-// measurement, line breaking, and ToUnicode CMap generation.
 package font
 
 import (

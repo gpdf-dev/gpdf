@@ -530,6 +530,355 @@ func TestLoadImageData_RawBase64(t *testing.T) {
 	}
 }
 
+func TestParseRGBColor(t *testing.T) {
+	tests := []struct {
+		input string
+		ok    bool
+	}{
+		{"rgb(1.0, 0.0, 0.0)", true},
+		{"rgb(0.5, 0.5, 0.5)", true},
+		{"RGB(0, 0, 0)", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			_, err := parseColor(tt.input)
+			if tt.ok && err != nil {
+				t.Errorf("parseColor(%q) error: %v", tt.input, err)
+			}
+		})
+	}
+}
+
+func TestParseRGBColor_Errors(t *testing.T) {
+	bad := []string{
+		"rgb(1.0, 0.0)",    // only 2 components
+		"rgb(a, 0.0, 0.0)", // non-numeric
+		"rgb(1.0, b, 0.0)", // non-numeric g
+		"rgb(1.0, 0.0, c)", // non-numeric b
+		"rgb(1,2,3,4)",     // 4 components
+	}
+	for _, s := range bad {
+		if _, err := parseColor(s); err == nil {
+			t.Errorf("parseColor(%q) expected error, got nil", s)
+		}
+	}
+}
+
+func TestParseVerticalAlign(t *testing.T) {
+	tests := []struct {
+		input string
+		want  document.VerticalAlign
+		ok    bool
+	}{
+		{"top", document.VAlignTop, true},
+		{"middle", document.VAlignMiddle, true},
+		{"bottom", document.VAlignBottom, true},
+		{"  Top  ", document.VAlignTop, true},
+		{"invalid", document.VAlignTop, false},
+		{"", document.VAlignTop, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			got, ok := parseVerticalAlign(tt.input)
+			if ok != tt.ok {
+				t.Errorf("parseVerticalAlign(%q) ok = %v, want %v", tt.input, ok, tt.ok)
+			}
+			if ok && got != tt.want {
+				t.Errorf("parseVerticalAlign(%q) = %v, want %v", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestParseQRErrorCorrection(t *testing.T) {
+	tests := []struct {
+		input string
+		ok    bool
+	}{
+		{"L", true},
+		{"M", true},
+		{"Q", true},
+		{"H", true},
+		{"l", true},   // lowercase
+		{" h ", true}, // whitespace
+		{"X", false},
+		{"", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			_, ok := parseQRErrorCorrection(tt.input)
+			if ok != tt.ok {
+				t.Errorf("parseQRErrorCorrection(%q) ok = %v, want %v", tt.input, ok, tt.ok)
+			}
+		})
+	}
+}
+
+func TestParseAlignOption_Default(t *testing.T) {
+	// "left" and unknown values should return AlignLeft.
+	opt := parseAlignOption("left")
+	style := document.DefaultStyle()
+	opt(&style)
+	if style.TextAlign != document.AlignLeft {
+		t.Errorf("expected AlignLeft, got %v", style.TextAlign)
+	}
+
+	opt = parseAlignOption("unknown")
+	style = document.DefaultStyle()
+	opt(&style)
+	if style.TextAlign != document.AlignLeft {
+		t.Errorf("expected AlignLeft for unknown, got %v", style.TextAlign)
+	}
+}
+
+func TestBuildSchemaImage_FromBase64(t *testing.T) {
+	// Create a minimal valid PNG as base64.
+	schema := &Schema{
+		Page: SchemaPage{Size: "A4"},
+		Body: []SchemaRow{
+			{Row: SchemaRowDef{
+				Cols: []SchemaCol{
+					{Span: 12, Image: &SchemaImage{
+						Src:    "AQID", // base64 for [1,2,3]
+						Width:  "50mm",
+						Height: "30mm",
+						Fit:    "contain",
+						Align:  "center",
+					}},
+				},
+			}},
+		},
+	}
+	doc, err := buildFromSchema(schema, nil)
+	if err != nil {
+		t.Fatalf("buildFromSchema error: %v", err)
+	}
+	// Should generate without error (image bytes are invalid but builder is lenient).
+	_, _ = doc.Generate()
+}
+
+func TestBuildSchemaImage_Nil(t *testing.T) {
+	// nil image should not panic.
+	schema := &Schema{
+		Page: SchemaPage{Size: "A4"},
+		Body: []SchemaRow{
+			{Row: SchemaRowDef{
+				Cols: []SchemaCol{
+					{Span: 12, Image: nil},
+				},
+			}},
+		},
+	}
+	_, err := buildFromSchema(schema, nil)
+	if err != nil {
+		t.Fatalf("buildFromSchema error: %v", err)
+	}
+}
+
+func TestBuildSchemaElement_TotalPages(t *testing.T) {
+	schema := &Schema{
+		Page: SchemaPage{Size: "A4"},
+		Body: []SchemaRow{
+			{Row: SchemaRowDef{
+				Cols: []SchemaCol{
+					{Span: 12, Elements: []SchemaElement{
+						{Type: "totalPages", Style: &SchemaStyle{Align: "center"}},
+					}},
+				},
+			}},
+		},
+	}
+	doc, err := buildFromSchema(schema, nil)
+	if err != nil {
+		t.Fatalf("buildFromSchema error: %v", err)
+	}
+	if _, err := doc.Generate(); err != nil {
+		t.Fatalf("Generate error: %v", err)
+	}
+}
+
+func TestBuildSchemaElement_ImageViaElement(t *testing.T) {
+	schema := &Schema{
+		Page: SchemaPage{Size: "A4"},
+		Body: []SchemaRow{
+			{Row: SchemaRowDef{
+				Cols: []SchemaCol{
+					{Span: 12, Elements: []SchemaElement{
+						{Type: "image", Image: &SchemaImage{Src: "AQID"}},
+					}},
+				},
+			}},
+		},
+	}
+	doc, err := buildFromSchema(schema, nil)
+	if err != nil {
+		t.Fatalf("error: %v", err)
+	}
+	_, _ = doc.Generate()
+}
+
+func TestBuildSchemaQRCode_Nil(t *testing.T) {
+	schema := &Schema{
+		Page: SchemaPage{Size: "A4"},
+		Body: []SchemaRow{
+			{Row: SchemaRowDef{
+				Cols: []SchemaCol{
+					{Span: 12, Elements: []SchemaElement{
+						{Type: "qrcode", QRCode: nil},
+					}},
+				},
+			}},
+		},
+	}
+	doc, err := buildFromSchema(schema, nil)
+	if err != nil {
+		t.Fatalf("error: %v", err)
+	}
+	_, _ = doc.Generate()
+}
+
+func TestBuildSchemaQRCode_WithErrorCorrection(t *testing.T) {
+	schema := &Schema{
+		Page: SchemaPage{Size: "A4"},
+		Body: []SchemaRow{
+			{Row: SchemaRowDef{
+				Cols: []SchemaCol{
+					{Span: 12, QRCode: &SchemaQRCode{
+						Data:            "https://example.com",
+						Size:            "25mm",
+						ErrorCorrection: "H",
+					}},
+				},
+			}},
+		},
+	}
+	doc, err := buildFromSchema(schema, nil)
+	if err != nil {
+		t.Fatalf("error: %v", err)
+	}
+	if _, err := doc.Generate(); err != nil {
+		t.Fatalf("Generate error: %v", err)
+	}
+}
+
+func TestBuildSchemaList_Nil(t *testing.T) {
+	schema := &Schema{
+		Page: SchemaPage{Size: "A4"},
+		Body: []SchemaRow{
+			{Row: SchemaRowDef{
+				Cols: []SchemaCol{
+					{Span: 12, Elements: []SchemaElement{
+						{Type: "list", List: nil},
+					}},
+				},
+			}},
+		},
+	}
+	doc, err := buildFromSchema(schema, nil)
+	if err != nil {
+		t.Fatalf("error: %v", err)
+	}
+	_, _ = doc.Generate()
+}
+
+func TestBuildSchemaList_Unordered(t *testing.T) {
+	schema := &Schema{
+		Page: SchemaPage{Size: "A4"},
+		Body: []SchemaRow{
+			{Row: SchemaRowDef{
+				Cols: []SchemaCol{
+					{Span: 12, List: &SchemaList{
+						Items: []string{"A", "B"},
+					}},
+				},
+			}},
+		},
+	}
+	doc, err := buildFromSchema(schema, nil)
+	if err != nil {
+		t.Fatalf("error: %v", err)
+	}
+	if _, err := doc.Generate(); err != nil {
+		t.Fatalf("Generate error: %v", err)
+	}
+}
+
+func TestBuildSchemaTable_WithCellVAlign(t *testing.T) {
+	schema := &Schema{
+		Page: SchemaPage{Size: "A4"},
+		Body: []SchemaRow{
+			{Row: SchemaRowDef{
+				Cols: []SchemaCol{
+					{Span: 12, Table: &SchemaTable{
+						Header:     []string{"Name", "Value"},
+						Rows:       [][]string{{"A", "1"}},
+						CellVAlign: "middle",
+					}},
+				},
+			}},
+		},
+	}
+	doc, err := buildFromSchema(schema, nil)
+	if err != nil {
+		t.Fatalf("error: %v", err)
+	}
+	if _, err := doc.Generate(); err != nil {
+		t.Fatalf("Generate error: %v", err)
+	}
+}
+
+func TestBuildSchemaTable_Nil(t *testing.T) {
+	schema := &Schema{
+		Page: SchemaPage{Size: "A4"},
+		Body: []SchemaRow{
+			{Row: SchemaRowDef{
+				Cols: []SchemaCol{
+					{Span: 12, Elements: []SchemaElement{
+						{Type: "table", Table: nil},
+					}},
+				},
+			}},
+		},
+	}
+	doc, err := buildFromSchema(schema, nil)
+	if err != nil {
+		t.Fatalf("error: %v", err)
+	}
+	_, _ = doc.Generate()
+}
+
+func TestBuildSchemaAbsolutes_WithOriginPage(t *testing.T) {
+	schema := &Schema{
+		Page: SchemaPage{Size: "A4", Margins: "20mm"},
+		Body: []SchemaRow{
+			{Row: SchemaRowDef{
+				Cols: []SchemaCol{
+					{Span: 12, Text: "Content"},
+				},
+			}},
+		},
+		Absolute: []SchemaAbsolute{
+			{
+				X:      "10mm",
+				Y:      "10mm",
+				Width:  "50mm",
+				Height: "20mm",
+				Origin: "page",
+				Elements: []SchemaElement{
+					{Type: "text", Content: "Absolute text"},
+				},
+			},
+		},
+	}
+	doc, err := buildFromSchema(schema, nil)
+	if err != nil {
+		t.Fatalf("error: %v", err)
+	}
+	if _, err := doc.Generate(); err != nil {
+		t.Fatalf("Generate error: %v", err)
+	}
+}
+
 func TestSchemaImage_FitAndAlign(t *testing.T) {
 	img := SchemaImage{
 		Src:   "AQID",

@@ -185,7 +185,7 @@ endobj
 << /Count 1 /Kids [6 0 R] /Type /Pages >>
 endobj
 7 0 obj
-<< /Author (ACME Corporation) /Producer (gpdf/0.5.0) /Title (Partnership Proposal) >>
+<< /Author (ACME Corporation) /Producer (gpdf) /Title (Partnership Proposal) >>
 endobj
 1 0 obj
 << /Pages 2 0 R /Type /Catalog >>
@@ -193,7 +193,7 @@ endobj
 xref
 0 8
 0000000000 65535 f 
-0000003110 00000 n 
+0000003104 00000 n 
 0000002952 00000 n 
 0000000009 00000 n 
 0000000084 00000 n 
@@ -203,5 +203,5 @@ xref
 trailer
 << /Info 7 0 R /Root 1 0 R /Size 8 >>
 startxref
-3159
+3153
 %%EOF

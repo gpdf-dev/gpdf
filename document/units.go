@@ -1,7 +1,3 @@
-// Package document provides a high-level document model for composing PDF
-// content using a tree of typed nodes. The model supports units, styles,
-// box model layout, and page-level structure that can be rendered to PDF
-// through the layout and render sub-packages.
 package document
 
 // Value is a dimension expressed as a numeric amount with an associated unit.

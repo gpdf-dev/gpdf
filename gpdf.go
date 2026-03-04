@@ -76,6 +76,16 @@ var (
 	BarcodeFormat = template.BarcodeFormat
 )
 
+// Re-export absolute positioning option functions for convenience.
+var (
+	// AbsoluteWidth sets the width constraint for absolute-positioned content.
+	AbsoluteWidth = template.AbsoluteWidth
+	// AbsoluteHeight sets the height constraint for absolute-positioned content.
+	AbsoluteHeight = template.AbsoluteHeight
+	// AbsoluteOriginPage sets the coordinate origin to the page corner.
+	AbsoluteOriginPage = template.AbsoluteOriginPage
+)
+
 // Re-export JSON schema / Go template integration functions.
 var (
 	// FromJSON creates a Document from a JSON schema definition with

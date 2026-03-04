@@ -6,6 +6,7 @@ import (
 	"image"
 	"image/color"
 	"image/png"
+	gotemplate "text/template"
 
 	gpdf "github.com/gpdf-dev/gpdf"
 	"github.com/gpdf-dev/gpdf/document"
@@ -288,6 +289,183 @@ func Example_barcode() {
 		r.Col(12, func(c *template.ColBuilder) {
 			c.Text("Order barcode:")
 			c.Barcode("INV-2026-0001", template.BarcodeWidth(document.Mm(80)))
+		})
+	})
+	data, _ := doc.Generate()
+	fmt.Println("PDF starts with:", string(data[:5]))
+	// Output: PDF starts with: %PDF-
+}
+
+func ExampleNewDocumentFromJSON() {
+	schema := []byte(`{
+		"page": {"size": "A4", "margins": "15mm"},
+		"metadata": {"title": "JSON Example", "author": "gpdf"},
+		"body": [
+			{"row": {"cols": [
+				{"span": 12, "text": "Generated from JSON schema", "style": {"size": 20, "bold": true}}
+			]}},
+			{"row": {"cols": [
+				{"span": 6, "text": "Left column"},
+				{"span": 6, "text": "Right column", "style": {"align": "right"}}
+			]}}
+		]
+	}`)
+	doc, _ := gpdf.NewDocumentFromJSON(schema, nil)
+	data, _ := doc.Generate()
+	fmt.Println("PDF starts with:", string(data[:5]))
+	// Output: PDF starts with: %PDF-
+}
+
+func ExampleNewDocumentFromJSON_withData() {
+	schema := []byte(`{
+		"page": {"size": "A4"},
+		"body": [
+			{"row": {"cols": [
+				{"span": 12, "text": "Hello, {{.Name}}!", "style": {"size": 24}}
+			]}}
+		]
+	}`)
+	data := map[string]string{"Name": "World"}
+	doc, _ := gpdf.NewDocumentFromJSON(schema, data)
+	pdfData, _ := doc.Generate()
+	fmt.Println("PDF starts with:", string(pdfData[:5]))
+	// Output: PDF starts with: %PDF-
+}
+
+func ExampleNewDocumentFromTemplate() {
+	tmplStr := `{
+		"page": {"size": "A4"},
+		"body": [
+			{"row": {"cols": [
+				{"span": 12, "text": "Items: {{len .Items}}", "style": {"size": 18}}
+			]}}
+			{{- range .Items}},
+			{"row": {"cols": [
+				{"span": 8, "text": "{{.Name}}"},
+				{"span": 4, "text": "{{.Price}}", "style": {"align": "right"}}
+			]}}
+			{{- end}}
+		]
+	}`
+	funcMap := gpdf.TemplateFuncMap()
+	tmpl := gotemplate.Must(gotemplate.New("").Funcs(funcMap).Parse(tmplStr))
+	data := map[string]any{
+		"Items": []map[string]string{
+			{"Name": "Widget", "Price": "$9.99"},
+			{"Name": "Gadget", "Price": "$24.99"},
+		},
+	}
+	doc, _ := gpdf.NewDocumentFromTemplate(tmpl, data)
+	pdfData, _ := doc.Generate()
+	fmt.Println("PDF starts with:", string(pdfData[:5]))
+	// Output: PDF starts with: %PDF-
+}
+
+func ExampleNewInvoice() {
+	doc := gpdf.NewInvoice(template.InvoiceData{
+		Number: "INV-001",
+		Date:   "2026-01-15",
+		From: template.InvoiceParty{
+			Name:    "Acme Corp",
+			Address: []string{"123 Main St", "Tokyo, Japan"},
+		},
+		To: template.InvoiceParty{
+			Name:    "Client Inc",
+			Address: []string{"456 Oak Ave", "Osaka, Japan"},
+		},
+		Items: []template.InvoiceItem{
+			{Description: "Consulting", Quantity: "10", UnitPrice: 150, Amount: 1500},
+			{Description: "Development", Quantity: "20", UnitPrice: 200, Amount: 4000},
+		},
+		TaxRate:  10,
+		Currency: "$",
+	})
+	data, _ := doc.Generate()
+	fmt.Println("PDF starts with:", string(data[:5]))
+	// Output: PDF starts with: %PDF-
+}
+
+func ExampleNewReport() {
+	doc := gpdf.NewReport(template.ReportData{
+		Title:    "Q1 Sales Report",
+		Subtitle: "January - March 2026",
+		Sections: []template.ReportSection{
+			{
+				Title:   "Summary",
+				Content: "Total revenue increased by 15% compared to Q4.",
+				Metrics: []template.ReportMetric{
+					{Label: "Revenue", Value: "$1.2M"},
+					{Label: "Growth", Value: "+15%"},
+				},
+			},
+		},
+	})
+	data, _ := doc.Generate()
+	fmt.Println("PDF starts with:", string(data[:5]))
+	// Output: PDF starts with: %PDF-
+}
+
+func ExampleNewLetter() {
+	doc := gpdf.NewLetter(template.LetterData{
+		Date: "March 3, 2026",
+		From: template.LetterParty{
+			Name:    "Acme Corp",
+			Address: []string{"123 Main St", "Tokyo, Japan"},
+		},
+		To: template.LetterParty{
+			Name:    "Client Inc",
+			Address: []string{"456 Oak Ave", "Osaka, Japan"},
+		},
+		Subject: "Partnership Proposal",
+		Body: []string{
+			"Dear Client Inc,",
+			"We are pleased to propose a new partnership opportunity.",
+			"Best regards,",
+		},
+		Signature: "John Smith, CEO",
+	})
+	data, _ := doc.Generate()
+	fmt.Println("PDF starts with:", string(data[:5]))
+	// Output: PDF starts with: %PDF-
+}
+
+func Example_colors() {
+	doc := gpdf.NewDocument()
+	page := doc.AddPage()
+	page.AutoRow(func(r *template.RowBuilder) {
+		r.Col(4, func(c *template.ColBuilder) {
+			c.Text("RGB", template.TextColor(pdf.RGB(0.2, 0.4, 0.8)))
+		})
+		r.Col(4, func(c *template.ColBuilder) {
+			c.Text("Hex", template.TextColor(pdf.RGBHex(0xFF6600)))
+		})
+		r.Col(4, func(c *template.ColBuilder) {
+			c.Text("Gray", template.TextColor(pdf.Gray(0.5)))
+		})
+	})
+	data, _ := doc.Generate()
+	fmt.Println("PDF starts with:", string(data[:5]))
+	// Output: PDF starts with: %PDF-
+}
+
+func Example_units() {
+	doc := gpdf.NewDocument(
+		gpdf.WithMargins(document.Edges{
+			Top:    document.Cm(2),   // centimeters
+			Right:  document.In(0.5), // inches
+			Bottom: document.Mm(15),  // millimeters
+			Left:   document.Pt(36),  // points
+		}),
+	)
+	page := doc.AddPage()
+	page.Row(document.Mm(20), func(r *template.RowBuilder) {
+		r.Col(12, func(c *template.ColBuilder) {
+			c.Text("Fixed 20mm height row")
+		})
+	})
+	page.AutoRow(func(r *template.RowBuilder) {
+		r.Col(12, func(c *template.ColBuilder) {
+			c.Text("Auto-height row")
 		})
 	})
 	data, _ := doc.Generate()

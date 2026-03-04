@@ -1,4 +1,3 @@
-// Package qrcode implements QR code encoding per ISO 18004.
 package qrcode
 
 // GF(2^8) finite field arithmetic with primitive polynomial 0x11d (x^8 + x^4 + x^3 + x^2 + 1).

@@ -59,6 +59,7 @@ func (bl *BlockLayout) Layout(node document.DocumentNode, constraints Constraint
 	bc := bl.newBlockContext(node, constraints)
 
 	var placed []PlacedNode
+	var absoluteNodes []PlacedNode
 	cursorY := 0.0
 	children := node.Children()
 
@@ -67,8 +68,18 @@ func (bl *BlockLayout) Layout(node document.DocumentNode, constraints Constraint
 			continue
 		}
 
+		// Absolute-positioned nodes are removed from normal flow.
+		if box, ok := child.(*document.Box); ok && box.BoxStyle.Position.Mode == document.PositionAbsolute {
+			absNode := bl.layoutAbsolute(box, &bc)
+			absoluteNodes = append(absoluteNodes, absNode)
+			continue
+		}
+
 		result, done := bl.layoutVerticalChild(&bc, child, children, i, placed, cursorY)
 		if done {
+			// Append absolute nodes to the overflow result so they
+			// still appear on this page.
+			result.Children = append(result.Children, absoluteNodes...)
 			return result
 		}
 
@@ -87,15 +98,21 @@ func (bl *BlockLayout) Layout(node document.DocumentNode, constraints Constraint
 			remaining := make([]document.DocumentNode, 0, 1+len(children[i+1:]))
 			remaining = append(remaining, result.Overflow)
 			remaining = append(remaining, children[i+1:]...)
-			return bc.overflowResult(placed, cursorY, remaining)
+			r := bc.overflowResult(placed, cursorY, remaining)
+			r.Children = append(r.Children, absoluteNodes...)
+			return r
 		}
 
 		if after, ok := bl.checkBreakAfter(child, children, i, &bc, placed, cursorY); ok {
+			after.Children = append(after.Children, absoluteNodes...)
 			return after
 		}
 	}
 
-	return bl.finishVerticalLayout(&bc, placed, cursorY)
+	result := bl.finishVerticalLayout(&bc, placed, cursorY)
+	// Absolute nodes are rendered after flow nodes (drawn on top).
+	result.Children = append(result.Children, absoluteNodes...)
+	return result
 }
 
 // newBlockContext resolves spacing and computes the content area for
@@ -199,6 +216,65 @@ func (bl *BlockLayout) finishVerticalLayout(bc *blockContext, placed []PlacedNod
 			Height: bc.wrapHeight(contentH),
 		},
 		Children: placed,
+	}
+}
+
+// layoutAbsolute places a node at its specified absolute coordinates.
+// The node is laid out independently from the normal flow, using the
+// full content area as available space minus the offset.
+func (bl *BlockLayout) layoutAbsolute(box *document.Box, bc *blockContext) PlacedNode {
+	const defaultFontSize = 12.0
+
+	pos := box.BoxStyle.Position
+	x := pos.X.Resolve(bc.contentWidth, defaultFontSize)
+	y := pos.Y.Resolve(bc.contentHeight, defaultFontSize)
+
+	// Determine available space for child layout.
+	availW := bc.contentWidth - x
+	if box.BoxStyle.Width.Unit != document.UnitAuto && box.BoxStyle.Width.Amount > 0 {
+		availW = box.BoxStyle.Width.Resolve(bc.contentWidth, defaultFontSize)
+	}
+	availH := bc.contentHeight - y
+	if box.BoxStyle.Height.Unit != document.UnitAuto && box.BoxStyle.Height.Amount > 0 {
+		availH = box.BoxStyle.Height.Resolve(bc.contentHeight, defaultFontSize)
+	}
+	if availW < 0 {
+		availW = 0
+	}
+	if availH < 0 {
+		availH = 0
+	}
+
+	// Layout the content inside a plain Box (without the Position to
+	// avoid infinite recursion).
+	inner := &document.Box{
+		Content: box.Content,
+		BoxStyle: document.BoxStyle{
+			Width:      box.BoxStyle.Width,
+			Height:     box.BoxStyle.Height,
+			Padding:    box.BoxStyle.Padding,
+			Border:     box.BoxStyle.Border,
+			Background: box.BoxStyle.Background,
+			Direction:  box.BoxStyle.Direction,
+		},
+	}
+
+	childConstraints := Constraints{
+		AvailableWidth:  availW,
+		AvailableHeight: availH,
+		FontResolver:    bc.constraints.FontResolver,
+	}
+
+	result := bl.Layout(inner, childConstraints)
+
+	return PlacedNode{
+		Node: box,
+		Position: document.Point{
+			X: bc.contentX + x,
+			Y: bc.contentY + y,
+		},
+		Size:     document.Size{Width: result.Bounds.Width, Height: result.Bounds.Height},
+		Children: result.Children,
 	}
 }
 

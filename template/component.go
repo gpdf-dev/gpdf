@@ -272,3 +272,30 @@ func BarcodeFormat(f barcode.Format) BarcodeOption {
 		cfg.format = f
 	}
 }
+
+// --- Absolute Positioning Options ---
+
+// AbsoluteOption configures an absolute-positioned element.
+type AbsoluteOption func(*absoluteConfig)
+
+type absoluteConfig struct {
+	width  document.Value
+	height document.Value
+	origin document.PositionOrigin
+}
+
+// AbsoluteWidth sets the width constraint for the absolute-positioned content.
+func AbsoluteWidth(w document.Value) AbsoluteOption {
+	return func(c *absoluteConfig) { c.width = w }
+}
+
+// AbsoluteHeight sets the height constraint for the absolute-positioned content.
+func AbsoluteHeight(h document.Value) AbsoluteOption {
+	return func(c *absoluteConfig) { c.height = h }
+}
+
+// AbsoluteOriginPage sets the coordinate origin to the page corner
+// (ignoring margins).
+func AbsoluteOriginPage() AbsoluteOption {
+	return func(c *absoluteConfig) { c.origin = document.OriginPage }
+}

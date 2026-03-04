@@ -7,7 +7,6 @@ import (
 
 	"github.com/gpdf-dev/gpdf/document"
 	"github.com/gpdf-dev/gpdf/document/layout"
-	"github.com/gpdf-dev/gpdf/internal/buildinfo"
 	"github.com/gpdf-dev/gpdf/pdf"
 	"github.com/gpdf-dev/gpdf/pdf/font"
 )
@@ -213,9 +212,8 @@ func TestBuildDocumentDefaultProducer(t *testing.T) {
 	doc := New()
 	doc.AddPage()
 	built := doc.buildDocument()
-	want := "gpdf/" + buildinfo.Version
-	if built.Metadata.Producer != want {
-		t.Errorf("producer: got %q, want %q", built.Metadata.Producer, want)
+	if built.Metadata.Producer != "gpdf" {
+		t.Errorf("producer: got %q, want %q", built.Metadata.Producer, "gpdf")
 	}
 }
 
@@ -1884,5 +1882,107 @@ func TestColBuilder_RichText_GeneratesPDF(t *testing.T) {
 	}
 	if !bytes.HasPrefix(data, []byte("%PDF-")) {
 		t.Error("output does not start with %PDF-")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// extractJPEGDimensions / extractImageDimensions tests
+// ---------------------------------------------------------------------------
+
+func TestExtractJPEGDimensions_ValidSOF0(t *testing.T) {
+	// Construct a minimal JPEG with SOF0 marker.
+	// The parser accesses data[i+5..i+8] where i is the index of 0xFF before SOF marker.
+	// SOI: FF D8, then SOF0: FF C0, length, precision, height, width.
+	// After SOI (2 bytes), scanner is at i=2. data[2]=0xFF, data[3]=0xC0 → SOF0.
+	// Access: data[i+5]=data[7], data[i+6]=data[8], data[i+7]=data[9], data[i+8]=data[10].
+	// Need i+9 < len(data) → 11 < len → need at least 12 bytes.
+	data := []byte{
+		0xFF, 0xD8, // SOI (i starts at 2)
+		0xFF, 0xC0, // SOF0 at i=2
+		0x00, 0x0B, // length (at i+2, i+3)
+		0x08,       // precision (at i+4)
+		0x00, 0x40, // height=64 (at i+5, i+6)
+		0x00, 0x80, // width=128 (at i+7, i+8)
+		0x00, // extra byte to satisfy i+9 < len
+	}
+	w, h := extractJPEGDimensions(data)
+	if w != 128 || h != 64 {
+		t.Errorf("extractJPEGDimensions = (%d, %d), want (128, 64)", w, h)
+	}
+}
+
+func TestExtractJPEGDimensions_Invalid(t *testing.T) {
+	// Not a JPEG.
+	w, h := extractJPEGDimensions([]byte{0x00, 0x00})
+	if w != 0 || h != 0 {
+		t.Errorf("expected (0,0) for non-JPEG, got (%d,%d)", w, h)
+	}
+
+	// Too short.
+	w, h = extractJPEGDimensions([]byte{0xFF})
+	if w != 0 || h != 0 {
+		t.Errorf("expected (0,0) for short data, got (%d,%d)", w, h)
+	}
+}
+
+func TestExtractJPEGDimensions_WithPrecedingSegment(t *testing.T) {
+	// SOI + APP0 segment (skipped) + SOF0.
+	data := []byte{
+		0xFF, 0xD8, // SOI
+		0xFF, 0xE0, // APP0
+		0x00, 0x04, // length=4 (includes length bytes)
+		0x00, 0x00, // dummy data
+		0xFF, 0xC0, // SOF0
+		0x00, 0x0B, // length
+		0x08,       // precision
+		0x01, 0x00, // height=256
+		0x02, 0x00, // width=512
+		0x00, // extra byte to satisfy i+9 < len
+	}
+	w, h := extractJPEGDimensions(data)
+	if w != 512 || h != 256 {
+		t.Errorf("extractJPEGDimensions = (%d, %d), want (512, 256)", w, h)
+	}
+}
+
+func TestExtractImageDimensions_PNG(t *testing.T) {
+	// Valid PNG header with IHDR: width=4, height=4.
+	png := make([]byte, 24)
+	// 8-byte signature (not needed for dimension extraction per the implementation).
+	png[16] = 0
+	png[17] = 0
+	png[18] = 0
+	png[19] = 4 // width=4
+	png[20] = 0
+	png[21] = 0
+	png[22] = 0
+	png[23] = 4 // height=4
+	w, h := extractImageDimensions(png, document.ImagePNG)
+	if w != 4 || h != 4 {
+		t.Errorf("extractImageDimensions(PNG) = (%d, %d), want (4, 4)", w, h)
+	}
+}
+
+func TestExtractImageDimensions_Unknown(t *testing.T) {
+	w, h := extractImageDimensions([]byte{0x00}, document.ImageFormat(99))
+	if w != 0 || h != 0 {
+		t.Errorf("expected (0,0) for unknown format, got (%d,%d)", w, h)
+	}
+}
+
+func TestTotalPages(t *testing.T) {
+	doc := New()
+	page := doc.AddPage()
+	page.AutoRow(func(r *RowBuilder) {
+		r.Col(12, func(c *ColBuilder) {
+			c.TotalPages(FontSize(10), AlignCenter())
+		})
+	})
+	data, err := doc.Generate()
+	if err != nil {
+		t.Fatalf("Generate error: %v", err)
+	}
+	if len(data) == 0 {
+		t.Fatal("generated PDF is empty")
 	}
 }

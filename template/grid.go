@@ -11,16 +11,27 @@ import (
 const gridColumns = 12
 
 // PageBuilder constructs the content of a single page using a row-based
-// grid system.
+// grid system. In addition to flow-based rows, it supports absolute
+// positioning for placing content at fixed coordinates.
 type PageBuilder struct {
-	doc  *Document
-	rows []rowEntry
+	doc       *Document
+	rows      []rowEntry
+	absolutes []absoluteEntry
 }
 
 type rowEntry struct {
 	height document.Value
 	auto   bool
 	fn     func(r *RowBuilder)
+}
+
+type absoluteEntry struct {
+	x      document.Value
+	y      document.Value
+	width  document.Value
+	height document.Value
+	origin document.PositionOrigin
+	fn     func(c *ColBuilder)
 }
 
 // Row adds a row with a specified height.
@@ -31,6 +42,31 @@ func (p *PageBuilder) Row(height document.Value, fn func(r *RowBuilder)) {
 // AutoRow adds a row whose height is determined automatically by its content.
 func (p *PageBuilder) AutoRow(fn func(r *RowBuilder)) {
 	p.rows = append(p.rows, rowEntry{auto: true, fn: fn})
+}
+
+// Absolute places content at fixed XY coordinates, removed from the
+// normal document flow. Coordinates are relative to the content area
+// (inside page margins) by default. Use [AbsoluteOriginPage] to
+// position relative to the page corner instead.
+//
+//	page.Absolute(document.Mm(100), document.Mm(200), func(c *ColBuilder) {
+//	    c.Image(stampData, template.FitWidth(document.Mm(30)))
+//	})
+func (p *PageBuilder) Absolute(x, y document.Value, fn func(c *ColBuilder), opts ...AbsoluteOption) {
+	cfg := absoluteConfig{
+		origin: document.OriginContentArea,
+	}
+	for _, opt := range opts {
+		opt(&cfg)
+	}
+	p.absolutes = append(p.absolutes, absoluteEntry{
+		x:      x,
+		y:      y,
+		width:  cfg.width,
+		height: cfg.height,
+		origin: cfg.origin,
+		fn:     fn,
+	})
 }
 
 // buildNodes converts the page builder state into document nodes.
@@ -44,6 +80,29 @@ func (p *PageBuilder) buildNodes() []document.DocumentNode {
 		node := rb.build(row.height, row.auto)
 		nodes = append(nodes, node)
 	}
+
+	// Absolute-positioned nodes are appended after flow nodes.
+	for _, abs := range p.absolutes {
+		cb := &ColBuilder{doc: p.doc}
+		if abs.fn != nil {
+			abs.fn(cb)
+		}
+		box := &document.Box{
+			Content: cb.buildNodes(),
+			BoxStyle: document.BoxStyle{
+				Width:  abs.width,
+				Height: abs.height,
+				Position: document.Position{
+					Mode:   document.PositionAbsolute,
+					X:      abs.x,
+					Y:      abs.y,
+					Origin: abs.origin,
+				},
+			},
+		}
+		nodes = append(nodes, box)
+	}
+
 	return nodes
 }
 

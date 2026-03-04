@@ -1,7 +1,3 @@
-// Package template provides a declarative, builder-pattern API for
-// constructing PDF documents. It sits on top of the document model
-// (Layer 2) and provides high-level constructs such as grids, headers,
-// footers, and reusable components.
 package template
 
 import (
@@ -11,7 +7,6 @@ import (
 	"github.com/gpdf-dev/gpdf/document"
 	"github.com/gpdf-dev/gpdf/document/layout"
 	"github.com/gpdf-dev/gpdf/document/render"
-	"github.com/gpdf-dev/gpdf/internal/buildinfo"
 	"github.com/gpdf-dev/gpdf/pdf"
 	"github.com/gpdf-dev/gpdf/pdf/font"
 )
@@ -27,7 +22,9 @@ type Document struct {
 	fontResolver *builtinFontResolver
 }
 
-// Config holds document-level configuration.
+// Config holds document-level configuration such as page size, margins,
+// default font settings, and metadata. It is populated by [Option] functions
+// passed to [New].
 type Config struct {
 	PageSize    document.Size
 	Margins     document.Edges
@@ -192,7 +189,7 @@ func (d *Document) buildDocument() *document.Document {
 	}
 
 	if d.config.Metadata.Producer == "" {
-		doc.Metadata.Producer = "gpdf/" + buildinfo.Version
+		doc.Metadata.Producer = "gpdf"
 	}
 
 	for _, pb := range d.pages {
