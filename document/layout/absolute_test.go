@@ -207,3 +207,64 @@ func TestAbsolutePositioning_OriginPage(t *testing.T) {
 		t.Error("expected OriginPage")
 	}
 }
+
+func TestAdjustAbsoluteOrigins(t *testing.T) {
+	marginX := 56.69 // 20mm
+	marginY := 56.69
+
+	absBox := &document.Box{
+		BoxStyle: document.BoxStyle{
+			Position: document.Position{
+				Mode:   document.PositionAbsolute,
+				X:      document.Mm(10),
+				Y:      document.Mm(10),
+				Origin: document.OriginPage,
+			},
+		},
+	}
+
+	normalBox := &document.Box{
+		BoxStyle: document.BoxStyle{
+			Position: document.Position{
+				Mode: document.PositionAbsolute,
+				X:    document.Mm(10),
+				Y:    document.Mm(10),
+				// OriginContent (default, no OriginPage)
+			},
+		},
+	}
+
+	textNode := &document.Text{
+		Content:   "Not a box",
+		TextStyle: document.Style{FontSize: 12},
+	}
+
+	nodes := []PlacedNode{
+		{Node: absBox, Position: document.Point{X: 100, Y: 200}},
+		{Node: normalBox, Position: document.Point{X: 100, Y: 200}},
+		{Node: textNode, Position: document.Point{X: 50, Y: 50}},
+	}
+
+	adjustAbsoluteOrigins(nodes, marginX, marginY)
+
+	// OriginPage node should have margins subtracted.
+	if !approxEqual(nodes[0].Position.X, 100-marginX, 0.01) {
+		t.Errorf("OriginPage X: got %g, want %g", nodes[0].Position.X, 100-marginX)
+	}
+	if !approxEqual(nodes[0].Position.Y, 200-marginY, 0.01) {
+		t.Errorf("OriginPage Y: got %g, want %g", nodes[0].Position.Y, 200-marginY)
+	}
+
+	// OriginContent node should be unchanged.
+	if !approxEqual(nodes[1].Position.X, 100, 0.01) {
+		t.Errorf("OriginContent X: got %g, want 100", nodes[1].Position.X)
+	}
+	if !approxEqual(nodes[1].Position.Y, 200, 0.01) {
+		t.Errorf("OriginContent Y: got %g, want 200", nodes[1].Position.Y)
+	}
+
+	// Text node should be unchanged.
+	if !approxEqual(nodes[2].Position.X, 50, 0.01) {
+		t.Errorf("Text X: got %g, want 50", nodes[2].Position.X)
+	}
+}

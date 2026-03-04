@@ -2,6 +2,7 @@ package render
 
 import (
 	"bytes"
+	"fmt"
 	"image"
 	"image/color"
 	"image/png"
@@ -1424,6 +1425,139 @@ func TestRenderTextDecorationCombined(t *testing.T) {
 	mCount := strings.Count(content, " m\n")
 	if mCount < 2 {
 		t.Errorf("Combined decoration should produce at least 2 line drawings, got %d moveto operators", mCount)
+	}
+}
+
+func TestResolvePDFFontName(t *testing.T) {
+	tests := []struct {
+		family    string
+		weight    document.FontWeight
+		fontStyle document.FontStyle
+		want      string
+	}{
+		// Empty family defaults to Helvetica.
+		{"", document.WeightNormal, document.StyleNormal, "Helvetica"},
+		{"", document.WeightBold, document.StyleNormal, "Helvetica-Bold"},
+		{"", document.WeightNormal, document.StyleItalic, "Helvetica-Oblique"},
+		{"", document.WeightBold, document.StyleItalic, "Helvetica-BoldOblique"},
+		// Base-14 variants.
+		{"Helvetica", document.WeightBold, document.StyleNormal, "Helvetica-Bold"},
+		{"Helvetica", document.WeightNormal, document.StyleItalic, "Helvetica-Oblique"},
+		{"Times-Roman", document.WeightBold, document.StyleNormal, "Times-Bold"},
+		{"Times-Roman", document.WeightNormal, document.StyleItalic, "Times-Italic"},
+		{"Times-Roman", document.WeightBold, document.StyleItalic, "Times-BoldItalic"},
+		{"Courier", document.WeightBold, document.StyleNormal, "Courier-Bold"},
+		{"Courier", document.WeightNormal, document.StyleItalic, "Courier-Oblique"},
+		// Non-standard font with suffixes.
+		{"MyFont", document.WeightBold, document.StyleNormal, "MyFont-Bold"},
+		{"MyFont", document.WeightNormal, document.StyleItalic, "MyFont-Italic"},
+		{"MyFont", document.WeightBold, document.StyleItalic, "MyFont-BoldItalic"},
+		// Normal weight, normal style returns family as-is.
+		{"MyFont", document.WeightNormal, document.StyleNormal, "MyFont"},
+	}
+	for _, tt := range tests {
+		name := fmt.Sprintf("%s_%d_%d", tt.family, tt.weight, tt.fontStyle)
+		t.Run(name, func(t *testing.T) {
+			got := resolvePDFFontName(tt.family, tt.weight, tt.fontStyle)
+			if got != tt.want {
+				t.Errorf("resolvePDFFontName(%q, %d, %d) = %q, want %q",
+					tt.family, tt.weight, tt.fontStyle, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestRenderTextDecorationOverline(t *testing.T) {
+	r, _ := newTestRenderer(t)
+	_ = r.BeginPage(document.Size{Width: 595, Height: 842})
+
+	style := document.DefaultStyle()
+	style.FontSize = 12
+	style.TextDecoration = document.DecorationOverline
+	textNode := &document.Text{Content: "Hello", TextStyle: style}
+	pn := layout.PlacedNode{
+		Node:     textNode,
+		Position: document.Point{X: 10, Y: 20},
+		Size:     document.Size{Width: 30, Height: 14.4},
+	}
+	err := r.renderPlacedNode(pn, 0, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	content := string(r.pageContent)
+	if !strings.Contains(content, "m\n") || !strings.Contains(content, "l\n") {
+		t.Error("Overline should produce line drawing operators")
+	}
+}
+
+func TestRenderPlacedNode_TextWithChildren(t *testing.T) {
+	// Parent text node with children should NOT render its own text.
+	r, _ := newTestRenderer(t)
+	_ = r.BeginPage(document.Size{Width: 595, Height: 842})
+
+	parentText := &document.Text{
+		Content:   "Parent",
+		TextStyle: document.DefaultStyle(),
+	}
+	childText := &document.Text{
+		Content:   "Child",
+		TextStyle: document.DefaultStyle(),
+	}
+	pn := layout.PlacedNode{
+		Node:     parentText,
+		Position: document.Point{X: 10, Y: 20},
+		Size:     document.Size{Width: 100, Height: 28},
+		Children: []layout.PlacedNode{
+			{
+				Node:     childText,
+				Position: document.Point{X: 0, Y: 0},
+				Size:     document.Size{Width: 100, Height: 14},
+			},
+		},
+	}
+	err := r.renderPlacedNode(pn, 0, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	content := string(r.pageContent)
+	// Should render the child but not the parent text.
+	if !strings.Contains(content, "(Child)") {
+		t.Error("Should render child text")
+	}
+	if strings.Contains(content, "(Parent)") {
+		t.Error("Should NOT render parent text when children exist")
+	}
+}
+
+func TestRenderDocumentWithPNGImage(t *testing.T) {
+	r, buf := newTestRenderer(t)
+	pngData := testPNG(t, 4, 4)
+	pages := []layout.PageLayout{
+		{
+			Size: document.A4,
+			Children: []layout.PlacedNode{
+				{
+					Node: &document.Image{
+						Source: document.ImageSource{
+							Data:   pngData,
+							Format: document.ImagePNG,
+							Width:  4,
+							Height: 4,
+						},
+					},
+					Position: document.Point{X: 72, Y: 72},
+					Size:     document.Size{Width: 100, Height: 100},
+				},
+			},
+		},
+	}
+	err := r.RenderDocument(pages, document.DocumentMetadata{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	output := buf.String()
+	if !strings.Contains(output, "XObject") {
+		t.Error("Should contain XObject for PNG image")
 	}
 }
 
