@@ -20,7 +20,7 @@
 | 02 | [Builder API](02-builder-api.md) | Go Builder pattern (Document / Page / Row / Col) |
 | 03 | [JSON Schema](03-json-schema.md) | Declarative PDF definition with JSON |
 | 04 | [Go Templates](04-go-templates.md) | Data-driven PDFs using `text/template` |
-| 05 | [Elements](05-elements.md) | Text, Image, Table, List, QR Code, Barcode, and more |
+| 05 | [Elements](05-elements.md) | Text, Image, Table, List, QR Code, Barcode, Absolute Positioning, and more |
 | 06 | [Styling](06-styling.md) | Colors, fonts, alignment, decoration, units |
 | 07 | [Layout](07-layout.md) | Grid system, page sizes, margins, headers/footers, pagination |
 | 08 | [Components](08-components.md) | Pre-built Invoice, Report, and Letter |

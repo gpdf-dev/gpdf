@@ -29,6 +29,7 @@
 - **다양한 단위** — pt, mm, cm, in, em, %
 - **색상 공간** — RGB, 그레이스케일, CMYK
 - **이미지** — JPEG 및 PNG 임베딩 (맞춤 옵션 지원)
+- **절대 위치 지정** — 페이지의 정확한 XY 좌표에 요소 배치
 - **문서 메타데이터** — 제목, 저자, 주제, 작성자
 
 ## 벤치마크
@@ -403,6 +404,22 @@ doc.Render(f)
 | `c.TotalPages(opts...)` | 전체 페이지 수 추가 |
 | `c.Line(opts...)` | 수평선 추가 |
 | `c.Spacer(height)` | 수직 공간 추가 |
+
+### 페이지 레벨 콘텐츠
+
+| 메서드 | 설명 |
+|---|---|
+| `page.AutoRow(fn)` | 자동 높이 행 추가 |
+| `page.Row(height, fn)` | 고정 높이 행 추가 |
+| `page.Absolute(x, y, fn, opts...)` | 정확한 XY 좌표에 콘텐츠 배치 |
+
+#### 절대 위치 지정 옵션
+
+| 옵션 | 설명 |
+|---|---|
+| `gpdf.AbsoluteWidth(value)` | 명시적 너비 설정 (기본값: 남은 공간) |
+| `gpdf.AbsoluteHeight(value)` | 명시적 높이 설정 (기본값: 남은 공간) |
+| `gpdf.AbsoluteOriginPage()` | 콘텐츠 영역 대신 페이지 모서리를 원점으로 사용 |
 
 ### 텍스트 옵션
 

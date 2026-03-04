@@ -38,11 +38,13 @@ type Schema struct {
 	Footer   []SchemaRow      `json:"footer,omitempty"`
 	Body     []SchemaRow      `json:"body,omitempty"`
 	Pages    []SchemaPageBody `json:"pages,omitempty"` // multiple explicit pages
+	Absolute []SchemaAbsolute `json:"absolute,omitempty"`
 }
 
 // SchemaPageBody defines the body content for a single page.
 type SchemaPageBody struct {
-	Body []SchemaRow `json:"body"`
+	Body     []SchemaRow      `json:"body"`
+	Absolute []SchemaAbsolute `json:"absolute,omitempty"`
 }
 
 // SchemaPage defines page-level settings.
@@ -165,6 +167,17 @@ type SchemaBarcode struct {
 	Width  string `json:"width,omitempty"`
 	Height string `json:"height,omitempty"`
 	Format string `json:"format,omitempty"` // "code128" (default)
+}
+
+// SchemaAbsolute defines an absolute-positioned element placed at
+// fixed XY coordinates on the page.
+type SchemaAbsolute struct {
+	X        string          `json:"x"`
+	Y        string          `json:"y"`
+	Width    string          `json:"width,omitempty"`
+	Height   string          `json:"height,omitempty"`
+	Origin   string          `json:"origin,omitempty"` // "content" (default) or "page"
+	Elements []SchemaElement `json:"elements"`
 }
 
 // ---------------------------------------------------------------------------
@@ -470,11 +483,13 @@ func buildFromSchema(schema *Schema, opts []Option) (*Document, error) {
 	if len(schema.Body) > 0 {
 		page := doc.AddPage()
 		buildSchemaRows(page, schema.Body)
+		buildSchemaAbsolutes(page, schema.Absolute)
 	}
 
 	for _, p := range schema.Pages {
 		page := doc.AddPage()
 		buildSchemaRows(page, p.Body)
+		buildSchemaAbsolutes(page, p.Absolute)
 	}
 
 	return doc, nil
@@ -751,4 +766,40 @@ func buildSchemaBarcode(c *ColBuilder, bc *SchemaBarcode) {
 		}
 	}
 	c.Barcode(bc.Data, opts...)
+}
+
+// buildSchemaAbsolutes adds absolute-positioned elements to a page.
+func buildSchemaAbsolutes(p *PageBuilder, absolutes []SchemaAbsolute) {
+	for _, abs := range absolutes {
+		xVal, err := parseValue(abs.X)
+		if err != nil {
+			continue
+		}
+		yVal, err := parseValue(abs.Y)
+		if err != nil {
+			continue
+		}
+
+		var opts []AbsoluteOption
+		if abs.Width != "" {
+			if v, err := parseValue(abs.Width); err == nil {
+				opts = append(opts, AbsoluteWidth(v))
+			}
+		}
+		if abs.Height != "" {
+			if v, err := parseValue(abs.Height); err == nil {
+				opts = append(opts, AbsoluteHeight(v))
+			}
+		}
+		if strings.ToLower(abs.Origin) == "page" {
+			opts = append(opts, AbsoluteOriginPage())
+		}
+
+		elements := abs.Elements // capture for closure
+		p.Absolute(xVal, yVal, func(c *ColBuilder) {
+			for _, elem := range elements {
+				buildSchemaElement(c, elem)
+			}
+		}, opts...)
+	}
 }

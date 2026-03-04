@@ -162,9 +162,33 @@ func (p *Paginator) composePageLayout(
 		children = append(children, offsetNodes(footerPlaced, mx, footerY)...)
 	}
 
+	// Adjust absolute-positioned nodes with OriginPage so their
+	// coordinates are relative to the page corner, not the content area.
+	adjustAbsoluteOrigins(children, mx, my)
+
 	return PageLayout{
 		Size:     pageSize,
 		Children: children,
+	}
+}
+
+// adjustAbsoluteOrigins walks the top-level placed nodes and adjusts
+// coordinates for absolute-positioned nodes that use OriginPage. These
+// nodes were laid out relative to the content area, so we subtract the
+// margin offset to make them relative to the page corner.
+func adjustAbsoluteOrigins(nodes []PlacedNode, marginX, marginY float64) {
+	for i := range nodes {
+		box, ok := nodes[i].Node.(*document.Box)
+		if !ok {
+			continue
+		}
+		if box.BoxStyle.Position.Mode != document.PositionAbsolute {
+			continue
+		}
+		if box.BoxStyle.Position.Origin == document.OriginPage {
+			nodes[i].Position.X -= marginX
+			nodes[i].Position.Y -= marginY
+		}
 	}
 }
 

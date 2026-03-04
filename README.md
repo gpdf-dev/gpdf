@@ -30,6 +30,7 @@ A pure Go, zero-dependency PDF generation library with a layered architecture an
 - **Multiple units** — pt, mm, cm, in, em, %
 - **Color spaces** — RGB, Grayscale, CMYK
 - **Images** — JPEG and PNG embedding with fit options
+- **Absolute positioning** — place elements at exact XY coordinates on the page
 - **Document metadata** — title, author, subject, creator
 
 ## Benchmark
@@ -603,6 +604,22 @@ doc.Render(f)
 | `c.TotalPages(opts...)` | Add total page count |
 | `c.Line(opts...)` | Add a horizontal line |
 | `c.Spacer(height)` | Add vertical space |
+
+### Page-Level Content
+
+| Method | Description |
+|---|---|
+| `page.AutoRow(fn)` | Add an auto-height row |
+| `page.Row(height, fn)` | Add a fixed-height row |
+| `page.Absolute(x, y, fn, opts...)` | Place content at exact XY coordinates |
+
+#### Absolute Positioning Options
+
+| Option | Description |
+|---|---|
+| `gpdf.AbsoluteWidth(value)` | Set explicit width (default: remaining space) |
+| `gpdf.AbsoluteHeight(value)` | Set explicit height (default: remaining space) |
+| `gpdf.AbsoluteOriginPage()` | Use page corner as origin instead of content area |
 
 ### Text Options
 

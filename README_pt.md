@@ -29,6 +29,7 @@ Biblioteca de geração de PDF em Go puro, sem dependências externas, com arqui
 - **Múltiplas unidades** — pt, mm, cm, in, em, %
 - **Espaços de cor** — RGB, escala de cinza, CMYK
 - **Imagens** — incorporação de JPEG e PNG com opções de ajuste
+- **Posicionamento absoluto** — posicionar elementos em coordenadas XY exatas na página
 - **Metadados do documento** — título, autor, assunto, criador
 
 ## Benchmark
@@ -403,6 +404,22 @@ doc.Render(f)
 | `c.TotalPages(opts...)` | Adicionar total de páginas |
 | `c.Line(opts...)` | Adicionar uma linha horizontal |
 | `c.Spacer(height)` | Adicionar espaço vertical |
+
+### Conteúdo em nível de página
+
+| Método | Descrição |
+|---|---|
+| `page.AutoRow(fn)` | Adicionar uma linha de altura automática |
+| `page.Row(height, fn)` | Adicionar uma linha de altura fixa |
+| `page.Absolute(x, y, fn, opts...)` | Posicionar conteúdo em coordenadas XY exatas |
+
+#### Opções de posicionamento absoluto
+
+| Opção | Descrição |
+|---|---|
+| `gpdf.AbsoluteWidth(value)` | Definir largura explícita (padrão: espaço restante) |
+| `gpdf.AbsoluteHeight(value)` | Definir altura explícita (padrão: espaço restante) |
+| `gpdf.AbsoluteOriginPage()` | Usar canto da página como origem em vez da área de conteúdo |
 
 ### Opções de texto
 

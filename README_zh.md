@@ -29,6 +29,7 @@
 - **多种单位** — pt、mm、cm、in、em、%
 - **色彩空间** — RGB、灰度、CMYK
 - **图片** — JPEG 和 PNG 嵌入（支持缩放选项）
+- **绝对定位** — 在页面上以精确 XY 坐标放置元素
 - **文档元数据** — 标题、作者、主题、创建者
 
 ## 基准测试
@@ -403,6 +404,22 @@ doc.Render(f)
 | `c.TotalPages(opts...)` | 添加总页数 |
 | `c.Line(opts...)` | 添加水平线 |
 | `c.Spacer(height)` | 添加垂直间距 |
+
+### 页面级内容
+
+| 方法 | 说明 |
+|---|---|
+| `page.AutoRow(fn)` | 添加自动高度行 |
+| `page.Row(height, fn)` | 添加固定高度行 |
+| `page.Absolute(x, y, fn, opts...)` | 在精确 XY 坐标放置内容 |
+
+#### 绝对定位选项
+
+| 选项 | 说明 |
+|---|---|
+| `gpdf.AbsoluteWidth(value)` | 设置显式宽度（默认：剩余空间） |
+| `gpdf.AbsoluteHeight(value)` | 设置显式高度（默认：剩余空间） |
+| `gpdf.AbsoluteOriginPage()` | 以页面角为原点，而非内容区域 |
 
 ### 文本选项
 
