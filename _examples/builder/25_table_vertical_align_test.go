@@ -72,5 +72,5 @@ func TestExample_25_TableVerticalAlign(t *testing.T) {
 		})
 	})
 
-	testutil.GeneratePDF(t, "25_table_vertical_align.pdf", doc)
+	testutil.GeneratePDFSharedGolden(t, "25_table_vertical_align.pdf", doc)
 }

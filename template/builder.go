@@ -7,7 +7,6 @@ import (
 	"github.com/gpdf-dev/gpdf/document"
 	"github.com/gpdf-dev/gpdf/document/layout"
 	"github.com/gpdf-dev/gpdf/document/render"
-	"github.com/gpdf-dev/gpdf/internal/buildinfo"
 	"github.com/gpdf-dev/gpdf/pdf"
 	"github.com/gpdf-dev/gpdf/pdf/font"
 )
@@ -190,7 +189,7 @@ func (d *Document) buildDocument() *document.Document {
 	}
 
 	if d.config.Metadata.Producer == "" {
-		doc.Metadata.Producer = "gpdf/" + buildinfo.Version
+		doc.Metadata.Producer = "gpdf"
 	}
 
 	for _, pb := range d.pages {

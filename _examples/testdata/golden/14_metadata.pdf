@@ -69,7 +69,7 @@ endobj
 << /Count 1 /Kids [7 0 R] /Type /Pages >>
 endobj
 8 0 obj
-<< /Author (gpdf Library) /Creator (gpdf example_test.go) /Producer (gpdf/0.5.0) /Subject (Example of document metadata) /Title (Annual Report 2026) >>
+<< /Author (gpdf Library) /Creator (gpdf example_test.go) /Producer (gpdf) /Subject (Example of document metadata) /Title (Annual Report 2026) >>
 endobj
 1 0 obj
 << /Pages 2 0 R /Type /Catalog >>
@@ -77,7 +77,7 @@ endobj
 xref
 0 9
 0000000000 65535 f 
-0000001296 00000 n 
+0000001290 00000 n 
 0000001072 00000 n 
 0000000009 00000 n 
 0000000084 00000 n 
@@ -88,5 +88,5 @@ xref
 trailer
 << /Info 8 0 R /Root 1 0 R /Size 9 >>
 startxref
-1345
+1339
 %%EOF

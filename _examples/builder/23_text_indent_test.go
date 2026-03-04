@@ -39,5 +39,5 @@ func TestExample_23_TextIndent(t *testing.T) {
 		})
 	})
 
-	testutil.GeneratePDF(t, "23_text_indent.pdf", doc)
+	testutil.GeneratePDFSharedGolden(t, "23_text_indent.pdf", doc)
 }

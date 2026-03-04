@@ -31,5 +31,5 @@ func TestExample_21_GpdfFacade(t *testing.T) {
 		})
 	})
 
-	testutil.GeneratePDF(t, "21_facade.pdf", doc)
+	testutil.GeneratePDFSharedGolden(t, "21_facade.pdf", doc)
 }
