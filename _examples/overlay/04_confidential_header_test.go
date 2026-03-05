@@ -3,6 +3,7 @@ package overlay_test
 import (
 	"testing"
 
+	gpdf "github.com/gpdf-dev/gpdf"
 	"github.com/gpdf-dev/gpdf/_examples/testutil"
 	"github.com/gpdf-dev/gpdf/document"
 	"github.com/gpdf-dev/gpdf/pdf"
@@ -12,9 +13,9 @@ import (
 func TestExample_Overlay_04_ConfidentialHeader(t *testing.T) {
 	source := generateSourcePDF(t, 3)
 
-	doc, err := template.OpenExisting(source)
+	doc, err := gpdf.Open(source)
 	if err != nil {
-		t.Fatalf("OpenExisting: %v", err)
+		t.Fatalf("gpdf.Open: %v", err)
 	}
 
 	// Add a red "CONFIDENTIAL" banner on every page.

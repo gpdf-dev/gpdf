@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"testing"
 
+	gpdf "github.com/gpdf-dev/gpdf"
 	"github.com/gpdf-dev/gpdf/_examples/testutil"
 	"github.com/gpdf-dev/gpdf/document"
 	"github.com/gpdf-dev/gpdf/pdf"
@@ -57,9 +58,9 @@ func generateSourcePDF(t *testing.T, numPages int) []byte {
 func TestExample_Overlay_01_TextOverlay(t *testing.T) {
 	source := generateSourcePDF(t, 1)
 
-	doc, err := template.OpenExisting(source)
+	doc, err := gpdf.Open(source)
 	if err != nil {
-		t.Fatalf("OpenExisting: %v", err)
+		t.Fatalf("gpdf.Open: %v", err)
 	}
 
 	// Add a "DRAFT" watermark using absolute positioning.

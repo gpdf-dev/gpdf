@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"testing"
 
+	gpdf "github.com/gpdf-dev/gpdf"
 	"github.com/gpdf-dev/gpdf/_examples/testutil"
 	"github.com/gpdf-dev/gpdf/document"
 	"github.com/gpdf-dev/gpdf/template"
@@ -12,9 +13,9 @@ import (
 func TestExample_Overlay_02_PageNumbers(t *testing.T) {
 	source := generateSourcePDF(t, 5)
 
-	doc, err := template.OpenExisting(source)
+	doc, err := gpdf.Open(source)
 	if err != nil {
-		t.Fatalf("OpenExisting: %v", err)
+		t.Fatalf("gpdf.Open: %v", err)
 	}
 
 	count, err := doc.PageCount()
