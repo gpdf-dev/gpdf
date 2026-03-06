@@ -29,6 +29,12 @@ type Writer struct {
 	nextObjNum int
 	compress   bool
 	closed     bool
+
+	// Extension hooks for gpdf-pro features (PDF/A, encryption, signatures).
+	catalogExtra  Dict                                // extra entries merged into catalog dict
+	trailerExtra  Dict                                // extra entries merged into trailer dict
+	onWriteObject func(ref ObjectRef, obj Object) Object // object transformation hook
+	beforeClose   []func(pw *Writer) error            // callbacks run before Close finalizes
 }
 
 // countWriter wraps an io.Writer and tracks the total number of bytes written.
@@ -86,6 +92,11 @@ func (pw *Writer) AllocObject() ObjectRef {
 //
 // It records the byte offset in the cross-reference table.
 func (pw *Writer) WriteObject(ref ObjectRef, obj Object) error {
+	// Apply object transformation hook if set (e.g., encryption).
+	if pw.onWriteObject != nil {
+		obj = pw.onWriteObject(ref, obj)
+	}
+
 	offset := pw.w.count
 	pw.xref.Add(ref.Number, offset, ref.Generation)
 
@@ -318,6 +329,49 @@ func (pw *Writer) SetCompression(enabled bool) {
 	pw.compress = enabled
 }
 
+// AddCatalogEntry adds an entry to the catalog dictionary.
+// This is used by extensions (e.g., PDF/A OutputIntents, signatures AcroForm).
+func (pw *Writer) AddCatalogEntry(key Name, value Object) {
+	if pw.catalogExtra == nil {
+		pw.catalogExtra = make(Dict)
+	}
+	pw.catalogExtra[key] = value
+}
+
+// AddTrailerEntry adds an entry to the trailer dictionary.
+// This is used by extensions (e.g., encryption Encrypt dict, ID array).
+func (pw *Writer) AddTrailerEntry(key Name, value Object) {
+	if pw.trailerExtra == nil {
+		pw.trailerExtra = make(Dict)
+	}
+	pw.trailerExtra[key] = value
+}
+
+// SetObjectHook registers a function that transforms each object before
+// it is written. This is used by encryption to encrypt strings and streams.
+func (pw *Writer) SetObjectHook(fn func(ref ObjectRef, obj Object) Object) {
+	pw.onWriteObject = fn
+}
+
+// OnBeforeClose registers a callback that runs before Close finalizes the PDF.
+// Multiple callbacks are executed in registration order.
+// This is used to write ICC profiles, XMP metadata, or encryption dictionaries.
+func (pw *Writer) OnBeforeClose(fn func(pw *Writer) error) {
+	pw.beforeClose = append(pw.beforeClose, fn)
+}
+
+// BytesWritten returns the total number of bytes written so far.
+// This is useful for calculating ByteRange offsets for digital signatures.
+func (pw *Writer) BytesWritten() int64 {
+	return pw.w.count
+}
+
+// RawWrite writes raw bytes directly to the output stream.
+// This is used for signature placeholders where exact byte control is needed.
+func (pw *Writer) RawWrite(data []byte) (int, error) {
+	return pw.w.Write(data)
+}
+
 // Close finishes writing the PDF document. It writes the page tree,
 // catalog, cross-reference table, trailer, and %%EOF marker.
 // Close must be called exactly once.
@@ -326,6 +380,13 @@ func (pw *Writer) Close() error {
 		return fmt.Errorf("pdf: writer already closed")
 	}
 	pw.closed = true
+
+	// 0. Run beforeClose hooks (e.g., write ICC profiles, XMP metadata, encrypt dicts).
+	for _, fn := range pw.beforeClose {
+		if err := fn(pw); err != nil {
+			return err
+		}
+	}
 
 	// 1. Write the page tree object.
 	kids := make(Array, len(pw.pages))
@@ -351,10 +412,13 @@ func (pw *Writer) Close() error {
 		}
 	}
 
-	// 3. Write the catalog object.
+	// 3. Write the catalog object, merging any extra entries.
 	catalogDict := Dict{
 		Name("Type"):  Name("Catalog"),
 		Name("Pages"): pw.pageTree,
+	}
+	for k, v := range pw.catalogExtra {
+		catalogDict[k] = v
 	}
 	if err := pw.WriteObject(pw.catalog, catalogDict); err != nil {
 		return err
@@ -366,13 +430,16 @@ func (pw *Writer) Close() error {
 		return err
 	}
 
-	// 5. Write the trailer.
+	// 5. Write the trailer, merging any extra entries.
 	trailerDict := Dict{
 		Name("Size"): Integer(pw.xref.Size()),
 		Name("Root"): pw.catalog,
 	}
 	if infoRef.Number > 0 {
 		trailerDict[Name("Info")] = infoRef
+	}
+	for k, v := range pw.trailerExtra {
+		trailerDict[k] = v
 	}
 
 	if _, err := io.WriteString(pw.w, "trailer\n"); err != nil {

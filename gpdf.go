@@ -46,6 +46,8 @@ var (
 	WithDefaultFont = template.WithDefaultFont
 	// WithMetadata sets document metadata (title, author, etc.).
 	WithMetadata = template.WithMetadata
+	// WithWriterSetup registers a Writer configuration hook for extensions.
+	WithWriterSetup = template.WithWriterSetup
 )
 
 // Re-export commonly used page sizes for convenience.

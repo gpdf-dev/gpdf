@@ -74,17 +74,17 @@ func TestXRefTable_WriteTo(t *testing.T) {
 	}
 
 	// Entry 0: free list head
-	if !strings.Contains(got, "0000000000 65535 f \r\n") {
+	if !strings.Contains(got, "0000000000 65535 f\r\n") {
 		t.Errorf("missing free list head entry: %q", got)
 	}
 
 	// Entry 1: offset 9
-	if !strings.Contains(got, "0000000009 00000 n \r\n") {
+	if !strings.Contains(got, "0000000009 00000 n\r\n") {
 		t.Errorf("missing entry 1: %q", got)
 	}
 
 	// Entry 2: offset 74
-	if !strings.Contains(got, "0000000074 00000 n \r\n") {
+	if !strings.Contains(got, "0000000074 00000 n\r\n") {
 		t.Errorf("missing entry 2: %q", got)
 	}
 }
