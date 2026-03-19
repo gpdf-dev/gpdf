@@ -145,6 +145,63 @@ page.AutoRow(func(r *template.RowBuilder) {
 })
 ```
 
+### CJK 字体（中文 / 日文 / 韩文）
+
+渲染 CJK 文本需要嵌入 TrueType 字体。每种语言使用对应的 Noto Sans 字体：
+
+```go
+fontData, _ := os.ReadFile("NotoSansSC-Regular.ttf")
+
+doc := gpdf.NewDocument(
+	gpdf.WithPageSize(gpdf.A4),
+	gpdf.WithFont("NotoSansSC", fontData),
+	gpdf.WithDefaultFont("NotoSansSC", 12),
+)
+
+page := doc.AddPage()
+page.AutoRow(func(r *template.RowBuilder) {
+	r.Col(12, func(c *template.ColBuilder) {
+		c.Text("你好世界", template.FontSize(18))
+	})
+})
+```
+
+对于多语言文档，注册多个字体并使用 `FontFamily()` 切换：
+
+```go
+jpFont, _ := os.ReadFile("NotoSansJP-Regular.ttf")
+scFont, _ := os.ReadFile("NotoSansSC-Regular.ttf")
+krFont, _ := os.ReadFile("NotoSansKR-Regular.ttf")
+
+doc := gpdf.NewDocument(
+	gpdf.WithFont("NotoSansJP", jpFont),
+	gpdf.WithFont("NotoSansSC", scFont),
+	gpdf.WithFont("NotoSansKR", krFont),
+	gpdf.WithDefaultFont("NotoSansSC", 12),
+)
+
+page := doc.AddPage()
+page.AutoRow(func(r *template.RowBuilder) {
+	r.Col(4, func(c *template.ColBuilder) {
+		c.Text("日本語", template.FontFamily("NotoSansJP"))
+	})
+	r.Col(4, func(c *template.ColBuilder) {
+		c.Text("中文", template.FontFamily("NotoSansSC"))
+	})
+	r.Col(4, func(c *template.ColBuilder) {
+		c.Text("한국어", template.FontFamily("NotoSansKR"))
+	})
+})
+```
+
+推荐字体（均为免费，OFL 许可）：
+
+| 字体 | 语言 |
+|---|---|
+| [Noto Sans JP](https://fonts.google.com/noto/specimen/Noto+Sans+JP) | 日文 |
+| [Noto Sans SC](https://fonts.google.com/noto/specimen/Noto+Sans+SC) | 简体中文 |
+| [Noto Sans KR](https://fonts.google.com/noto/specimen/Noto+Sans+KR) | 韩文 |
+
 ### 12 列网格布局
 
 使用 Bootstrap 风格的 12 列网格构建布局：

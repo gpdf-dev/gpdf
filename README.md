@@ -146,6 +146,63 @@ page.AutoRow(func(r *template.RowBuilder) {
 })
 ```
 
+### CJK Fonts (Japanese / Chinese / Korean)
+
+Embed TrueType fonts for CJK text rendering. Each language needs its own Noto Sans font:
+
+```go
+fontData, _ := os.ReadFile("NotoSansJP-Regular.ttf")
+
+doc := gpdf.NewDocument(
+	gpdf.WithPageSize(gpdf.A4),
+	gpdf.WithFont("NotoSansJP", fontData),
+	gpdf.WithDefaultFont("NotoSansJP", 12),
+)
+
+page := doc.AddPage()
+page.AutoRow(func(r *template.RowBuilder) {
+	r.Col(12, func(c *template.ColBuilder) {
+		c.Text("こんにちは世界", template.FontSize(18))
+	})
+})
+```
+
+For multi-language documents, register multiple fonts and switch with `FontFamily()`:
+
+```go
+jpFont, _ := os.ReadFile("NotoSansJP-Regular.ttf")
+scFont, _ := os.ReadFile("NotoSansSC-Regular.ttf")
+krFont, _ := os.ReadFile("NotoSansKR-Regular.ttf")
+
+doc := gpdf.NewDocument(
+	gpdf.WithFont("NotoSansJP", jpFont),
+	gpdf.WithFont("NotoSansSC", scFont),
+	gpdf.WithFont("NotoSansKR", krFont),
+	gpdf.WithDefaultFont("NotoSansJP", 12),
+)
+
+page := doc.AddPage()
+page.AutoRow(func(r *template.RowBuilder) {
+	r.Col(4, func(c *template.ColBuilder) {
+		c.Text("日本語", template.FontFamily("NotoSansJP"))
+	})
+	r.Col(4, func(c *template.ColBuilder) {
+		c.Text("中文", template.FontFamily("NotoSansSC"))
+	})
+	r.Col(4, func(c *template.ColBuilder) {
+		c.Text("한국어", template.FontFamily("NotoSansKR"))
+	})
+})
+```
+
+Recommended fonts (all free, OFL license):
+
+| Font | Language |
+|---|---|
+| [Noto Sans JP](https://fonts.google.com/noto/specimen/Noto+Sans+JP) | Japanese |
+| [Noto Sans SC](https://fonts.google.com/noto/specimen/Noto+Sans+SC) | Simplified Chinese |
+| [Noto Sans KR](https://fonts.google.com/noto/specimen/Noto+Sans+KR) | Korean |
+
 ### 12-Column Grid Layout
 
 Build layouts using a Bootstrap-style 12-column grid:

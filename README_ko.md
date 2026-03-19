@@ -145,6 +145,63 @@ page.AutoRow(func(r *template.RowBuilder) {
 })
 ```
 
+### CJK 폰트 (한국어 / 일본어 / 중국어)
+
+CJK 텍스트 렌더링에는 TrueType 폰트 임베딩이 필요합니다. 각 언어에 맞는 Noto Sans 폰트를 사용합니다:
+
+```go
+fontData, _ := os.ReadFile("NotoSansKR-Regular.ttf")
+
+doc := gpdf.NewDocument(
+	gpdf.WithPageSize(gpdf.A4),
+	gpdf.WithFont("NotoSansKR", fontData),
+	gpdf.WithDefaultFont("NotoSansKR", 12),
+)
+
+page := doc.AddPage()
+page.AutoRow(func(r *template.RowBuilder) {
+	r.Col(12, func(c *template.ColBuilder) {
+		c.Text("안녕하세요 세계", template.FontSize(18))
+	})
+})
+```
+
+다국어 문서의 경우, 여러 폰트를 등록하고 `FontFamily()`로 전환합니다:
+
+```go
+jpFont, _ := os.ReadFile("NotoSansJP-Regular.ttf")
+scFont, _ := os.ReadFile("NotoSansSC-Regular.ttf")
+krFont, _ := os.ReadFile("NotoSansKR-Regular.ttf")
+
+doc := gpdf.NewDocument(
+	gpdf.WithFont("NotoSansJP", jpFont),
+	gpdf.WithFont("NotoSansSC", scFont),
+	gpdf.WithFont("NotoSansKR", krFont),
+	gpdf.WithDefaultFont("NotoSansKR", 12),
+)
+
+page := doc.AddPage()
+page.AutoRow(func(r *template.RowBuilder) {
+	r.Col(4, func(c *template.ColBuilder) {
+		c.Text("日本語", template.FontFamily("NotoSansJP"))
+	})
+	r.Col(4, func(c *template.ColBuilder) {
+		c.Text("中文", template.FontFamily("NotoSansSC"))
+	})
+	r.Col(4, func(c *template.ColBuilder) {
+		c.Text("한국어", template.FontFamily("NotoSansKR"))
+	})
+})
+```
+
+추천 폰트 (모두 무료, OFL 라이선스):
+
+| 폰트 | 언어 |
+|---|---|
+| [Noto Sans JP](https://fonts.google.com/noto/specimen/Noto+Sans+JP) | 일본어 |
+| [Noto Sans SC](https://fonts.google.com/noto/specimen/Noto+Sans+SC) | 간체 중국어 |
+| [Noto Sans KR](https://fonts.google.com/noto/specimen/Noto+Sans+KR) | 한국어 |
+
 ### 12컬럼 그리드 레이아웃
 
 Bootstrap 스타일의 12컬럼 그리드로 레이아웃 구성:
