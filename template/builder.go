@@ -166,14 +166,13 @@ func (d *Document) Render(w io.Writer) error {
 		d.config.WriterSetup(pw)
 	}
 
-	// Register fonts with the PDF writer.
-	for family, data := range d.fontDataMap {
-		if _, _, err := pw.RegisterFont(family, data); err != nil {
-			return err
-		}
+	renderer := render.NewPDFRenderer(pw)
+
+	// Register TrueType fonts with the renderer for Type0/CIDFont encoding.
+	for family, ttf := range d.fonts {
+		renderer.RegisterTTFont(family, ttf, d.fontDataMap[family])
 	}
 
-	renderer := render.NewPDFRenderer(pw)
 	return renderer.RenderDocument(pages, doc.Metadata)
 }
 

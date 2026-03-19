@@ -152,6 +152,27 @@ func (pw *Writer) AddPage(page PageObject) error {
 	return nil
 }
 
+// ReserveFontRef reserves a font resource name and object reference for the
+// given font name without writing any PDF objects. This allows Type0/CIDFont
+// structures to be written later via OnBeforeClose hooks.
+func (pw *Writer) ReserveFontRef(name string) (string, ObjectRef) {
+	if ref, ok := pw.fonts[name]; ok {
+		idx := 1
+		for k := range pw.fonts {
+			if k == name {
+				break
+			}
+			idx++
+		}
+		return fmt.Sprintf("F%d", idx), ref
+	}
+
+	fontRef := pw.AllocObject()
+	resName := fmt.Sprintf("F%d", len(pw.fonts)+1)
+	pw.fonts[name] = fontRef
+	return resName, fontRef
+}
+
 // RegisterFont registers a font with the given name and font data.
 // It writes the font as a PDF font object and returns the PDF resource
 // name (e.g., "F1") and the object reference.
