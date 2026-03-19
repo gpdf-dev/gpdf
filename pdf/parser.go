@@ -500,7 +500,7 @@ func decompressFlate(data []byte) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("pdf: zlib open: %w", err)
 	}
-	defer r.Close()
+	defer func() { _ = r.Close() }()
 	out, err := io.ReadAll(r)
 	if err != nil {
 		return nil, fmt.Errorf("pdf: zlib decompress: %w", err)

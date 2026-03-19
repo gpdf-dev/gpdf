@@ -171,10 +171,7 @@ func (r *Reader) parseXRefAndTrailer() error {
 	offset := startxrefOffset
 	var firstTrailer Dict
 
-	for {
-		if visited[offset] {
-			break
-		}
+	for !visited[offset] {
 		visited[offset] = true
 
 		p := newParser(r.data)
@@ -390,7 +387,7 @@ func parseXRefFieldWidths(d Dict) ([3]int, error) {
 // parseXRefIndices extracts the /Index array from an xref stream dict.
 // Returns [0, Size] as default if /Index is absent.
 func parseXRefIndices(d Dict) []int {
-	sizeObj, _ := d[Name("Size")]
+	sizeObj := d[Name("Size")]
 	size := 0
 	if v, ok := sizeObj.(Integer); ok {
 		size = int(v)
@@ -574,7 +571,7 @@ func (r *Reader) walkPageTree(node Object, inheritedMediaBox *Rectangle) error {
 		}
 	}
 
-	typeObj, _ := d[Name("Type")]
+	typeObj := d[Name("Type")]
 	typeName, _ := typeObj.(Name)
 
 	switch string(typeName) {

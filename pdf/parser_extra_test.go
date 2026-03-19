@@ -211,8 +211,8 @@ func TestDecompressFlate(t *testing.T) {
 	// Compress with zlib.
 	var buf bytes.Buffer
 	w := zlib.NewWriter(&buf)
-	w.Write(original)
-	w.Close()
+	_, _ = w.Write(original)
+	_ = w.Close()
 
 	// Decompress.
 	result, err := decompressFlate(buf.Bytes())

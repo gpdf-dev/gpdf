@@ -37,7 +37,9 @@ func TestTrueTypeFontHexEncoding(t *testing.T) {
 	renderer.RegisterTTFont("TestCJK", ttf, fontData)
 
 	// Begin a page to set up pageHeight for Y conversion.
-	renderer.BeginPage(document.Size{Width: 595, Height: 842})
+	if err = renderer.BeginPage(document.Size{Width: 595, Height: 842}); err != nil {
+		t.Fatalf("BeginPage failed: %v", err)
+	}
 
 	// Render Japanese text.
 	text := "日本語テスト"
@@ -144,7 +146,9 @@ func TestStandardFontNotAffected(t *testing.T) {
 	pw := pdf.NewWriter(&buf)
 	renderer := NewPDFRenderer(pw)
 
-	renderer.BeginPage(document.Size{Width: 595, Height: 842})
+	if err := renderer.BeginPage(document.Size{Width: 595, Height: 842}); err != nil {
+		t.Fatalf("BeginPage failed: %v", err)
+	}
 
 	style := document.Style{
 		FontFamily: "Helvetica",

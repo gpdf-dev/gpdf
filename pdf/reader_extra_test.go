@@ -236,8 +236,8 @@ func TestReaderDecodeStreamFilterArray(t *testing.T) {
 	original := []byte("test data for array filter")
 	var zbuf bytes.Buffer
 	zw := zlib.NewWriter(&zbuf)
-	zw.Write(original)
-	zw.Close()
+	_, _ = zw.Write(original)
+	_ = zw.Close()
 
 	s := Stream{
 		Dict: Dict{
@@ -471,8 +471,8 @@ func TestBuildXRefStreamPDF(t *testing.T) {
 	// Compress the stream content.
 	var compressedContent bytes.Buffer
 	zw := zlib.NewWriter(&compressedContent)
-	zw.Write(streamContent.Bytes())
-	zw.Close()
+	_, _ = zw.Write(streamContent.Bytes())
+	_ = zw.Close()
 
 	fmt.Fprintf(&pdf, "4 0 obj\n")
 	fmt.Fprintf(&pdf, "<< /Type /XRef /Size 5 /W [1 2 1] /Root 1 0 R /Length %d /Filter /FlateDecode >>\n", compressedContent.Len())

@@ -160,7 +160,7 @@ func TestReaderString(t *testing.T) {
 	}
 }
 
-func TestParserObjects(t *testing.T) {
+func TestParserObjects(t *testing.T) { //nolint:gocyclo
 	tests := []struct {
 		name  string
 		input string

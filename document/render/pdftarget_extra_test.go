@@ -358,26 +358,13 @@ func TestFullTTFontRendering(t *testing.T) {
 	}
 
 	output := buf.String()
-	if !strings.Contains(output, "%PDF-1.7") {
-		t.Error("should contain PDF header")
-	}
-	if !strings.Contains(output, "%%EOF") {
-		t.Error("should contain EOF")
-	}
-	if !strings.Contains(output, "/Type0") {
-		t.Error("should contain Type0 font")
-	}
-	if !strings.Contains(output, "/CIDFontType2") {
-		t.Error("should contain CIDFontType2")
-	}
-	if !strings.Contains(output, "/ToUnicode") {
-		t.Error("should contain ToUnicode CMap")
-	}
-	if !strings.Contains(output, "/FontDescriptor") {
-		t.Error("should contain FontDescriptor")
-	}
-	if !strings.Contains(output, "/FontFile2") {
-		t.Error("should contain embedded FontFile2")
+	for _, want := range []string{
+		"%PDF-1.7", "%%EOF", "/Type0", "/CIDFontType2",
+		"/ToUnicode", "/FontDescriptor", "/FontFile2",
+	} {
+		if !strings.Contains(output, want) {
+			t.Errorf("output should contain %q", want)
+		}
 	}
 }
 
