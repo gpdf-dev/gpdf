@@ -143,6 +143,21 @@ func (r *PDFRenderer) RenderText(text string, pos document.Point, style document
 	// Resolve the PDF font name including weight/style variants.
 	fontName := resolvePDFFontName(style.FontFamily, style.FontWeight, style.FontStyle)
 
+	// For TrueType fonts, if the variant (e.g. "NotoSansJP-Bold") is not
+	// registered, fall back to the base family name for rendering and use
+	// PDF text rendering mode to simulate bold/italic.
+	ttFontName := fontName
+	simulateBold := false
+	simulateItalic := false
+	if _, ok := r.ttFonts[fontName]; !ok {
+		if _, ok := r.ttFonts[style.FontFamily]; ok {
+			ttFontName = style.FontFamily
+			fontName = style.FontFamily
+			simulateBold = style.FontWeight >= document.WeightBold
+			simulateItalic = style.FontStyle == document.StyleItalic
+		}
+	}
+
 	// Ensure the font is registered.
 	fontResName, err := r.ensureFont(fontName)
 	if err != nil {
@@ -159,17 +174,42 @@ func (r *PDFRenderer) RenderText(text string, pos document.Point, style document
 	buf.WriteString(style.Color.FillColorCmd())
 	buf.WriteByte('\n')
 
-	// Begin text block.
-	buf.WriteString("BT\n")
-	fmt.Fprintf(&buf, "/%s %g Tf\n", fontResName, fontSize)
+	// Simulate bold for TrueType fonts by using text rendering mode 2
+	// (fill + stroke) with a thin line width.
+	if simulateBold {
+		buf.WriteString(style.Color.StrokeColorCmd())
+		buf.WriteByte('\n')
+		lineWidth := fontSize * 0.03
+		fmt.Fprintf(&buf, "%g w\n", lineWidth)
+	}
+
+	// Simulate italic for TrueType fonts using a text matrix with shear.
+	if simulateItalic {
+		buf.WriteString("BT\n")
+		// Italic shear angle ~12 degrees (tan(12°) ≈ 0.2126)
+		fmt.Fprintf(&buf, "/%s %g Tf\n", fontResName, fontSize)
+		if simulateBold {
+			buf.WriteString("2 Tr\n") // fill + stroke
+		}
+		fmt.Fprintf(&buf, "1 0 0.2126 1 %g %g Tm\n", pos.X, pdfY)
+	} else {
+		// Begin text block.
+		buf.WriteString("BT\n")
+		fmt.Fprintf(&buf, "/%s %g Tf\n", fontResName, fontSize)
+		if simulateBold {
+			buf.WriteString("2 Tr\n") // fill + stroke
+		}
+	}
 	if style.WordSpacing != 0 {
 		fmt.Fprintf(&buf, "%g Tw\n", style.WordSpacing)
 	}
 	if style.LetterSpacing != 0 {
 		fmt.Fprintf(&buf, "%g Tc\n", style.LetterSpacing)
 	}
-	fmt.Fprintf(&buf, "%g %g Td\n", pos.X, pdfY)
-	if ttf, ok := r.ttFonts[fontName]; ok {
+	if !simulateItalic {
+		fmt.Fprintf(&buf, "%g %g Td\n", pos.X, pdfY)
+	}
+	if ttf, ok := r.ttFonts[ttFontName]; ok {
 		encoded := ttf.Encode(text)
 		fmt.Fprintf(&buf, "<%s> Tj\n", hex.EncodeToString(encoded))
 	} else {
@@ -180,6 +220,9 @@ func (r *PDFRenderer) RenderText(text string, pos document.Point, style document
 	}
 	if style.WordSpacing != 0 {
 		buf.WriteString("0 Tw\n")
+	}
+	if simulateBold {
+		buf.WriteString("0 Tr\n") // reset to fill mode
 	}
 	buf.WriteString("ET\n")
 
