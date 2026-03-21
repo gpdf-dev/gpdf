@@ -1,0 +1,495 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gpdf.dev/schema/gpdf.schema.json",
+  "title": "gpdf Document Schema",
+  "description": "JSON schema for gpdf PDF generation library. Defines the declarative document format accepted by template.FromJSON().",
+  "type": "object",
+  "required": ["page"],
+  "additionalProperties": false,
+  "properties": {
+    "page": {
+      "$ref": "#/$defs/page",
+      "description": "Page-level settings (size, margins)."
+    },
+    "metadata": {
+      "$ref": "#/$defs/metadata",
+      "description": "Optional document metadata (title, author, etc.)."
+    },
+    "header": {
+      "type": "array",
+      "description": "Rows rendered at the top of every page.",
+      "items": { "$ref": "#/$defs/row" }
+    },
+    "footer": {
+      "type": "array",
+      "description": "Rows rendered at the bottom of every page.",
+      "items": { "$ref": "#/$defs/row" }
+    },
+    "body": {
+      "type": "array",
+      "description": "Main content rows. Automatically paginated.",
+      "items": { "$ref": "#/$defs/row" }
+    },
+    "pages": {
+      "type": "array",
+      "description": "Explicit page definitions. Each entry becomes one page with its own body and absolute elements.",
+      "items": { "$ref": "#/$defs/pageBody" }
+    },
+    "absolute": {
+      "type": "array",
+      "description": "Absolute-positioned elements on the first page (or all pages when used with body).",
+      "items": { "$ref": "#/$defs/absolute" }
+    }
+  },
+  "$defs": {
+    "dimension": {
+      "type": "string",
+      "description": "A dimension value with unit. Supported units: mm, cm, in, pt, em, %. A bare number defaults to pt. 'auto' is also accepted.",
+      "pattern": "^(auto|[0-9]+(\\.[0-9]+)?(mm|cm|in|pt|em|%)|[0-9]+(\\.[0-9]+)?)$"
+    },
+    "color": {
+      "type": "string",
+      "description": "A color value. Supported formats: named colors (red, blue, ...), hex (#RRGGBB), rgb(r, g, b) with 0.0-1.0 floats, or gray(v) with 0.0-1.0.",
+      "anyOf": [
+        {
+          "enum": ["black", "white", "red", "green", "blue", "yellow", "cyan", "magenta"]
+        },
+        {
+          "pattern": "^#[0-9A-Fa-f]{6}$"
+        },
+        {
+          "pattern": "^rgb\\(\\s*[0-9]*\\.?[0-9]+\\s*,\\s*[0-9]*\\.?[0-9]+\\s*,\\s*[0-9]*\\.?[0-9]+\\s*\\)$"
+        },
+        {
+          "pattern": "^gray\\(\\s*[0-9]*\\.?[0-9]+\\s*\\)$"
+        }
+      ]
+    },
+    "page": {
+      "type": "object",
+      "description": "Page-level settings.",
+      "required": ["size"],
+      "additionalProperties": false,
+      "properties": {
+        "size": {
+          "type": "string",
+          "description": "Page size.",
+          "enum": ["A4", "A3", "Letter", "Legal"]
+        },
+        "margins": {
+          "$ref": "#/$defs/dimension",
+          "description": "Uniform page margins (e.g. \"20mm\", \"15pt\")."
+        }
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Document metadata embedded in the PDF.",
+      "additionalProperties": false,
+      "properties": {
+        "title": {
+          "type": "string",
+          "description": "Document title."
+        },
+        "author": {
+          "type": "string",
+          "description": "Document author."
+        },
+        "subject": {
+          "type": "string",
+          "description": "Document subject."
+        },
+        "creator": {
+          "type": "string",
+          "description": "Creator application name."
+        }
+      }
+    },
+    "row": {
+      "type": "object",
+      "description": "A row wrapper containing a row definition.",
+      "required": ["row"],
+      "additionalProperties": false,
+      "properties": {
+        "row": {
+          "$ref": "#/$defs/rowDef"
+        }
+      }
+    },
+    "rowDef": {
+      "type": "object",
+      "description": "Row definition with height and columns.",
+      "required": ["cols"],
+      "additionalProperties": false,
+      "properties": {
+        "height": {
+          "type": "string",
+          "description": "Row height. Use \"auto\" for automatic height or a dimension (e.g. \"12mm\")."
+        },
+        "cols": {
+          "type": "array",
+          "description": "Columns in this row. Uses a 12-column grid system.",
+          "items": { "$ref": "#/$defs/col" }
+        }
+      }
+    },
+    "col": {
+      "type": "object",
+      "description": "A grid column. Specify content via shorthand fields (text, image, etc.) or the elements array for multiple elements.",
+      "required": ["span"],
+      "additionalProperties": false,
+      "properties": {
+        "span": {
+          "type": "integer",
+          "description": "Column span in the 12-column grid (1-12).",
+          "minimum": 1,
+          "maximum": 12
+        },
+        "text": {
+          "type": "string",
+          "description": "Shorthand: text content for this column."
+        },
+        "image": {
+          "$ref": "#/$defs/image",
+          "description": "Shorthand: image element."
+        },
+        "table": {
+          "$ref": "#/$defs/table",
+          "description": "Shorthand: table element."
+        },
+        "list": {
+          "$ref": "#/$defs/list",
+          "description": "Shorthand: list element."
+        },
+        "line": {
+          "$ref": "#/$defs/line",
+          "description": "Shorthand: horizontal line element."
+        },
+        "spacer": {
+          "$ref": "#/$defs/dimension",
+          "description": "Shorthand: vertical spacer with the given height."
+        },
+        "qrcode": {
+          "$ref": "#/$defs/qrcode",
+          "description": "Shorthand: QR code element."
+        },
+        "barcode": {
+          "$ref": "#/$defs/barcode",
+          "description": "Shorthand: barcode element."
+        },
+        "style": {
+          "$ref": "#/$defs/style",
+          "description": "Text style applied to the text shorthand field."
+        },
+        "elements": {
+          "type": "array",
+          "description": "Multiple elements in this column. Use instead of shorthand fields when a column needs more than one element.",
+          "items": { "$ref": "#/$defs/element" }
+        }
+      }
+    },
+    "element": {
+      "type": "object",
+      "description": "A content element within a column or absolute container.",
+      "required": ["type"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "description": "Element type.",
+          "enum": ["text", "image", "table", "list", "line", "spacer", "qrcode", "barcode", "pageNumber", "totalPages"]
+        },
+        "content": {
+          "type": "string",
+          "description": "Text content (for type \"text\")."
+        },
+        "style": {
+          "$ref": "#/$defs/style",
+          "description": "Text styling properties."
+        },
+        "image": {
+          "$ref": "#/$defs/image",
+          "description": "Image configuration (for type \"image\")."
+        },
+        "table": {
+          "$ref": "#/$defs/table",
+          "description": "Table configuration (for type \"table\")."
+        },
+        "list": {
+          "$ref": "#/$defs/list",
+          "description": "List configuration (for type \"list\")."
+        },
+        "line": {
+          "$ref": "#/$defs/line",
+          "description": "Line configuration (for type \"line\")."
+        },
+        "height": {
+          "$ref": "#/$defs/dimension",
+          "description": "Height for spacer elements."
+        },
+        "qrcode": {
+          "$ref": "#/$defs/qrcode",
+          "description": "QR code configuration (for type \"qrcode\")."
+        },
+        "barcode": {
+          "$ref": "#/$defs/barcode",
+          "description": "Barcode configuration (for type \"barcode\")."
+        }
+      }
+    },
+    "style": {
+      "type": "object",
+      "description": "Text styling properties.",
+      "additionalProperties": false,
+      "properties": {
+        "size": {
+          "type": "number",
+          "description": "Font size in points.",
+          "exclusiveMinimum": 0
+        },
+        "bold": {
+          "type": "boolean",
+          "description": "Bold text."
+        },
+        "italic": {
+          "type": "boolean",
+          "description": "Italic text."
+        },
+        "align": {
+          "type": "string",
+          "description": "Text alignment.",
+          "enum": ["left", "center", "right"]
+        },
+        "color": {
+          "$ref": "#/$defs/color",
+          "description": "Text color."
+        },
+        "background": {
+          "$ref": "#/$defs/color",
+          "description": "Background color."
+        },
+        "fontFamily": {
+          "type": "string",
+          "description": "Font family name (e.g. \"Helvetica\", \"Courier\", \"Times-Roman\", or a registered TrueType font)."
+        },
+        "underline": {
+          "type": "boolean",
+          "description": "Underlined text."
+        },
+        "strikethrough": {
+          "type": "boolean",
+          "description": "Strikethrough text."
+        },
+        "letterSpacing": {
+          "type": "number",
+          "description": "Additional letter spacing in points."
+        },
+        "textIndent": {
+          "$ref": "#/$defs/dimension",
+          "description": "First-line text indent (e.g. \"24pt\", \"10mm\")."
+        }
+      }
+    },
+    "image": {
+      "type": "object",
+      "description": "Image element. Supports base64, data URIs, and file paths.",
+      "required": ["src"],
+      "additionalProperties": false,
+      "properties": {
+        "src": {
+          "type": "string",
+          "description": "Image source: data URI (data:image/png;base64,...), file path, or raw base64 string."
+        },
+        "width": {
+          "$ref": "#/$defs/dimension",
+          "description": "Image width constraint."
+        },
+        "height": {
+          "$ref": "#/$defs/dimension",
+          "description": "Image height constraint."
+        },
+        "fit": {
+          "type": "string",
+          "description": "Image fit mode within the available space.",
+          "enum": ["contain", "cover", "stretch", "original"]
+        },
+        "align": {
+          "type": "string",
+          "description": "Horizontal alignment of the image.",
+          "enum": ["left", "center", "right"]
+        }
+      }
+    },
+    "table": {
+      "type": "object",
+      "description": "Table element with header and data rows.",
+      "required": ["header", "rows"],
+      "additionalProperties": false,
+      "properties": {
+        "header": {
+          "type": "array",
+          "description": "Header row cell texts.",
+          "items": { "type": "string" }
+        },
+        "rows": {
+          "type": "array",
+          "description": "Data rows. Each row is an array of cell text strings.",
+          "items": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        },
+        "columnWidths": {
+          "type": "array",
+          "description": "Relative column widths as percentages (e.g. [35, 35, 30]).",
+          "items": { "type": "number" }
+        },
+        "headerStyle": {
+          "$ref": "#/$defs/style",
+          "description": "Styling for the header row."
+        },
+        "stripeColor": {
+          "$ref": "#/$defs/color",
+          "description": "Alternating row background color."
+        },
+        "cellVAlign": {
+          "type": "string",
+          "description": "Vertical alignment of cell content.",
+          "enum": ["top", "middle", "bottom"]
+        }
+      }
+    },
+    "list": {
+      "type": "object",
+      "description": "List element (ordered or unordered).",
+      "required": ["items"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "description": "List type. Defaults to \"unordered\" (bullets).",
+          "enum": ["ordered", "unordered"]
+        },
+        "items": {
+          "type": "array",
+          "description": "List item texts.",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "line": {
+      "type": "object",
+      "description": "Horizontal line (rule) element.",
+      "additionalProperties": false,
+      "properties": {
+        "color": {
+          "$ref": "#/$defs/color",
+          "description": "Line color."
+        },
+        "thickness": {
+          "$ref": "#/$defs/dimension",
+          "description": "Line thickness (e.g. \"1pt\", \"0.5mm\")."
+        }
+      }
+    },
+    "qrcode": {
+      "type": "object",
+      "description": "QR code element.",
+      "required": ["data"],
+      "additionalProperties": false,
+      "properties": {
+        "data": {
+          "type": "string",
+          "description": "Data to encode in the QR code."
+        },
+        "size": {
+          "$ref": "#/$defs/dimension",
+          "description": "QR code size (width and height)."
+        },
+        "errorCorrection": {
+          "type": "string",
+          "description": "Error correction level. L=~7%, M=~15% (default), Q=~25%, H=~30%.",
+          "enum": ["L", "M", "Q", "H"]
+        }
+      }
+    },
+    "barcode": {
+      "type": "object",
+      "description": "Barcode element.",
+      "required": ["data"],
+      "additionalProperties": false,
+      "properties": {
+        "data": {
+          "type": "string",
+          "description": "Data to encode in the barcode."
+        },
+        "width": {
+          "$ref": "#/$defs/dimension",
+          "description": "Barcode width."
+        },
+        "height": {
+          "$ref": "#/$defs/dimension",
+          "description": "Barcode height."
+        },
+        "format": {
+          "type": "string",
+          "description": "Barcode format.",
+          "enum": ["code128"]
+        }
+      }
+    },
+    "absolute": {
+      "type": "object",
+      "description": "Absolute-positioned container placed at fixed XY coordinates on the page.",
+      "required": ["x", "y", "elements"],
+      "additionalProperties": false,
+      "properties": {
+        "x": {
+          "$ref": "#/$defs/dimension",
+          "description": "X coordinate from the left edge."
+        },
+        "y": {
+          "$ref": "#/$defs/dimension",
+          "description": "Y coordinate from the top edge."
+        },
+        "width": {
+          "$ref": "#/$defs/dimension",
+          "description": "Width constraint for the container."
+        },
+        "height": {
+          "$ref": "#/$defs/dimension",
+          "description": "Height constraint for the container."
+        },
+        "origin": {
+          "type": "string",
+          "description": "Coordinate origin. \"content\" = relative to content area (inside margins). \"page\" = relative to page corner.",
+          "enum": ["content", "page"],
+          "default": "content"
+        },
+        "elements": {
+          "type": "array",
+          "description": "Elements to render at this position.",
+          "items": { "$ref": "#/$defs/element" }
+        }
+      }
+    },
+    "pageBody": {
+      "type": "object",
+      "description": "Content definition for a single explicit page.",
+      "required": ["body"],
+      "additionalProperties": false,
+      "properties": {
+        "body": {
+          "type": "array",
+          "description": "Rows for this page.",
+          "items": { "$ref": "#/$defs/row" }
+        },
+        "absolute": {
+          "type": "array",
+          "description": "Absolute-positioned elements for this page.",
+          "items": { "$ref": "#/$defs/absolute" }
+        }
+      }
+    }
+  }
+}

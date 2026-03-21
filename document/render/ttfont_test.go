@@ -230,11 +230,6 @@ func testSearchRange(n int) testSearchRangeResult {
 	return r
 }
 
-type testTableEntry struct {
-	tag  string
-	data []byte
-}
-
 // assembleTestTTF assembles table entries into a valid TrueType font binary.
 func assembleTestTTF(tables []struct {
 	tag  string
