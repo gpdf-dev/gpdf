@@ -51,6 +51,7 @@ type signerInfo struct {
 	SignedAttrs        asn1.RawValue `asn1:"optional,tag:0"`
 	SignatureAlgorithm pkix.AlgorithmIdentifier
 	Signature          []byte
+	UnsignedAttrs      asn1.RawValue `asn1:"optional,tag:1"`
 }
 
 type issuerAndSerialNumber struct {
@@ -88,7 +89,8 @@ func computeSignature(key crypto.PrivateKey, digest []byte) ([]byte, error) {
 }
 
 // buildSignerInfoBytes builds and marshals the SignerInfo structure.
-func buildSignerInfoBytes(cert *x509.Certificate, attrsBytes []byte, sig []byte, digestAlg, sigAlg pkix.AlgorithmIdentifier) ([]byte, error) {
+// If unsignedAttrsBytes is non-nil, it is included as unsigned attributes (e.g., timestamp token).
+func buildSignerInfoBytes(cert *x509.Certificate, attrsBytes []byte, sig []byte, digestAlg, sigAlg pkix.AlgorithmIdentifier, unsignedAttrsBytes []byte) ([]byte, error) {
 	issuerRaw := asn1.RawValue{FullBytes: cert.RawIssuer}
 
 	innerAttrsBytes, err := extractInnerBytes(attrsBytes)
@@ -117,6 +119,10 @@ func buildSignerInfoBytes(cert *x509.Certificate, attrsBytes []byte, sig []byte,
 		SignedAttrs:        asn1.RawValue{FullBytes: signedAttrsEncoded},
 		SignatureAlgorithm: sigAlg,
 		Signature:          sig,
+	}
+
+	if len(unsignedAttrsBytes) > 0 {
+		si.UnsignedAttrs = asn1.RawValue{FullBytes: unsignedAttrsBytes}
 	}
 
 	return asn1.Marshal(si)
@@ -162,7 +168,20 @@ func createCMSSignature(hash []byte, signer Signer, cfg *signConfig) ([]byte, er
 		return nil, fmt.Errorf("sign: %w", err)
 	}
 
-	siBytes, err := buildSignerInfoBytes(cert, attrsBytes, sig, digestAlg, sigAlg)
+	// Fetch RFC 3161 timestamp token if TSA URL is configured
+	var unsignedAttrsBytes []byte
+	if cfg.tsaURL != "" {
+		token, err := fetchTimestamp(cfg.tsaURL, sig)
+		if err != nil {
+			return nil, fmt.Errorf("timestamp: %w", err)
+		}
+		unsignedAttrsBytes, err = buildUnsignedAttrs(token)
+		if err != nil {
+			return nil, fmt.Errorf("build unsigned attrs: %w", err)
+		}
+	}
+
+	siBytes, err := buildSignerInfoBytes(cert, attrsBytes, sig, digestAlg, sigAlg, unsignedAttrsBytes)
 	if err != nil {
 		return nil, fmt.Errorf("marshal signer info: %w", err)
 	}

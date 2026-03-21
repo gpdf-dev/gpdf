@@ -33,6 +33,10 @@ type SignatureInfo struct {
 	MessageDigest   []byte // from signed attributes
 	RawSignature    []byte // the cryptographic signature value
 	SignedAttrsRaw  []byte // DER-encoded signed attributes (for verification)
+
+	// Timestamp fields
+	HasTimestamp   bool   // true if RFC 3161 timestamp token is present
+	TimestampToken []byte // raw DER of the timestamp token (ContentInfo)
 }
 
 // ParseSignatureInfo extracts signature information from a signed PDF.
@@ -168,6 +172,7 @@ type cmsSignerInfo struct {
 	SignedAttrs     asn1.RawValue `asn1:"optional,tag:0"`
 	SignatureAlg    asn1.RawValue
 	Signature       []byte
+	UnsignedAttrs   asn1.RawValue `asn1:"optional,tag:1"`
 }
 
 func (info *SignatureInfo) parseCMS() error {
@@ -233,6 +238,12 @@ func (info *SignatureInfo) parseCMS() error {
 		info.MessageDigest = extractMessageDigest(si.SignedAttrs.Bytes)
 	}
 
+	// Parse unsigned attributes to detect timestamp token
+	if len(si.UnsignedAttrs.Bytes) > 0 {
+		info.TimestampToken = extractTimestampToken(si.UnsignedAttrs.Bytes)
+		info.HasTimestamp = len(info.TimestampToken) > 0
+	}
+
 	return nil
 }
 
@@ -249,6 +260,27 @@ func marshalAsSet(raw asn1.RawValue) []byte {
 		return nil
 	}
 	return encoded
+}
+
+// extractTimestampToken walks the unsigned attributes to find the timestamp token
+// (OID 1.2.840.113549.1.9.16.2.14).
+func extractTimestampToken(attrsBytes []byte) []byte {
+	rest := attrsBytes
+	for len(rest) > 0 {
+		var attr struct {
+			Type   asn1.ObjectIdentifier
+			Values asn1.RawValue `asn1:"set"`
+		}
+		var err error
+		rest, err = asn1.Unmarshal(rest, &attr)
+		if err != nil {
+			break
+		}
+		if attr.Type.Equal(oidAttributeTimeStampToken) {
+			return attr.Values.Bytes
+		}
+	}
+	return nil
 }
 
 // extractMessageDigest walks the signed attributes to find messageDigest (OID 1.2.840.113549.1.9.4).
