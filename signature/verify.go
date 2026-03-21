@@ -314,7 +314,7 @@ func extractContentsHex(s string) ([]byte, error) {
 	re := regexp.MustCompile(`/Contents\s*<([0-9A-Fa-f]+)>`)
 	m := re.FindStringSubmatch(s)
 	if m == nil {
-		return nil, fmt.Errorf("Contents hex string not found")
+		return nil, fmt.Errorf("contents hex string not found")
 	}
 	hexStr := strings.TrimRight(m[1], "0") // remove trailing zero padding
 	if len(hexStr)%2 != 0 {

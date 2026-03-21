@@ -2,9 +2,10 @@
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/gpdf-dev/gpdf.svg)](https://pkg.go.dev/github.com/gpdf-dev/gpdf)
 [![CI](https://github.com/gpdf-dev/gpdf/actions/workflows/check-code.yml/badge.svg)](https://github.com/gpdf-dev/gpdf/actions/workflows/check-code.yml)
-![coverage](https://img.shields.io/badge/coverage-92.6%25-brightgreen)
+![coverage](https://img.shields.io/badge/coverage-85.0%25-green)
 [![Go Report Card](https://goreportcard.com/badge/github.com/gpdf-dev/gpdf)](https://goreportcard.com/report/github.com/gpdf-dev/gpdf)
 [![Go Version](https://img.shields.io/badge/Go-%3E%3D1.22-blue)](https://go.dev/)
+[![Website](https://img.shields.io/badge/Website-gpdf.dev-blue)](https://gpdf.dev/)
 
 **English** | [日本語](README_ja.md) | [中文](README_zh.md) | [한국어](README_ko.md) | [Español](README_es.md) | [Português](README_pt.md)
 

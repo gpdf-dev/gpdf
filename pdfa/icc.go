@@ -72,8 +72,8 @@ func buildSRGBProfile() []byte {
 		_ = binary.Write(&buf, binary.BigEndian, uint32(0)) // unicode count
 		// ScriptCode (empty)
 		_ = binary.Write(&buf, binary.BigEndian, uint16(0)) // scriptcode code
-		buf.WriteByte(0)                                     // scriptcode count
-		buf.Write(make([]byte, 67))                          // scriptcode string (67 bytes)
+		buf.WriteByte(0)                                    // scriptcode count
+		buf.Write(make([]byte, 67))                         // scriptcode string (67 bytes)
 		// Pad to 4-byte boundary
 		for buf.Len()%4 != 0 {
 			buf.WriteByte(0)
@@ -135,7 +135,7 @@ func buildSRGBProfile() []byte {
 	buf.Grow(totalSize)
 
 	// === Header (128 bytes) ===
-	_ = binary.Write(buf, binary.BigEndian, uint32(totalSize)) // Profile size
+	_ = binary.Write(buf, binary.BigEndian, uint32(totalSize))  // Profile size
 	buf.WriteString("gpdf")                                     // Preferred CMM Type
 	_ = binary.Write(buf, binary.BigEndian, uint32(0x02100000)) // Version 2.1.0
 	buf.WriteString("mntr")                                     // Device class: monitor
@@ -148,13 +148,13 @@ func buildSRGBProfile() []byte {
 	_ = binary.Write(buf, binary.BigEndian, uint16(0))    // hour
 	_ = binary.Write(buf, binary.BigEndian, uint16(0))    // minute
 	_ = binary.Write(buf, binary.BigEndian, uint16(0))    // second
-	buf.WriteString("acsp")                                // File signature (always "acsp")
-	buf.WriteString("APPL")                                // Primary platform
-	_ = binary.Write(buf, binary.BigEndian, uint32(0))     // Profile flags
-	buf.WriteString("gpdf")                                // Device manufacturer
-	buf.WriteString("sRGB")                                // Device model
-	_ = binary.Write(buf, binary.BigEndian, uint64(0))     // Device attributes
-	_ = binary.Write(buf, binary.BigEndian, uint32(0))     // Rendering intent (perceptual)
+	buf.WriteString("acsp")                               // File signature (always "acsp")
+	buf.WriteString("APPL")                               // Primary platform
+	_ = binary.Write(buf, binary.BigEndian, uint32(0))    // Profile flags
+	buf.WriteString("gpdf")                               // Device manufacturer
+	buf.WriteString("sRGB")                               // Device model
+	_ = binary.Write(buf, binary.BigEndian, uint64(0))    // Device attributes
+	_ = binary.Write(buf, binary.BigEndian, uint32(0))    // Rendering intent (perceptual)
 	// PCS illuminant (D50 XYZ)
 	_ = binary.Write(buf, binary.BigEndian, s15Fixed16(0.9642))
 	_ = binary.Write(buf, binary.BigEndian, s15Fixed16(1.0))

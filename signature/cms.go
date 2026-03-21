@@ -63,68 +63,34 @@ type attribute struct {
 	Values asn1.RawValue `asn1:"set"`
 }
 
-// createCMSSignature creates a CMS/PKCS#7 SignedData structure.
-func createCMSSignature(hash []byte, signer Signer, cfg *signConfig) ([]byte, error) {
-	cert := signer.Certificate
-
-	// Determine signature algorithm
-	var sigAlg pkix.AlgorithmIdentifier
-	switch signer.PrivateKey.(type) {
+// signatureAlgorithm returns the AlgorithmIdentifier for the given private key.
+func signatureAlgorithm(key crypto.PrivateKey) (pkix.AlgorithmIdentifier, error) {
+	switch key.(type) {
 	case *rsa.PrivateKey:
-		sigAlg = pkix.AlgorithmIdentifier{Algorithm: oidRSAWithSHA256}
+		return pkix.AlgorithmIdentifier{Algorithm: oidRSAWithSHA256}, nil
 	case *ecdsa.PrivateKey:
-		sigAlg = pkix.AlgorithmIdentifier{Algorithm: oidECDSAWithSHA256}
+		return pkix.AlgorithmIdentifier{Algorithm: oidECDSAWithSHA256}, nil
 	default:
-		return nil, fmt.Errorf("unsupported key type: %T", signer.PrivateKey)
+		return pkix.AlgorithmIdentifier{}, fmt.Errorf("unsupported key type: %T", key)
 	}
+}
 
-	digestAlg := pkix.AlgorithmIdentifier{Algorithm: oidSHA256}
-
-	// Build signed attributes
-	signTime := cfg.signTime
-	if signTime.IsZero() {
-		signTime = time.Now()
-	}
-
-	attrs, err := buildSignedAttrs(hash, signTime)
-	if err != nil {
-		return nil, fmt.Errorf("build signed attrs: %w", err)
-	}
-
-	// Marshal signed attributes as a SEQUENCE (the default for []attribute)
-	attrsBytes, err := marshalAttributes(attrs)
-	if err != nil {
-		return nil, fmt.Errorf("marshal attrs: %w", err)
-	}
-
-	// For signing, the authenticated attributes must be encoded as a SET
-	// (tag 0x31) rather than the IMPLICIT [0] (tag 0xA0) used in SignerInfo.
-	attrsBytesForSign := make([]byte, len(attrsBytes))
-	copy(attrsBytesForSign, attrsBytes)
-	attrsBytesForSign[0] = 0x31 // SET tag
-
-	attrHash := crypto.SHA256.New()
-	attrHash.Write(attrsBytesForSign)
-	attrDigest := attrHash.Sum(nil)
-
-	// Create signature
-	var sig []byte
-	switch key := signer.PrivateKey.(type) {
+// computeSignature signs the digest with the given private key.
+func computeSignature(key crypto.PrivateKey, digest []byte) ([]byte, error) {
+	switch k := key.(type) {
 	case *rsa.PrivateKey:
-		sig, err = rsa.SignPKCS1v15(rand.Reader, key, crypto.SHA256, attrDigest)
+		return rsa.SignPKCS1v15(rand.Reader, k, crypto.SHA256, digest)
 	case *ecdsa.PrivateKey:
-		sig, err = ecdsa.SignASN1(rand.Reader, key, attrDigest)
+		return ecdsa.SignASN1(rand.Reader, k, digest)
+	default:
+		return nil, fmt.Errorf("unsupported key type: %T", key)
 	}
-	if err != nil {
-		return nil, fmt.Errorf("sign: %w", err)
-	}
+}
 
-	// Build SignerInfo
+// buildSignerInfoBytes builds and marshals the SignerInfo structure.
+func buildSignerInfoBytes(cert *x509.Certificate, attrsBytes []byte, sig []byte, digestAlg, sigAlg pkix.AlgorithmIdentifier) ([]byte, error) {
 	issuerRaw := asn1.RawValue{FullBytes: cert.RawIssuer}
 
-	// Build SignedAttrs as IMPLICIT [0] tagged value
-	// attrsBytes is a SEQUENCE containing the attribute elements.
-	// We need to extract just the inner content bytes.
 	innerAttrsBytes, err := extractInnerBytes(attrsBytes)
 	if err != nil {
 		return nil, fmt.Errorf("extract inner attrs: %w", err)
@@ -153,8 +119,50 @@ func createCMSSignature(hash []byte, signer Signer, cfg *signConfig) ([]byte, er
 		Signature:          sig,
 	}
 
-	// Marshal signer info
-	siBytes, err := asn1.Marshal(si)
+	return asn1.Marshal(si)
+}
+
+// createCMSSignature creates a CMS/PKCS#7 SignedData structure.
+func createCMSSignature(hash []byte, signer Signer, cfg *signConfig) ([]byte, error) {
+	cert := signer.Certificate
+
+	sigAlg, err := signatureAlgorithm(signer.PrivateKey)
+	if err != nil {
+		return nil, err
+	}
+
+	digestAlg := pkix.AlgorithmIdentifier{Algorithm: oidSHA256}
+
+	signTime := cfg.signTime
+	if signTime.IsZero() {
+		signTime = time.Now()
+	}
+
+	attrs, err := buildSignedAttrs(hash, signTime)
+	if err != nil {
+		return nil, fmt.Errorf("build signed attrs: %w", err)
+	}
+
+	attrsBytes, err := marshalAttributes(attrs)
+	if err != nil {
+		return nil, fmt.Errorf("marshal attrs: %w", err)
+	}
+
+	// For signing, authenticated attributes must be encoded as SET (0x31)
+	attrsBytesForSign := make([]byte, len(attrsBytes))
+	copy(attrsBytesForSign, attrsBytes)
+	attrsBytesForSign[0] = 0x31
+
+	attrHash := crypto.SHA256.New()
+	attrHash.Write(attrsBytesForSign)
+	attrDigest := attrHash.Sum(nil)
+
+	sig, err := computeSignature(signer.PrivateKey, attrDigest)
+	if err != nil {
+		return nil, fmt.Errorf("sign: %w", err)
+	}
+
+	siBytes, err := buildSignerInfoBytes(cert, attrsBytes, sig, digestAlg, sigAlg)
 	if err != nil {
 		return nil, fmt.Errorf("marshal signer info: %w", err)
 	}

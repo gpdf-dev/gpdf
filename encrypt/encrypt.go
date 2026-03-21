@@ -94,7 +94,7 @@ func Apply(pw *pdf.Writer, opts ...Option) error {
 			pdf.Name("Filter"): pdf.Name("Standard"),
 			pdf.Name("V"):      pdf.Integer(5),
 			pdf.Name("R"):      pdf.Integer(6),
-			pdf.Name("Length"):  pdf.Integer(256),
+			pdf.Name("Length"): pdf.Integer(256),
 			pdf.Name("CF"): pdf.Dict{
 				pdf.Name("StdCF"): pdf.Dict{
 					pdf.Name("Type"):   pdf.Name("CryptFilter"),

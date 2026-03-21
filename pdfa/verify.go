@@ -86,38 +86,49 @@ func ParseConformance(pdfData []byte) *Conformance {
 // Validate checks all PDF/A conformance requirements and returns a list of violations.
 func (c *Conformance) Validate() []string {
 	var violations []string
+	violations = c.validateXMP(violations)
+	violations = c.validateOutputIntents(violations)
+	violations = c.validateICC(violations)
 
-	// XMP checks
-	if c.XMP == nil {
-		violations = append(violations, "XMP metadata not found")
-	} else {
-		if !c.XMP.HasXPacket {
-			violations = append(violations, "XMP missing xpacket header/footer")
-		}
-		if c.Part == 0 {
-			violations = append(violations, "pdfaid:part not found or invalid")
-		}
-		if c.Level == "" {
-			violations = append(violations, "pdfaid:conformance not found")
-		}
-		if c.XMP.Title == "" {
-			violations = append(violations, "XMP dc:title is empty (recommended)")
-		}
-		if c.XMP.Producer == "" {
-			violations = append(violations, "XMP pdf:Producer is empty")
-		}
-		if c.XMP.CreatorTool == "" {
-			violations = append(violations, "XMP xmp:CreatorTool is empty")
-		}
-		if c.XMP.CreateDate == "" {
-			violations = append(violations, "XMP xmp:CreateDate is empty")
-		}
-		if c.XMP.ModifyDate == "" {
-			violations = append(violations, "XMP xmp:ModifyDate is empty")
-		}
+	for _, elem := range c.ForbiddenElements {
+		violations = append(violations, fmt.Sprintf("forbidden element found: %s", elem))
 	}
 
-	// OutputIntent checks
+	return violations
+}
+
+func (c *Conformance) validateXMP(violations []string) []string {
+	if c.XMP == nil {
+		return append(violations, "XMP metadata not found")
+	}
+	if !c.XMP.HasXPacket {
+		violations = append(violations, "XMP missing xpacket header/footer")
+	}
+	if c.Part == 0 {
+		violations = append(violations, "pdfaid:part not found or invalid")
+	}
+	if c.Level == "" {
+		violations = append(violations, "pdfaid:conformance not found")
+	}
+	if c.XMP.Title == "" {
+		violations = append(violations, "XMP dc:title is empty (recommended)")
+	}
+	if c.XMP.Producer == "" {
+		violations = append(violations, "XMP pdf:Producer is empty")
+	}
+	if c.XMP.CreatorTool == "" {
+		violations = append(violations, "XMP xmp:CreatorTool is empty")
+	}
+	if c.XMP.CreateDate == "" {
+		violations = append(violations, "XMP xmp:CreateDate is empty")
+	}
+	if c.XMP.ModifyDate == "" {
+		violations = append(violations, "XMP xmp:ModifyDate is empty")
+	}
+	return violations
+}
+
+func (c *Conformance) validateOutputIntents(violations []string) []string {
 	if !c.HasOutputIntents {
 		violations = append(violations, "/OutputIntents missing from catalog")
 	}
@@ -133,33 +144,28 @@ func (c *Conformance) Validate() []string {
 	if !c.HasMetadataStream {
 		violations = append(violations, "Metadata stream (/Subtype /XML) missing")
 	}
+	return violations
+}
 
-	// ICC profile checks
+func (c *Conformance) validateICC(violations []string) []string {
 	if c.ICCInfo == nil {
-		violations = append(violations, "ICC color profile not found")
-	} else {
-		if !c.ICCInfo.HasACSP {
-			violations = append(violations, "ICC profile missing 'acsp' signature")
-		}
-		if c.ICCInfo.ColorSpace != "RGB " {
-			violations = append(violations, fmt.Sprintf("ICC color space = %q, want 'RGB '", c.ICCInfo.ColorSpace))
-		}
-		if c.ICCInfo.DeviceClass != "mntr" {
-			violations = append(violations, fmt.Sprintf("ICC device class = %q, want 'mntr'", c.ICCInfo.DeviceClass))
-		}
-		if c.Part == 1 && !strings.HasPrefix(c.ICCInfo.Version, "2.") {
-			violations = append(violations, fmt.Sprintf("PDF/A-1b requires ICC v2.x, got %s", c.ICCInfo.Version))
-		}
-		for _, tag := range c.ICCInfo.MissingTags {
-			violations = append(violations, fmt.Sprintf("ICC profile missing required tag: %s", tag))
-		}
+		return append(violations, "ICC color profile not found")
 	}
-
-	// Forbidden elements
-	for _, elem := range c.ForbiddenElements {
-		violations = append(violations, fmt.Sprintf("forbidden element found: %s", elem))
+	if !c.ICCInfo.HasACSP {
+		violations = append(violations, "ICC profile missing 'acsp' signature")
 	}
-
+	if c.ICCInfo.ColorSpace != "RGB " {
+		violations = append(violations, fmt.Sprintf("ICC color space = %q, want 'RGB '", c.ICCInfo.ColorSpace))
+	}
+	if c.ICCInfo.DeviceClass != "mntr" {
+		violations = append(violations, fmt.Sprintf("ICC device class = %q, want 'mntr'", c.ICCInfo.DeviceClass))
+	}
+	if c.Part == 1 && !strings.HasPrefix(c.ICCInfo.Version, "2.") {
+		violations = append(violations, fmt.Sprintf("PDF/A-1b requires ICC v2.x, got %s", c.ICCInfo.Version))
+	}
+	for _, tag := range c.ICCInfo.MissingTags {
+		violations = append(violations, fmt.Sprintf("ICC profile missing required tag: %s", tag))
+	}
 	return violations
 }
 
@@ -212,7 +218,21 @@ func parseXMP(pdfStr string) (*XMPInfo, error) {
 	// Extract XMP between xpacket markers
 	xmpRegion := pdfStr[beginIdx : endIdx+len("<?xpacket end=\"w\"?>")]
 
-	// Find <rdf:RDF ...> ... </rdf:RDF>
+	rdf, err := decodeRDF(xmpRegion)
+	if err != nil {
+		return nil, err
+	}
+
+	// Extract values from all Description elements
+	for _, desc := range rdf.Descriptions {
+		mergeDescription(info, &desc)
+	}
+
+	return info, nil
+}
+
+// decodeRDF extracts and decodes the rdf:RDF element from an XMP region.
+func decodeRDF(xmpRegion string) (*xmpRDF, error) {
 	rdfStart := strings.Index(xmpRegion, "<rdf:RDF")
 	rdfEnd := strings.Index(xmpRegion, "</rdf:RDF>")
 	if rdfStart < 0 || rdfEnd < 0 {
@@ -220,45 +240,59 @@ func parseXMP(pdfStr string) (*XMPInfo, error) {
 	}
 	rdfXML := xmpRegion[rdfStart : rdfEnd+len("</rdf:RDF>")]
 
-	// Parse with xml.Decoder
 	var rdf xmpRDF
 	decoder := xml.NewDecoder(strings.NewReader(rdfXML))
 	if err := decoder.Decode(&rdf); err != nil {
 		return nil, fmt.Errorf("XML decode: %w", err)
 	}
+	return &rdf, nil
+}
 
-	// Extract values from all Description elements
-	for _, desc := range rdf.Descriptions {
-		if desc.Title != nil && len(desc.Title.Items) > 0 && desc.Title.Items[0].Value != "" {
-			info.Title = desc.Title.Items[0].Value
-		}
-		if desc.Creator != nil && len(desc.Creator.Items) > 0 && desc.Creator.Items[0].Value != "" {
-			info.Creator = desc.Creator.Items[0].Value
-		}
-		if desc.Description != nil && len(desc.Description.Items) > 0 && desc.Description.Items[0].Value != "" {
-			info.Subject = desc.Description.Items[0].Value
-		}
-		if desc.CreatorTool != "" {
-			info.CreatorTool = desc.CreatorTool
-		}
-		if desc.CreateDate != "" {
-			info.CreateDate = desc.CreateDate
-		}
-		if desc.ModifyDate != "" {
-			info.ModifyDate = desc.ModifyDate
-		}
-		if desc.Producer != "" {
-			info.Producer = desc.Producer
-		}
-		if desc.Part > 0 {
-			info.PDFAPart = desc.Part
-		}
-		if desc.Conformance != "" {
-			info.PDFAConf = desc.Conformance
-		}
+// altValue returns the first non-empty value from an xmpAlt, or "".
+func altValue(a *xmpAlt) string {
+	if a != nil && len(a.Items) > 0 {
+		return a.Items[0].Value
 	}
+	return ""
+}
 
-	return info, nil
+// seqValue returns the first non-empty value from an xmpSeq, or "".
+func seqValue(s *xmpSeq) string {
+	if s != nil && len(s.Items) > 0 {
+		return s.Items[0].Value
+	}
+	return ""
+}
+
+// mergeDescription merges fields from an xmpDescription into XMPInfo.
+func mergeDescription(info *XMPInfo, desc *xmpDescription) {
+	if v := altValue(desc.Title); v != "" {
+		info.Title = v
+	}
+	if v := seqValue(desc.Creator); v != "" {
+		info.Creator = v
+	}
+	if v := altValue(desc.Description); v != "" {
+		info.Subject = v
+	}
+	if desc.CreatorTool != "" {
+		info.CreatorTool = desc.CreatorTool
+	}
+	if desc.CreateDate != "" {
+		info.CreateDate = desc.CreateDate
+	}
+	if desc.ModifyDate != "" {
+		info.ModifyDate = desc.ModifyDate
+	}
+	if desc.Producer != "" {
+		info.Producer = desc.Producer
+	}
+	if desc.Part > 0 {
+		info.PDFAPart = desc.Part
+	}
+	if desc.Conformance != "" {
+		info.PDFAConf = desc.Conformance
+	}
 }
 
 // --- ICC profile parsing ---
