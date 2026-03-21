@@ -148,9 +148,9 @@ func buildTestCmapTable(runeMap map[rune]uint16) []byte {
 	segCount := len(segments)
 	subtableLen := 14 + segCount*2*4 + 2
 	subtable := make([]byte, subtableLen)
-	binary.BigEndian.PutUint16(subtable[0:2], 4)                  // format
+	binary.BigEndian.PutUint16(subtable[0:2], 4)                   // format
 	binary.BigEndian.PutUint16(subtable[2:4], uint16(subtableLen)) // length
-	binary.BigEndian.PutUint16(subtable[6:8], uint16(segCount*2)) // segCountX2
+	binary.BigEndian.PutUint16(subtable[6:8], uint16(segCount*2))  // segCountX2
 
 	// searchRange, entrySelector, rangeShift
 	sr := testSearchRange(segCount)
@@ -193,14 +193,14 @@ func buildTestNameTable(fontName string) []byte {
 	storageOffset := 6 + 12
 	totalLen := storageOffset + len(nameBytes)
 	tbl := make([]byte, totalLen)
-	binary.BigEndian.PutUint16(tbl[0:2], 0)                          // format
-	binary.BigEndian.PutUint16(tbl[2:4], 1)                          // count
-	binary.BigEndian.PutUint16(tbl[4:6], uint16(storageOffset))      // stringOffset
+	binary.BigEndian.PutUint16(tbl[0:2], 0)                     // format
+	binary.BigEndian.PutUint16(tbl[2:4], 1)                     // count
+	binary.BigEndian.PutUint16(tbl[4:6], uint16(storageOffset)) // stringOffset
 	off := 6
-	binary.BigEndian.PutUint16(tbl[off:off+2], 1)                    // platformID (Mac)
-	binary.BigEndian.PutUint16(tbl[off+2:off+4], 0)                  // encodingID
-	binary.BigEndian.PutUint16(tbl[off+4:off+6], 0)                  // languageID
-	binary.BigEndian.PutUint16(tbl[off+6:off+8], 6)                  // nameID (PostScript)
+	binary.BigEndian.PutUint16(tbl[off:off+2], 1)   // platformID (Mac)
+	binary.BigEndian.PutUint16(tbl[off+2:off+4], 0) // encodingID
+	binary.BigEndian.PutUint16(tbl[off+4:off+6], 0) // languageID
+	binary.BigEndian.PutUint16(tbl[off+6:off+8], 6) // nameID (PostScript)
 	binary.BigEndian.PutUint16(tbl[off+8:off+10], uint16(len(nameBytes)))
 	binary.BigEndian.PutUint16(tbl[off+10:off+12], 0) // offset
 	copy(tbl[storageOffset:], nameBytes)

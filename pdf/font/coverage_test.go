@@ -17,10 +17,10 @@ func TestParseCmapFormat12_Basic(t *testing.T) {
 	dataLen := 16 + numGroups*12
 	tbl := make([]byte, dataLen)
 
-	binary.BigEndian.PutUint16(tbl[0:2], 12)                // format
-	binary.BigEndian.PutUint16(tbl[2:4], 0)                 // reserved
-	binary.BigEndian.PutUint32(tbl[4:8], uint32(dataLen))    // length
-	binary.BigEndian.PutUint32(tbl[8:12], 0)                 // language
+	binary.BigEndian.PutUint16(tbl[0:2], 12)                  // format
+	binary.BigEndian.PutUint16(tbl[2:4], 0)                   // reserved
+	binary.BigEndian.PutUint32(tbl[4:8], uint32(dataLen))     // length
+	binary.BigEndian.PutUint32(tbl[8:12], 0)                  // language
 	binary.BigEndian.PutUint32(tbl[12:16], uint32(numGroups)) // numGroups
 
 	// Group 0: U+0041 ('A') to U+0043 ('C'), startGlyphID = 1
@@ -63,7 +63,7 @@ func TestParseCmapFormat12_TruncatedGroups(t *testing.T) {
 	tbl := make([]byte, 16+12) // room for 1 group
 	binary.BigEndian.PutUint16(tbl[0:2], 12)
 	binary.BigEndian.PutUint32(tbl[4:8], uint32(16+12*2)) // length for 2 groups
-	binary.BigEndian.PutUint32(tbl[12:16], 2)              // numGroups = 2
+	binary.BigEndian.PutUint32(tbl[12:16], 2)             // numGroups = 2
 
 	// Fill group 0
 	binary.BigEndian.PutUint32(tbl[16:20], 0x41)
@@ -104,7 +104,7 @@ func TestParseOS2_ShortTable(t *testing.T) {
 
 	// Table directory at offset 12
 	copy(data[12:16], []byte("OS/2"))
-	binary.BigEndian.PutUint32(data[16:20], 0) // checksum
+	binary.BigEndian.PutUint32(data[16:20], 0)  // checksum
 	binary.BigEndian.PutUint32(data[20:24], 28) // offset = 28
 	binary.BigEndian.PutUint32(data[24:28], 60) // length = 60 (< 72)
 
@@ -326,9 +326,9 @@ func TestAddCompositeComponents_WithComposite(t *testing.T) {
 
 	// loca table (long format)
 	loca := make([]byte, (numGlyphs+1)*4)
-	binary.BigEndian.PutUint32(loca[0:4], 0)   // glyph 0 start
-	binary.BigEndian.PutUint32(loca[4:8], 12)  // glyph 1 start
-	binary.BigEndian.PutUint32(loca[8:12], 30) // glyph 2 start
+	binary.BigEndian.PutUint32(loca[0:4], 0)    // glyph 0 start
+	binary.BigEndian.PutUint32(loca[4:8], 12)   // glyph 1 start
+	binary.BigEndian.PutUint32(loca[8:12], 30)  // glyph 2 start
 	binary.BigEndian.PutUint32(loca[12:16], 42) // end
 
 	// head table (need indexToLocFormat at offset 50)
@@ -362,7 +362,7 @@ func TestAddCompositeComponents_SimpleOnly(t *testing.T) {
 	glyphSize := 12
 
 	glyf := make([]byte, numGlyphs*glyphSize)
-	binary.BigEndian.PutUint16(glyf[0:2], 1)  // glyph 0: simple
+	binary.BigEndian.PutUint16(glyf[0:2], 1)   // glyph 0: simple
 	binary.BigEndian.PutUint16(glyf[12:14], 1) // glyph 1: simple
 
 	loca := make([]byte, (numGlyphs+1)*4)
@@ -402,19 +402,19 @@ func TestParseCmap_Format12Only(t *testing.T) {
 	f12Len := 16 + numGroups*12
 	f12 := make([]byte, f12Len)
 	binary.BigEndian.PutUint16(f12[0:2], 12)                  // format
-	binary.BigEndian.PutUint32(f12[4:8], uint32(f12Len))       // length
-	binary.BigEndian.PutUint32(f12[12:16], uint32(numGroups))  // numGroups
-	binary.BigEndian.PutUint32(f12[16:20], 0x41)               // startCharCode
-	binary.BigEndian.PutUint32(f12[20:24], 0x43)               // endCharCode
-	binary.BigEndian.PutUint32(f12[24:28], 1)                  // startGlyphID
+	binary.BigEndian.PutUint32(f12[4:8], uint32(f12Len))      // length
+	binary.BigEndian.PutUint32(f12[12:16], uint32(numGroups)) // numGroups
+	binary.BigEndian.PutUint32(f12[16:20], 0x41)              // startCharCode
+	binary.BigEndian.PutUint32(f12[20:24], 0x43)              // endCharCode
+	binary.BigEndian.PutUint32(f12[24:28], 1)                 // startGlyphID
 
 	// cmap header: version(2) + numSubtables(2) = 4 bytes
 	// Subtable record: platformID(2) + encodingID(2) + offset(4) = 8 bytes
 	cmapHeader := make([]byte, 4+8)
-	binary.BigEndian.PutUint16(cmapHeader[0:2], 0) // version
-	binary.BigEndian.PutUint16(cmapHeader[2:4], 1) // numSubtables
-	binary.BigEndian.PutUint16(cmapHeader[4:6], 3) // platformID = 3 (Windows)
-	binary.BigEndian.PutUint16(cmapHeader[6:8], 10) // encodingID = 10 (Unicode full)
+	binary.BigEndian.PutUint16(cmapHeader[0:2], 0)                        // version
+	binary.BigEndian.PutUint16(cmapHeader[2:4], 1)                        // numSubtables
+	binary.BigEndian.PutUint16(cmapHeader[4:6], 3)                        // platformID = 3 (Windows)
+	binary.BigEndian.PutUint16(cmapHeader[6:8], 10)                       // encodingID = 10 (Unicode full)
 	binary.BigEndian.PutUint32(cmapHeader[8:12], uint32(len(cmapHeader))) // offset
 
 	cmapData := append(cmapHeader, f12...)
@@ -536,9 +536,9 @@ func TestGlyphWidth_BeyondHmtxBounds(t *testing.T) {
 	binary.BigEndian.PutUint16(f12[0:2], 12)
 	binary.BigEndian.PutUint32(f12[4:8], uint32(f12Len))
 	binary.BigEndian.PutUint32(f12[12:16], uint32(numGroups))
-	binary.BigEndian.PutUint32(f12[16:20], 0x41)  // startCharCode = A
-	binary.BigEndian.PutUint32(f12[20:24], 0x41)  // endCharCode = A
-	binary.BigEndian.PutUint32(f12[24:28], 100)    // startGlyphID = 100
+	binary.BigEndian.PutUint32(f12[16:20], 0x41) // startCharCode = A
+	binary.BigEndian.PutUint32(f12[20:24], 0x41) // endCharCode = A
+	binary.BigEndian.PutUint32(f12[24:28], 100)  // startGlyphID = 100
 
 	cmapHeader := make([]byte, 12)
 	binary.BigEndian.PutUint16(cmapHeader[0:2], 0)
