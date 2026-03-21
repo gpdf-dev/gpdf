@@ -7,7 +7,7 @@ replace github.com/gpdf-dev/gpdf => ../
 require (
 	github.com/go-pdf/fpdf v0.9.0
 	github.com/johnfercher/maroto/v2 v2.3.3
-	github.com/gpdf-dev/gpdf v0.9.2
+	github.com/gpdf-dev/gpdf v1.0.0
 	github.com/signintech/gopdf v0.36.0
 	golang.org/x/image v0.18.0
 )
