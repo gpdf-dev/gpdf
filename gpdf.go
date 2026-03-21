@@ -25,6 +25,10 @@ import (
 	gotemplate "text/template"
 
 	"github.com/gpdf-dev/gpdf/document"
+	"github.com/gpdf-dev/gpdf/encrypt"
+	"github.com/gpdf-dev/gpdf/pdfa"
+	"github.com/gpdf-dev/gpdf/pdf"
+	"github.com/gpdf-dev/gpdf/signature"
 	"github.com/gpdf-dev/gpdf/template"
 )
 
@@ -110,6 +114,26 @@ var (
 	// NewLetter creates a ready-to-generate business letter PDF from structured data.
 	NewLetter = template.Letter
 )
+
+// WithPDFA returns a template.Option that enables PDF/A conformance.
+func WithPDFA(opts ...pdfa.Option) template.Option {
+	return template.WithWriterSetup(func(pw *pdf.Writer) {
+		pdfa.Apply(pw, opts...)
+	})
+}
+
+// WithEncryption returns a template.Option that enables AES-256 encryption.
+func WithEncryption(opts ...encrypt.Option) template.Option {
+	return template.WithWriterSetup(func(pw *pdf.Writer) {
+		_ = encrypt.Apply(pw, opts...)
+	})
+}
+
+// SignDocument adds a digital signature to a generated PDF.
+// This is a post-processing step applied after document generation.
+func SignDocument(pdfData []byte, signer signature.Signer, opts ...signature.Option) ([]byte, error) {
+	return signature.Sign(pdfData, signer, opts...)
+}
 
 // Open creates an ExistingDocument from raw PDF data for reading and modifying.
 // Use the returned document's Overlay method to add content on top of existing pages.
