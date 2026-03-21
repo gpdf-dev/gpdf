@@ -3,6 +3,7 @@ package pdf_test
 import (
 	"bytes"
 	"compress/zlib"
+	"fmt"
 	"io"
 	"strings"
 	"testing"
@@ -889,5 +890,480 @@ func TestWriter_RegisterFont_Compressed(t *testing.T) {
 	got := buf.String()
 	if !strings.Contains(got, "/FlateDecode") {
 		t.Errorf("expected FlateDecode filter for compressed font data")
+	}
+}
+
+// ===========================================================================
+// ReserveFontRef tests
+// ===========================================================================
+
+func TestWriter_ReserveFontRef(t *testing.T) {
+	var buf bytes.Buffer
+	w := pdf.NewWriter(&buf)
+
+	resName, ref := w.ReserveFontRef("MyFont")
+	if resName != "F1" {
+		t.Errorf("ReserveFontRef resource name = %q, want %q", resName, "F1")
+	}
+	if ref.Number == 0 {
+		t.Errorf("ref.Number = 0, want > 0")
+	}
+}
+
+func TestWriter_ReserveFontRef_Stable(t *testing.T) {
+	var buf bytes.Buffer
+	w := pdf.NewWriter(&buf)
+
+	resName1, ref1 := w.ReserveFontRef("MyFont")
+	resName2, ref2 := w.ReserveFontRef("MyFont")
+
+	// Same font should return the same ref.
+	if ref1.Number != ref2.Number {
+		t.Errorf("duplicate ReserveFontRef returned different refs: %d vs %d", ref1.Number, ref2.Number)
+	}
+	// Resource names should be consistent.
+	if resName1 != resName2 {
+		t.Errorf("duplicate ReserveFontRef returned different names: %q vs %q", resName1, resName2)
+	}
+}
+
+func TestWriter_ReserveFontRef_Incrementing(t *testing.T) {
+	var buf bytes.Buffer
+	w := pdf.NewWriter(&buf)
+
+	resName1, _ := w.ReserveFontRef("FontA")
+	resName2, _ := w.ReserveFontRef("FontB")
+
+	if resName1 != "F1" {
+		t.Errorf("first font resource name = %q, want %q", resName1, "F1")
+	}
+	if resName2 != "F2" {
+		t.Errorf("second font resource name = %q, want %q", resName2, "F2")
+	}
+}
+
+func TestWriter_ReserveFontRef_NoObjectsWritten(t *testing.T) {
+	var buf bytes.Buffer
+	w := pdf.NewWriter(&buf)
+
+	// ReserveFontRef should NOT write any PDF objects (unlike RegisterFont).
+	beforeLen := buf.Len()
+	_, _ = w.ReserveFontRef("ReservedFont")
+	afterLen := buf.Len()
+
+	if afterLen != beforeLen {
+		t.Errorf("ReserveFontRef wrote %d bytes, expected 0", afterLen-beforeLen)
+	}
+}
+
+// ===========================================================================
+// AddCatalogEntry tests
+// ===========================================================================
+
+func TestWriter_AddCatalogEntry(t *testing.T) {
+	var buf bytes.Buffer
+	w := pdf.NewWriter(&buf)
+	_ = w.AddPage(pdf.PageObject{
+		MediaBox: pdf.Rectangle{LLX: 0, LLY: 0, URX: 612, URY: 792},
+	})
+
+	w.AddCatalogEntry(pdf.Name("MarkInfo"), pdf.Dict{
+		pdf.Name("Marked"): pdf.Boolean(true),
+	})
+
+	err := w.Close()
+	if err != nil {
+		t.Fatalf("Close error: %v", err)
+	}
+	got := buf.String()
+	if !strings.Contains(got, "/MarkInfo") {
+		t.Errorf("expected /MarkInfo in catalog: %q", got)
+	}
+}
+
+func TestWriter_AddCatalogEntry_Multiple(t *testing.T) {
+	var buf bytes.Buffer
+	w := pdf.NewWriter(&buf)
+	_ = w.AddPage(pdf.PageObject{
+		MediaBox: pdf.Rectangle{LLX: 0, LLY: 0, URX: 612, URY: 792},
+	})
+
+	w.AddCatalogEntry(pdf.Name("Lang"), pdf.LiteralString("en-US"))
+	w.AddCatalogEntry(pdf.Name("PageLayout"), pdf.Name("SinglePage"))
+
+	err := w.Close()
+	if err != nil {
+		t.Fatalf("Close error: %v", err)
+	}
+	got := buf.String()
+	if !strings.Contains(got, "/Lang") {
+		t.Errorf("expected /Lang in catalog: %q", got)
+	}
+	if !strings.Contains(got, "/PageLayout") {
+		t.Errorf("expected /PageLayout in catalog: %q", got)
+	}
+}
+
+// ===========================================================================
+// AddTrailerEntry tests
+// ===========================================================================
+
+func TestWriter_AddTrailerEntry(t *testing.T) {
+	var buf bytes.Buffer
+	w := pdf.NewWriter(&buf)
+	_ = w.AddPage(pdf.PageObject{
+		MediaBox: pdf.Rectangle{LLX: 0, LLY: 0, URX: 612, URY: 792},
+	})
+
+	idStr := pdf.LiteralString("test-id-value")
+	w.AddTrailerEntry(pdf.Name("ID"), pdf.Array{idStr, idStr})
+
+	err := w.Close()
+	if err != nil {
+		t.Fatalf("Close error: %v", err)
+	}
+	got := buf.String()
+	trailerIdx := strings.Index(got, "trailer")
+	if trailerIdx < 0 {
+		t.Fatal("trailer not found")
+	}
+	trailerSection := got[trailerIdx:]
+	if !strings.Contains(trailerSection, "/ID") {
+		t.Errorf("expected /ID in trailer: %q", trailerSection)
+	}
+}
+
+func TestWriter_AddTrailerEntry_Multiple(t *testing.T) {
+	var buf bytes.Buffer
+	w := pdf.NewWriter(&buf)
+	_ = w.AddPage(pdf.PageObject{
+		MediaBox: pdf.Rectangle{LLX: 0, LLY: 0, URX: 612, URY: 792},
+	})
+
+	w.AddTrailerEntry(pdf.Name("Encrypt"), pdf.ObjectRef{Number: 99, Generation: 0})
+	w.AddTrailerEntry(pdf.Name("ID"), pdf.Array{pdf.LiteralString("abc"), pdf.LiteralString("def")})
+
+	err := w.Close()
+	if err != nil {
+		t.Fatalf("Close error: %v", err)
+	}
+	got := buf.String()
+	trailerIdx := strings.Index(got, "trailer")
+	if trailerIdx < 0 {
+		t.Fatal("trailer not found")
+	}
+	trailerSection := got[trailerIdx:]
+	if !strings.Contains(trailerSection, "/Encrypt") {
+		t.Errorf("expected /Encrypt in trailer: %q", trailerSection)
+	}
+	if !strings.Contains(trailerSection, "/ID") {
+		t.Errorf("expected /ID in trailer: %q", trailerSection)
+	}
+}
+
+// ===========================================================================
+// SetObjectHook tests
+// ===========================================================================
+
+func TestWriter_SetObjectHook(t *testing.T) {
+	var buf bytes.Buffer
+	w := pdf.NewWriter(&buf)
+
+	// Hook that replaces any Dict with one containing a /Hooked key.
+	hookCalled := false
+	w.SetObjectHook(func(ref pdf.ObjectRef, obj pdf.Object) pdf.Object {
+		hookCalled = true
+		if d, ok := obj.(pdf.Dict); ok {
+			d[pdf.Name("Hooked")] = pdf.Boolean(true)
+			return d
+		}
+		return obj
+	})
+
+	ref := w.AllocObject()
+	err := w.WriteObject(ref, pdf.Dict{
+		pdf.Name("Type"): pdf.Name("Test"),
+	})
+	if err != nil {
+		t.Fatalf("WriteObject error: %v", err)
+	}
+	if !hookCalled {
+		t.Error("expected object hook to be called")
+	}
+	got := buf.String()
+	if !strings.Contains(got, "/Hooked") {
+		t.Errorf("expected /Hooked in output after hook: %q", got)
+	}
+}
+
+func TestWriter_SetObjectHook_TransformsMultipleObjects(t *testing.T) {
+	var buf bytes.Buffer
+	w := pdf.NewWriter(&buf)
+
+	callCount := 0
+	w.SetObjectHook(func(ref pdf.ObjectRef, obj pdf.Object) pdf.Object {
+		callCount++
+		return obj
+	})
+
+	ref1 := w.AllocObject()
+	_ = w.WriteObject(ref1, pdf.Dict{pdf.Name("A"): pdf.Name("1")})
+	ref2 := w.AllocObject()
+	_ = w.WriteObject(ref2, pdf.Dict{pdf.Name("B"): pdf.Name("2")})
+
+	if callCount != 2 {
+		t.Errorf("hook called %d times, want 2", callCount)
+	}
+}
+
+// ===========================================================================
+// OnBeforeClose tests
+// ===========================================================================
+
+func TestWriter_OnBeforeClose(t *testing.T) {
+	var buf bytes.Buffer
+	w := pdf.NewWriter(&buf)
+	_ = w.AddPage(pdf.PageObject{
+		MediaBox: pdf.Rectangle{LLX: 0, LLY: 0, URX: 612, URY: 792},
+	})
+
+	called := false
+	w.OnBeforeClose(func(pw *pdf.Writer) error {
+		called = true
+		return nil
+	})
+
+	err := w.Close()
+	if err != nil {
+		t.Fatalf("Close error: %v", err)
+	}
+	if !called {
+		t.Error("expected OnBeforeClose callback to be called")
+	}
+}
+
+func TestWriter_OnBeforeClose_Order(t *testing.T) {
+	var buf bytes.Buffer
+	w := pdf.NewWriter(&buf)
+	_ = w.AddPage(pdf.PageObject{
+		MediaBox: pdf.Rectangle{LLX: 0, LLY: 0, URX: 612, URY: 792},
+	})
+
+	var order []int
+	w.OnBeforeClose(func(pw *pdf.Writer) error {
+		order = append(order, 1)
+		return nil
+	})
+	w.OnBeforeClose(func(pw *pdf.Writer) error {
+		order = append(order, 2)
+		return nil
+	})
+	w.OnBeforeClose(func(pw *pdf.Writer) error {
+		order = append(order, 3)
+		return nil
+	})
+
+	err := w.Close()
+	if err != nil {
+		t.Fatalf("Close error: %v", err)
+	}
+	if len(order) != 3 || order[0] != 1 || order[1] != 2 || order[2] != 3 {
+		t.Errorf("callbacks called in wrong order: %v, want [1 2 3]", order)
+	}
+}
+
+func TestWriter_OnBeforeClose_ErrorPropagation(t *testing.T) {
+	var buf bytes.Buffer
+	w := pdf.NewWriter(&buf)
+	_ = w.AddPage(pdf.PageObject{
+		MediaBox: pdf.Rectangle{LLX: 0, LLY: 0, URX: 612, URY: 792},
+	})
+
+	w.OnBeforeClose(func(pw *pdf.Writer) error {
+		return fmt.Errorf("hook error")
+	})
+
+	err := w.Close()
+	if err == nil {
+		t.Fatal("expected error from OnBeforeClose, got nil")
+	}
+	if !strings.Contains(err.Error(), "hook error") {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestWriter_OnBeforeClose_WritesObjects(t *testing.T) {
+	var buf bytes.Buffer
+	w := pdf.NewWriter(&buf)
+	_ = w.AddPage(pdf.PageObject{
+		MediaBox: pdf.Rectangle{LLX: 0, LLY: 0, URX: 612, URY: 792},
+	})
+
+	// Use OnBeforeClose to write an extra object (simulating ICC profile write).
+	w.OnBeforeClose(func(pw *pdf.Writer) error {
+		ref := pw.AllocObject()
+		return pw.WriteObject(ref, pdf.Dict{
+			pdf.Name("Type"):    pdf.Name("OutputIntent"),
+			pdf.Name("Subtype"): pdf.Name("GTS_PDFA1"),
+		})
+	})
+
+	err := w.Close()
+	if err != nil {
+		t.Fatalf("Close error: %v", err)
+	}
+	got := buf.String()
+	if !strings.Contains(got, "/OutputIntent") {
+		t.Errorf("expected /OutputIntent written by hook: %q", got)
+	}
+}
+
+// ===========================================================================
+// BytesWritten tests
+// ===========================================================================
+
+func TestWriter_BytesWritten(t *testing.T) {
+	var buf bytes.Buffer
+	w := pdf.NewWriter(&buf)
+
+	// After NewWriter, the header has been written.
+	n := w.BytesWritten()
+	if n <= 0 {
+		t.Errorf("BytesWritten() = %d after header, want > 0", n)
+	}
+}
+
+func TestWriter_BytesWritten_Increases(t *testing.T) {
+	var buf bytes.Buffer
+	w := pdf.NewWriter(&buf)
+
+	before := w.BytesWritten()
+	ref := w.AllocObject()
+	_ = w.WriteObject(ref, pdf.Dict{pdf.Name("Test"): pdf.Name("Value")})
+	after := w.BytesWritten()
+
+	if after <= before {
+		t.Errorf("BytesWritten() did not increase: before=%d, after=%d", before, after)
+	}
+}
+
+// ===========================================================================
+// RawWrite tests
+// ===========================================================================
+
+func TestWriter_RawWrite(t *testing.T) {
+	var buf bytes.Buffer
+	w := pdf.NewWriter(&buf)
+
+	data := []byte("% Custom raw comment\n")
+	n, err := w.RawWrite(data)
+	if err != nil {
+		t.Fatalf("RawWrite error: %v", err)
+	}
+	if n != len(data) {
+		t.Errorf("RawWrite wrote %d bytes, want %d", n, len(data))
+	}
+	got := buf.String()
+	if !strings.Contains(got, "% Custom raw comment") {
+		t.Errorf("expected raw data in output: %q", got)
+	}
+}
+
+func TestWriter_RawWrite_UpdatesBytesWritten(t *testing.T) {
+	var buf bytes.Buffer
+	w := pdf.NewWriter(&buf)
+
+	before := w.BytesWritten()
+	data := []byte("raw-data-12345")
+	_, _ = w.RawWrite(data)
+	after := w.BytesWritten()
+
+	if after != before+int64(len(data)) {
+		t.Errorf("BytesWritten() = %d, want %d", after, before+int64(len(data)))
+	}
+}
+
+// ===========================================================================
+// Close with hooks integration tests
+// ===========================================================================
+
+func TestWriter_Close_WithCatalogAndTrailerExtras(t *testing.T) {
+	var buf bytes.Buffer
+	w := pdf.NewWriter(&buf)
+	_ = w.AddPage(pdf.PageObject{
+		MediaBox: pdf.Rectangle{LLX: 0, LLY: 0, URX: 612, URY: 792},
+	})
+
+	w.AddCatalogEntry(pdf.Name("Lang"), pdf.LiteralString("ja-JP"))
+	w.AddTrailerEntry(pdf.Name("ID"), pdf.Array{
+		pdf.LiteralString("id1"),
+		pdf.LiteralString("id2"),
+	})
+
+	err := w.Close()
+	if err != nil {
+		t.Fatalf("Close error: %v", err)
+	}
+	got := buf.String()
+
+	// Catalog entry should appear in the catalog object.
+	if !strings.Contains(got, "/Lang") {
+		t.Errorf("expected /Lang in output: %q", got)
+	}
+
+	// Trailer entry should appear in the trailer section.
+	trailerIdx := strings.Index(got, "trailer")
+	if trailerIdx < 0 {
+		t.Fatal("trailer not found")
+	}
+	trailerSection := got[trailerIdx:]
+	if !strings.Contains(trailerSection, "/ID") {
+		t.Errorf("expected /ID in trailer section: %q", trailerSection)
+	}
+
+	// Standard structure should still be present.
+	if !strings.Contains(got, "/Catalog") {
+		t.Errorf("expected /Catalog: %q", got)
+	}
+	if !strings.Contains(got, "%%EOF") {
+		t.Errorf("expected %%EOF: %q", got)
+	}
+}
+
+func TestWriter_Close_BeforeCloseWithHookAndExtras(t *testing.T) {
+	var buf bytes.Buffer
+	w := pdf.NewWriter(&buf)
+	_ = w.AddPage(pdf.PageObject{
+		MediaBox: pdf.Rectangle{LLX: 0, LLY: 0, URX: 612, URY: 792},
+	})
+
+	// Simulate a PDF/A extension: hook writes extra object, adds catalog entry.
+	w.OnBeforeClose(func(pw *pdf.Writer) error {
+		ref := pw.AllocObject()
+		if err := pw.WriteObject(ref, pdf.Dict{
+			pdf.Name("Type"): pdf.Name("Metadata"),
+		}); err != nil {
+			return err
+		}
+		pw.AddCatalogEntry(pdf.Name("Metadata"), ref)
+		return nil
+	})
+
+	hookCalled := false
+	w.SetObjectHook(func(ref pdf.ObjectRef, obj pdf.Object) pdf.Object {
+		hookCalled = true
+		return obj
+	})
+
+	err := w.Close()
+	if err != nil {
+		t.Fatalf("Close error: %v", err)
+	}
+	if !hookCalled {
+		t.Error("expected object hook to be called during Close")
+	}
+	got := buf.String()
+	if !strings.Contains(got, "/Metadata") {
+		t.Errorf("expected /Metadata from beforeClose hook: %q", got)
 	}
 }
