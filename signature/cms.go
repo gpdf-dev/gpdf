@@ -169,16 +169,9 @@ func createCMSSignature(hash []byte, signer Signer, cfg *signConfig) ([]byte, er
 	}
 
 	// Fetch RFC 3161 timestamp token if TSA URL is configured
-	var unsignedAttrsBytes []byte
-	if cfg.tsaURL != "" {
-		token, err := fetchTimestamp(cfg.tsaURL, sig)
-		if err != nil {
-			return nil, fmt.Errorf("timestamp: %w", err)
-		}
-		unsignedAttrsBytes, err = buildUnsignedAttrs(token)
-		if err != nil {
-			return nil, fmt.Errorf("build unsigned attrs: %w", err)
-		}
+	unsignedAttrsBytes, err := buildTimestampAttrs(cfg.tsaURL, sig)
+	if err != nil {
+		return nil, err
 	}
 
 	siBytes, err := buildSignerInfoBytes(cert, attrsBytes, sig, digestAlg, sigAlg, unsignedAttrsBytes)
@@ -186,9 +179,31 @@ func createCMSSignature(hash []byte, signer Signer, cfg *signConfig) ([]byte, er
 		return nil, fmt.Errorf("marshal signer info: %w", err)
 	}
 
+	return marshalSignedData(cert, signer.Chain, siBytes, digestAlg)
+}
+
+// buildTimestampAttrs fetches a timestamp token and builds unsigned attributes.
+// Returns nil if tsaURL is empty.
+func buildTimestampAttrs(tsaURL string, sig []byte) ([]byte, error) {
+	if tsaURL == "" {
+		return nil, nil
+	}
+	token, err := fetchTimestamp(tsaURL, sig)
+	if err != nil {
+		return nil, fmt.Errorf("timestamp: %w", err)
+	}
+	unsignedAttrs, err := buildUnsignedAttrs(token)
+	if err != nil {
+		return nil, fmt.Errorf("build unsigned attrs: %w", err)
+	}
+	return unsignedAttrs, nil
+}
+
+// marshalSignedData assembles and marshals the CMS SignedData and ContentInfo wrapper.
+func marshalSignedData(cert *x509.Certificate, chain []*x509.Certificate, siBytes []byte, digestAlg pkix.AlgorithmIdentifier) ([]byte, error) {
 	// Build certificates
 	var certsBytes []byte
-	allCerts := append([]*x509.Certificate{cert}, signer.Chain...)
+	allCerts := append([]*x509.Certificate{cert}, chain...)
 	for _, c := range allCerts {
 		certsBytes = append(certsBytes, c.Raw...)
 	}

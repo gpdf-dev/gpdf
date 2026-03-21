@@ -147,7 +147,7 @@ func mockTSAServer(t *testing.T) *httptest.Server {
 
 		respDER, _ := asn1.Marshal(resp)
 		w.Header().Set("Content-Type", "application/timestamp-reply")
-		w.Write(respDER)
+		_, _ = w.Write(respDER)
 	}))
 }
 
@@ -267,7 +267,7 @@ func TestSign_WithTimestamp_TSARejection(t *testing.T) {
 		}
 		respDER, _ := asn1.Marshal(resp)
 		w.Header().Set("Content-Type", "application/timestamp-reply")
-		w.Write(respDER)
+		_, _ = w.Write(respDER)
 	}))
 	defer tsa.Close()
 
@@ -289,7 +289,7 @@ func TestFetchTimestamp(t *testing.T) {
 
 	// Create a dummy signature to timestamp
 	sig := make([]byte, 256)
-	rand.Read(sig)
+	_, _ = rand.Read(sig)
 
 	token, err := fetchTimestamp(tsa.URL, sig)
 	if err != nil {
@@ -331,4 +331,3 @@ func TestBuildUnsignedAttrs(t *testing.T) {
 		t.Errorf("expected context-specific [1], got class=%d tag=%d", raw.Class, raw.Tag)
 	}
 }
-
