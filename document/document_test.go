@@ -851,3 +851,48 @@ func TestListTypeConstants(t *testing.T) {
 		t.Errorf("Ordered = %v, want 1", Ordered)
 	}
 }
+
+func TestListStyle(t *testing.T) {
+	s := Style{FontSize: 14, Color: pdf.RGB(0, 0, 0)}
+	l := &List{
+		ListStyle: s,
+		Items: []ListItem{
+			{Content: []DocumentNode{&Text{Content: "A"}}},
+		},
+	}
+	got := l.Style()
+	if got.FontSize != 14 {
+		t.Errorf("List.Style().FontSize = %v, want 14", got.FontSize)
+	}
+}
+
+func TestListItemNodeStyle_FallbackToListStyle(t *testing.T) {
+	listStyle := Style{FontSize: 12}
+	l := &List{
+		ListStyle: listStyle,
+		Items: []ListItem{
+			{Content: []DocumentNode{&Text{Content: "item"}}},
+		},
+	}
+	children := l.Children()
+	got := children[0].Style()
+	if got.FontSize != 12 {
+		t.Errorf("ListItemNode.Style().FontSize = %v, want 12 (list fallback)", got.FontSize)
+	}
+}
+
+func TestListItemNodeStyle_ExplicitItemStyle(t *testing.T) {
+	listStyle := Style{FontSize: 12}
+	itemStyle := Style{FontSize: 18}
+	l := &List{
+		ListStyle: listStyle,
+		Items: []ListItem{
+			{Content: []DocumentNode{&Text{Content: "item"}}, ItemStyle: itemStyle},
+		},
+	}
+	children := l.Children()
+	got := children[0].Style()
+	if got.FontSize != 18 {
+		t.Errorf("ListItemNode.Style().FontSize = %v, want 18 (explicit item style)", got.FontSize)
+	}
+}

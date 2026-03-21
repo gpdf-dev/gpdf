@@ -31,7 +31,8 @@ type Config struct {
 	DefaultFont string
 	FontSize    float64
 	Metadata    document.DocumentMetadata
-	rawFonts    map[string][]byte // font family -> raw TTF data
+	rawFonts    map[string][]byte    // font family -> raw TTF data
+	WriterSetup func(pw *pdf.Writer) // hook to configure Writer before rendering
 }
 
 // Option configures a Document.
@@ -68,6 +69,13 @@ func WithDefaultFont(family string, size float64) Option {
 // WithMetadata sets the document metadata (title, author, etc.).
 func WithMetadata(info document.DocumentMetadata) Option {
 	return func(c *Config) { c.Metadata = info }
+}
+
+// WithWriterSetup registers a function that configures the PDF Writer
+// before rendering begins. This is used by extensions (e.g., gpdf-pro)
+// to set up hooks for PDF/A, encryption, or other features.
+func WithWriterSetup(fn func(pw *pdf.Writer)) Option {
+	return func(c *Config) { c.WriterSetup = fn }
 }
 
 // New creates a new Document builder with the given options.
@@ -153,14 +161,18 @@ func (d *Document) Render(w io.Writer) error {
 	// 5. Render to PDF.
 	pw := pdf.NewWriter(w)
 
-	// Register fonts with the PDF writer.
-	for family, data := range d.fontDataMap {
-		if _, _, err := pw.RegisterFont(family, data); err != nil {
-			return err
-		}
+	// Apply writer setup hook if configured (e.g., PDF/A, encryption).
+	if d.config.WriterSetup != nil {
+		d.config.WriterSetup(pw)
 	}
 
 	renderer := render.NewPDFRenderer(pw)
+
+	// Register TrueType fonts with the renderer for Type0/CIDFont encoding.
+	for family, ttf := range d.fonts {
+		renderer.RegisterTTFont(family, ttf, d.fontDataMap[family])
+	}
+
 	return renderer.RenderDocument(pages, doc.Metadata)
 }
 

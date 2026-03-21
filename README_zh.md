@@ -30,6 +30,7 @@
 - **色彩空间** — RGB、灰度、CMYK
 - **图片** — JPEG 和 PNG 嵌入（支持缩放选项）
 - **绝对定位** — 在页面上以精确 XY 坐标放置元素
+- **现有 PDF 叠加** — 打开现有 PDF 并在上面添加文字、图片、印章
 - **文档元数据** — 标题、作者、主题、创建者
 
 ## 基准测试
@@ -143,6 +144,63 @@ page.AutoRow(func(r *template.RowBuilder) {
 	})
 })
 ```
+
+### CJK 字体（中文 / 日文 / 韩文）
+
+渲染 CJK 文本需要嵌入 TrueType 字体。每种语言使用对应的 Noto Sans 字体：
+
+```go
+fontData, _ := os.ReadFile("NotoSansSC-Regular.ttf")
+
+doc := gpdf.NewDocument(
+	gpdf.WithPageSize(gpdf.A4),
+	gpdf.WithFont("NotoSansSC", fontData),
+	gpdf.WithDefaultFont("NotoSansSC", 12),
+)
+
+page := doc.AddPage()
+page.AutoRow(func(r *template.RowBuilder) {
+	r.Col(12, func(c *template.ColBuilder) {
+		c.Text("你好世界", template.FontSize(18))
+	})
+})
+```
+
+对于多语言文档，注册多个字体并使用 `FontFamily()` 切换：
+
+```go
+jpFont, _ := os.ReadFile("NotoSansJP-Regular.ttf")
+scFont, _ := os.ReadFile("NotoSansSC-Regular.ttf")
+krFont, _ := os.ReadFile("NotoSansKR-Regular.ttf")
+
+doc := gpdf.NewDocument(
+	gpdf.WithFont("NotoSansJP", jpFont),
+	gpdf.WithFont("NotoSansSC", scFont),
+	gpdf.WithFont("NotoSansKR", krFont),
+	gpdf.WithDefaultFont("NotoSansSC", 12),
+)
+
+page := doc.AddPage()
+page.AutoRow(func(r *template.RowBuilder) {
+	r.Col(4, func(c *template.ColBuilder) {
+		c.Text("日本語", template.FontFamily("NotoSansJP"))
+	})
+	r.Col(4, func(c *template.ColBuilder) {
+		c.Text("中文", template.FontFamily("NotoSansSC"))
+	})
+	r.Col(4, func(c *template.ColBuilder) {
+		c.Text("한국어", template.FontFamily("NotoSansKR"))
+	})
+})
+```
+
+推荐字体（均为免费，OFL 许可）：
+
+| 字体 | 语言 |
+|---|---|
+| [Noto Sans JP](https://fonts.google.com/noto/specimen/Noto+Sans+JP) | 日文 |
+| [Noto Sans SC](https://fonts.google.com/noto/specimen/Noto+Sans+SC) | 简体中文 |
+| [Noto Sans KR](https://fonts.google.com/noto/specimen/Noto+Sans+KR) | 韩文 |
 
 ### 12 列网格布局
 
@@ -326,6 +384,33 @@ doc := template.Letter(template.LetterData{
 })
 ```
 
+### 现有 PDF 叠加
+
+打开现有 PDF，使用同一构建器 API 叠加内容：
+
+```go
+// 打开现有 PDF
+doc, err := gpdf.Open(existingPDFBytes)
+
+// 在第 1 页添加 "DRAFT" 水印
+doc.Overlay(0, func(p *template.PageBuilder) {
+	p.Absolute(document.Mm(50), document.Mm(140), func(c *template.ColBuilder) {
+		c.Text("DRAFT", template.FontSize(72),
+			template.TextColor(pdf.Gray(0.85)))
+	})
+})
+
+// 为每页添加页码
+count, _ := doc.PageCount()
+doc.EachPage(func(i int, p *template.PageBuilder) {
+	p.Absolute(document.Mm(170), document.Mm(285), func(c *template.ColBuilder) {
+		c.Text(fmt.Sprintf("%d / %d", i+1, count), template.FontSize(10))
+	}, template.AbsoluteWidth(document.Mm(20)))
+})
+
+result, _ := doc.Save()
+```
+
 ### 文档元数据
 
 ```go
@@ -420,6 +505,16 @@ doc.Render(f)
 | `gpdf.AbsoluteWidth(value)` | 设置显式宽度（默认：剩余空间） |
 | `gpdf.AbsoluteHeight(value)` | 设置显式高度（默认：剩余空间） |
 | `gpdf.AbsoluteOriginPage()` | 以页面角为原点，而非内容区域 |
+
+### 现有 PDF 操作
+
+| 函数 / 方法 | 说明 |
+|---|---|
+| `gpdf.Open(data, opts...)` | 打开现有 PDF 用于叠加 |
+| `doc.PageCount()` | 获取页数 |
+| `doc.Overlay(page, fn)` | 在指定页上叠加内容 |
+| `doc.EachPage(fn)` | 对每页应用叠加 |
+| `doc.Save()` | 保存修改后的 PDF |
 
 ### 文本选项
 

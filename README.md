@@ -2,7 +2,7 @@
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/gpdf-dev/gpdf.svg)](https://pkg.go.dev/github.com/gpdf-dev/gpdf)
 [![CI](https://github.com/gpdf-dev/gpdf/actions/workflows/check-code.yml/badge.svg)](https://github.com/gpdf-dev/gpdf/actions/workflows/check-code.yml)
-![coverage](https://img.shields.io/badge/coverage-92.0%25-brightgreen)
+![coverage](https://img.shields.io/badge/coverage-92.6%25-brightgreen)
 [![Go Report Card](https://goreportcard.com/badge/github.com/gpdf-dev/gpdf)](https://goreportcard.com/report/github.com/gpdf-dev/gpdf)
 [![Go Version](https://img.shields.io/badge/Go-%3E%3D1.22-blue)](https://go.dev/)
 
@@ -31,6 +31,7 @@ A pure Go, zero-dependency PDF generation library with a layered architecture an
 - **Color spaces** — RGB, Grayscale, CMYK
 - **Images** — JPEG and PNG embedding with fit options
 - **Absolute positioning** — place elements at exact XY coordinates on the page
+- **Existing PDF overlay** — open existing PDFs and add text, images, stamps on top
 - **Document metadata** — title, author, subject, creator
 
 ## Benchmark
@@ -144,6 +145,63 @@ page.AutoRow(func(r *template.RowBuilder) {
 	})
 })
 ```
+
+### CJK Fonts (Japanese / Chinese / Korean)
+
+Embed TrueType fonts for CJK text rendering. Each language needs its own Noto Sans font:
+
+```go
+fontData, _ := os.ReadFile("NotoSansJP-Regular.ttf")
+
+doc := gpdf.NewDocument(
+	gpdf.WithPageSize(gpdf.A4),
+	gpdf.WithFont("NotoSansJP", fontData),
+	gpdf.WithDefaultFont("NotoSansJP", 12),
+)
+
+page := doc.AddPage()
+page.AutoRow(func(r *template.RowBuilder) {
+	r.Col(12, func(c *template.ColBuilder) {
+		c.Text("こんにちは世界", template.FontSize(18))
+	})
+})
+```
+
+For multi-language documents, register multiple fonts and switch with `FontFamily()`:
+
+```go
+jpFont, _ := os.ReadFile("NotoSansJP-Regular.ttf")
+scFont, _ := os.ReadFile("NotoSansSC-Regular.ttf")
+krFont, _ := os.ReadFile("NotoSansKR-Regular.ttf")
+
+doc := gpdf.NewDocument(
+	gpdf.WithFont("NotoSansJP", jpFont),
+	gpdf.WithFont("NotoSansSC", scFont),
+	gpdf.WithFont("NotoSansKR", krFont),
+	gpdf.WithDefaultFont("NotoSansJP", 12),
+)
+
+page := doc.AddPage()
+page.AutoRow(func(r *template.RowBuilder) {
+	r.Col(4, func(c *template.ColBuilder) {
+		c.Text("日本語", template.FontFamily("NotoSansJP"))
+	})
+	r.Col(4, func(c *template.ColBuilder) {
+		c.Text("中文", template.FontFamily("NotoSansSC"))
+	})
+	r.Col(4, func(c *template.ColBuilder) {
+		c.Text("한국어", template.FontFamily("NotoSansKR"))
+	})
+})
+```
+
+Recommended fonts (all free, OFL license):
+
+| Font | Language |
+|---|---|
+| [Noto Sans JP](https://fonts.google.com/noto/specimen/Noto+Sans+JP) | Japanese |
+| [Noto Sans SC](https://fonts.google.com/noto/specimen/Noto+Sans+SC) | Simplified Chinese |
+| [Noto Sans KR](https://fonts.google.com/noto/specimen/Noto+Sans+KR) | Korean |
 
 ### 12-Column Grid Layout
 
@@ -409,6 +467,33 @@ for i := 1; i <= 5; i++ {
 }
 ```
 
+### Existing PDF Overlay
+
+Open an existing PDF and overlay content using the same builder API:
+
+```go
+// Open an existing PDF
+doc, err := gpdf.Open(existingPDFBytes)
+
+// Add a "DRAFT" watermark on page 1
+doc.Overlay(0, func(p *template.PageBuilder) {
+	p.Absolute(document.Mm(50), document.Mm(140), func(c *template.ColBuilder) {
+		c.Text("DRAFT", template.FontSize(72),
+			template.TextColor(pdf.Gray(0.85)))
+	})
+})
+
+// Add page numbers to every page
+count, _ := doc.PageCount()
+doc.EachPage(func(i int, p *template.PageBuilder) {
+	p.Absolute(document.Mm(170), document.Mm(285), func(c *template.ColBuilder) {
+		c.Text(fmt.Sprintf("%d / %d", i+1, count), template.FontSize(10))
+	}, template.AbsoluteWidth(document.Mm(20)))
+})
+
+result, _ := doc.Save()
+```
+
 ### JSON Schema
 
 Define documents entirely in JSON:
@@ -620,6 +705,16 @@ doc.Render(f)
 | `gpdf.AbsoluteWidth(value)` | Set explicit width (default: remaining space) |
 | `gpdf.AbsoluteHeight(value)` | Set explicit height (default: remaining space) |
 | `gpdf.AbsoluteOriginPage()` | Use page corner as origin instead of content area |
+
+### Existing PDF Operations
+
+| Function / Method | Description |
+|---|---|
+| `gpdf.Open(data, opts...)` | Open an existing PDF for overlay |
+| `doc.PageCount()` | Get the number of pages |
+| `doc.Overlay(page, fn)` | Add content on top of a specific page |
+| `doc.EachPage(fn)` | Apply overlay to every page |
+| `doc.Save()` | Save the modified PDF |
 
 ### Text Options
 

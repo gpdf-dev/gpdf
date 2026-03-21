@@ -69,8 +69,9 @@ func (t *XRefTable) WriteTo(w io.Writer) (int64, error) {
 		if !e.InUse {
 			marker = 'f'
 		}
-		// Each line is exactly 20 bytes: 10-digit offset + space + 5-digit gen + space + marker + \r\n
-		line := fmt.Sprintf("%010d %05d %c \r\n", e.Offset, e.Generation, marker)
+		// Each line is exactly 20 bytes: 10-digit offset + space + 5-digit gen + space + marker + EOL(2).
+		// EOL is CR+LF per PDF spec (ISO 32000-2 §7.5.4).
+		line := fmt.Sprintf("%010d %05d %c\r\n", e.Offset, e.Generation, marker)
 		if _, err := io.WriteString(cw, line); err != nil {
 			return cw.n, err
 		}

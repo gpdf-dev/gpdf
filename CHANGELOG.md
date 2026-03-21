@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- Existing PDF overlay — open, read, and modify existing PDFs
+  - `pdf.Reader`: PDF parser with XRef table/stream parsing, page tree traversal, object caching
+  - `pdf.Modifier`: Incremental Update engine (non-destructive append to existing PDF)
+  - `template.ExistingDocument`: High-level API with `Overlay()`, `EachPage()`, `Save()`
+  - `gpdf.Open()`: Facade entry point for opening existing PDFs
+  - `render.OverlayRenderer`: Content stream capture for overlay rendering
+- Overlay examples: text watermark, page numbers, stamps, confidential header, facade usage
+
 ## [0.9.0] - 2026-03-05
 
 ### Added

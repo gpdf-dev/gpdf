@@ -29,6 +29,12 @@ type Writer struct {
 	nextObjNum int
 	compress   bool
 	closed     bool
+
+	// Extension hooks for gpdf-pro features (PDF/A, encryption, signatures).
+	catalogExtra  Dict                                   // extra entries merged into catalog dict
+	trailerExtra  Dict                                   // extra entries merged into trailer dict
+	onWriteObject func(ref ObjectRef, obj Object) Object // object transformation hook
+	beforeClose   []func(pw *Writer) error               // callbacks run before Close finalizes
 }
 
 // countWriter wraps an io.Writer and tracks the total number of bytes written.
@@ -86,6 +92,11 @@ func (pw *Writer) AllocObject() ObjectRef {
 //
 // It records the byte offset in the cross-reference table.
 func (pw *Writer) WriteObject(ref ObjectRef, obj Object) error {
+	// Apply object transformation hook if set (e.g., encryption).
+	if pw.onWriteObject != nil {
+		obj = pw.onWriteObject(ref, obj)
+	}
+
 	offset := pw.w.count
 	pw.xref.Add(ref.Number, offset, ref.Generation)
 
@@ -139,6 +150,27 @@ func (pw *Writer) AddPage(page PageObject) error {
 
 	pw.pages = append(pw.pages, pageRef)
 	return nil
+}
+
+// ReserveFontRef reserves a font resource name and object reference for the
+// given font name without writing any PDF objects. This allows Type0/CIDFont
+// structures to be written later via OnBeforeClose hooks.
+func (pw *Writer) ReserveFontRef(name string) (string, ObjectRef) {
+	if ref, ok := pw.fonts[name]; ok {
+		idx := 1
+		for k := range pw.fonts {
+			if k == name {
+				break
+			}
+			idx++
+		}
+		return fmt.Sprintf("F%d", idx), ref
+	}
+
+	fontRef := pw.AllocObject()
+	resName := fmt.Sprintf("F%d", len(pw.fonts)+1)
+	pw.fonts[name] = fontRef
+	return resName, fontRef
 }
 
 // RegisterFont registers a font with the given name and font data.
@@ -318,6 +350,49 @@ func (pw *Writer) SetCompression(enabled bool) {
 	pw.compress = enabled
 }
 
+// AddCatalogEntry adds an entry to the catalog dictionary.
+// This is used by extensions (e.g., PDF/A OutputIntents, signatures AcroForm).
+func (pw *Writer) AddCatalogEntry(key Name, value Object) {
+	if pw.catalogExtra == nil {
+		pw.catalogExtra = make(Dict)
+	}
+	pw.catalogExtra[key] = value
+}
+
+// AddTrailerEntry adds an entry to the trailer dictionary.
+// This is used by extensions (e.g., encryption Encrypt dict, ID array).
+func (pw *Writer) AddTrailerEntry(key Name, value Object) {
+	if pw.trailerExtra == nil {
+		pw.trailerExtra = make(Dict)
+	}
+	pw.trailerExtra[key] = value
+}
+
+// SetObjectHook registers a function that transforms each object before
+// it is written. This is used by encryption to encrypt strings and streams.
+func (pw *Writer) SetObjectHook(fn func(ref ObjectRef, obj Object) Object) {
+	pw.onWriteObject = fn
+}
+
+// OnBeforeClose registers a callback that runs before Close finalizes the PDF.
+// Multiple callbacks are executed in registration order.
+// This is used to write ICC profiles, XMP metadata, or encryption dictionaries.
+func (pw *Writer) OnBeforeClose(fn func(pw *Writer) error) {
+	pw.beforeClose = append(pw.beforeClose, fn)
+}
+
+// BytesWritten returns the total number of bytes written so far.
+// This is useful for calculating ByteRange offsets for digital signatures.
+func (pw *Writer) BytesWritten() int64 {
+	return pw.w.count
+}
+
+// RawWrite writes raw bytes directly to the output stream.
+// This is used for signature placeholders where exact byte control is needed.
+func (pw *Writer) RawWrite(data []byte) (int, error) {
+	return pw.w.Write(data)
+}
+
 // Close finishes writing the PDF document. It writes the page tree,
 // catalog, cross-reference table, trailer, and %%EOF marker.
 // Close must be called exactly once.
@@ -327,52 +402,80 @@ func (pw *Writer) Close() error {
 	}
 	pw.closed = true
 
-	// 1. Write the page tree object.
-	kids := make(Array, len(pw.pages))
-	for i, ref := range pw.pages {
-		kids[i] = ref
-	}
-	pageTreeDict := Dict{
-		Name("Type"):  Name("Pages"),
-		Name("Kids"):  kids,
-		Name("Count"): Integer(len(pw.pages)),
-	}
-	if err := pw.WriteObject(pw.pageTree, pageTreeDict); err != nil {
-		return err
-	}
-
-	// 2. Write info dictionary if any metadata is set.
-	var infoRef ObjectRef
-	infoDict := pw.info.ToDict()
-	if len(infoDict) > 0 {
-		infoRef = pw.AllocObject()
-		if err := pw.WriteObject(infoRef, infoDict); err != nil {
+	// 0. Run beforeClose hooks (e.g., write ICC profiles, XMP metadata, encrypt dicts).
+	for _, fn := range pw.beforeClose {
+		if err := fn(pw); err != nil {
 			return err
 		}
 	}
 
-	// 3. Write the catalog object.
+	// 1. Write the page tree object.
+	if err := pw.writePageTree(); err != nil {
+		return err
+	}
+
+	// 2. Write info dictionary if any metadata is set.
+	infoRef, err := pw.writeInfoDict()
+	if err != nil {
+		return err
+	}
+
+	// 3. Write the catalog object, merging any extra entries.
+	if err := pw.writeCatalog(); err != nil {
+		return err
+	}
+
+	// 4. Write xref, trailer, and EOF.
+	return pw.writeTrailer(infoRef)
+}
+
+func (pw *Writer) writePageTree() error {
+	kids := make(Array, len(pw.pages))
+	for i, ref := range pw.pages {
+		kids[i] = ref
+	}
+	return pw.WriteObject(pw.pageTree, Dict{
+		Name("Type"):  Name("Pages"),
+		Name("Kids"):  kids,
+		Name("Count"): Integer(len(pw.pages)),
+	})
+}
+
+func (pw *Writer) writeInfoDict() (ObjectRef, error) {
+	infoDict := pw.info.ToDict()
+	if len(infoDict) == 0 {
+		return ObjectRef{}, nil
+	}
+	ref := pw.AllocObject()
+	return ref, pw.WriteObject(ref, infoDict)
+}
+
+func (pw *Writer) writeCatalog() error {
 	catalogDict := Dict{
 		Name("Type"):  Name("Catalog"),
 		Name("Pages"): pw.pageTree,
 	}
-	if err := pw.WriteObject(pw.catalog, catalogDict); err != nil {
-		return err
+	for k, v := range pw.catalogExtra {
+		catalogDict[k] = v
 	}
+	return pw.WriteObject(pw.catalog, catalogDict)
+}
 
-	// 4. Write the cross-reference table.
+func (pw *Writer) writeTrailer(infoRef ObjectRef) error {
 	xrefOffset := pw.w.count
 	if _, err := pw.xref.WriteTo(pw.w); err != nil {
 		return err
 	}
 
-	// 5. Write the trailer.
 	trailerDict := Dict{
 		Name("Size"): Integer(pw.xref.Size()),
 		Name("Root"): pw.catalog,
 	}
 	if infoRef.Number > 0 {
 		trailerDict[Name("Info")] = infoRef
+	}
+	for k, v := range pw.trailerExtra {
+		trailerDict[k] = v
 	}
 
 	if _, err := io.WriteString(pw.w, "trailer\n"); err != nil {
@@ -381,17 +484,12 @@ func (pw *Writer) Close() error {
 	if _, err := trailerDict.WriteTo(pw.w); err != nil {
 		return err
 	}
-
-	// 6. Write startxref.
 	if _, err := fmt.Fprintf(pw.w, "\nstartxref\n%d\n", xrefOffset); err != nil {
 		return err
 	}
-
-	// 7. Write %%EOF.
 	if _, err := io.WriteString(pw.w, "%%EOF\n"); err != nil {
 		return err
 	}
-
 	return nil
 }
 

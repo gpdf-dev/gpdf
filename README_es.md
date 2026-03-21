@@ -30,6 +30,7 @@ Biblioteca de generación de PDF en Go puro, sin dependencias externas, con arqu
 - **Espacios de color** — RGB, escala de grises, CMYK
 - **Imágenes** — incrustación de JPEG y PNG con opciones de ajuste
 - **Posicionamiento absoluto** — colocar elementos en coordenadas XY exactas en la página
+- **Superposición de PDF existente** — abrir PDFs existentes y agregar texto, imágenes, sellos encima
 - **Metadatos del documento** — título, autor, asunto, creador
 
 ## Benchmark
@@ -143,6 +144,63 @@ page.AutoRow(func(r *template.RowBuilder) {
 	})
 })
 ```
+
+### Fuentes CJK (japonés / chino / coreano)
+
+Para renderizar texto CJK es necesario incrustar fuentes TrueType. Cada idioma necesita su propia fuente Noto Sans:
+
+```go
+fontData, _ := os.ReadFile("NotoSansJP-Regular.ttf")
+
+doc := gpdf.NewDocument(
+	gpdf.WithPageSize(gpdf.A4),
+	gpdf.WithFont("NotoSansJP", fontData),
+	gpdf.WithDefaultFont("NotoSansJP", 12),
+)
+
+page := doc.AddPage()
+page.AutoRow(func(r *template.RowBuilder) {
+	r.Col(12, func(c *template.ColBuilder) {
+		c.Text("こんにちは世界", template.FontSize(18))
+	})
+})
+```
+
+Para documentos multilingues, registre varias fuentes y cambie con `FontFamily()`:
+
+```go
+jpFont, _ := os.ReadFile("NotoSansJP-Regular.ttf")
+scFont, _ := os.ReadFile("NotoSansSC-Regular.ttf")
+krFont, _ := os.ReadFile("NotoSansKR-Regular.ttf")
+
+doc := gpdf.NewDocument(
+	gpdf.WithFont("NotoSansJP", jpFont),
+	gpdf.WithFont("NotoSansSC", scFont),
+	gpdf.WithFont("NotoSansKR", krFont),
+	gpdf.WithDefaultFont("NotoSansJP", 12),
+)
+
+page := doc.AddPage()
+page.AutoRow(func(r *template.RowBuilder) {
+	r.Col(4, func(c *template.ColBuilder) {
+		c.Text("日本語", template.FontFamily("NotoSansJP"))
+	})
+	r.Col(4, func(c *template.ColBuilder) {
+		c.Text("中文", template.FontFamily("NotoSansSC"))
+	})
+	r.Col(4, func(c *template.ColBuilder) {
+		c.Text("한국어", template.FontFamily("NotoSansKR"))
+	})
+})
+```
+
+Fuentes recomendadas (todas gratuitas, licencia OFL):
+
+| Fuente | Idioma |
+|---|---|
+| [Noto Sans JP](https://fonts.google.com/noto/specimen/Noto+Sans+JP) | Japonés |
+| [Noto Sans SC](https://fonts.google.com/noto/specimen/Noto+Sans+SC) | Chino simplificado |
+| [Noto Sans KR](https://fonts.google.com/noto/specimen/Noto+Sans+KR) | Coreano |
 
 ### Cuadrícula de 12 columnas
 
@@ -326,6 +384,33 @@ doc := template.Letter(template.LetterData{
 })
 ```
 
+### Superposición de PDF existente
+
+Abrir un PDF existente y superponer contenido usando la misma API de constructores:
+
+```go
+// Abrir un PDF existente
+doc, err := gpdf.Open(existingPDFBytes)
+
+// Agregar marca de agua "DRAFT" en la página 1
+doc.Overlay(0, func(p *template.PageBuilder) {
+	p.Absolute(document.Mm(50), document.Mm(140), func(c *template.ColBuilder) {
+		c.Text("DRAFT", template.FontSize(72),
+			template.TextColor(pdf.Gray(0.85)))
+	})
+})
+
+// Agregar números de página en todas las páginas
+count, _ := doc.PageCount()
+doc.EachPage(func(i int, p *template.PageBuilder) {
+	p.Absolute(document.Mm(170), document.Mm(285), func(c *template.ColBuilder) {
+		c.Text(fmt.Sprintf("%d / %d", i+1, count), template.FontSize(10))
+	}, template.AbsoluteWidth(document.Mm(20)))
+})
+
+result, _ := doc.Save()
+```
+
 ### Metadatos del documento
 
 ```go
@@ -420,6 +505,16 @@ doc.Render(f)
 | `gpdf.AbsoluteWidth(value)` | Establecer ancho explícito (predeterminado: espacio restante) |
 | `gpdf.AbsoluteHeight(value)` | Establecer altura explícita (predeterminado: espacio restante) |
 | `gpdf.AbsoluteOriginPage()` | Usar esquina de página como origen en lugar del área de contenido |
+
+### Operaciones con PDF existente
+
+| Función / Método | Descripción |
+|---|---|
+| `gpdf.Open(data, opts...)` | Abrir un PDF existente para superposición |
+| `doc.PageCount()` | Obtener el número de páginas |
+| `doc.Overlay(page, fn)` | Superponer contenido en una página específica |
+| `doc.EachPage(fn)` | Aplicar superposición a todas las páginas |
+| `doc.Save()` | Guardar el PDF modificado |
 
 ### Opciones de texto
 

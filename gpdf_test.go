@@ -79,3 +79,53 @@ func TestReexportedOptions(t *testing.T) {
 		t.Error("WithMetadata is nil")
 	}
 }
+
+func TestOpen(t *testing.T) {
+	// Generate a valid PDF first.
+	doc := NewDocument()
+	page := doc.AddPage()
+	page.AutoRow(func(r *template.RowBuilder) {
+		r.Col(12, func(c *template.ColBuilder) {
+			c.Text("Hello from original")
+		})
+	})
+	pdfData, err := doc.Generate()
+	if err != nil {
+		t.Fatalf("Generate failed: %v", err)
+	}
+
+	// Open the generated PDF.
+	existing, err := Open(pdfData)
+	if err != nil {
+		t.Fatalf("Open failed: %v", err)
+	}
+	if existing == nil {
+		t.Fatal("Open returned nil document")
+	}
+
+	// Save without modifications to verify round-trip.
+	result, err := existing.Save()
+	if err != nil {
+		t.Fatalf("Save failed: %v", err)
+	}
+	if len(result) == 0 {
+		t.Fatal("Save returned empty data")
+	}
+	if string(result[:5]) != "%PDF-" {
+		t.Fatalf("Invalid PDF header: %q", result[:5])
+	}
+}
+
+func TestOpenInvalidData(t *testing.T) {
+	_, err := Open([]byte("not a pdf"))
+	if err == nil {
+		t.Fatal("Open should fail with invalid data")
+	}
+}
+
+func TestOpenEmptyData(t *testing.T) {
+	_, err := Open(nil)
+	if err == nil {
+		t.Fatal("Open should fail with nil data")
+	}
+}

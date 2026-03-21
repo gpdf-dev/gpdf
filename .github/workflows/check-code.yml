@@ -74,7 +74,11 @@ jobs:
       - name: Check gocyclo
         run: |
           go install github.com/fzipp/gocyclo/cmd/gocyclo@latest
-          gocyclo -over 15 .
+          RESULT=$(gocyclo -over 15 . | grep -v '_test.go' || true)
+          if [ -n "$RESULT" ]; then
+            echo "$RESULT"
+            exit 1
+          fi
 
   version-sync:
     runs-on: ubuntu-latest

@@ -30,6 +30,7 @@
 - **색상 공간** — RGB, 그레이스케일, CMYK
 - **이미지** — JPEG 및 PNG 임베딩 (맞춤 옵션 지원)
 - **절대 위치 지정** — 페이지의 정확한 XY 좌표에 요소 배치
+- **기존 PDF 오버레이** — 기존 PDF를 열어 텍스트, 이미지, 스탬프를 위에 추가
 - **문서 메타데이터** — 제목, 저자, 주제, 작성자
 
 ## 벤치마크
@@ -143,6 +144,63 @@ page.AutoRow(func(r *template.RowBuilder) {
 	})
 })
 ```
+
+### CJK 폰트 (한국어 / 일본어 / 중국어)
+
+CJK 텍스트 렌더링에는 TrueType 폰트 임베딩이 필요합니다. 각 언어에 맞는 Noto Sans 폰트를 사용합니다:
+
+```go
+fontData, _ := os.ReadFile("NotoSansKR-Regular.ttf")
+
+doc := gpdf.NewDocument(
+	gpdf.WithPageSize(gpdf.A4),
+	gpdf.WithFont("NotoSansKR", fontData),
+	gpdf.WithDefaultFont("NotoSansKR", 12),
+)
+
+page := doc.AddPage()
+page.AutoRow(func(r *template.RowBuilder) {
+	r.Col(12, func(c *template.ColBuilder) {
+		c.Text("안녕하세요 세계", template.FontSize(18))
+	})
+})
+```
+
+다국어 문서의 경우, 여러 폰트를 등록하고 `FontFamily()`로 전환합니다:
+
+```go
+jpFont, _ := os.ReadFile("NotoSansJP-Regular.ttf")
+scFont, _ := os.ReadFile("NotoSansSC-Regular.ttf")
+krFont, _ := os.ReadFile("NotoSansKR-Regular.ttf")
+
+doc := gpdf.NewDocument(
+	gpdf.WithFont("NotoSansJP", jpFont),
+	gpdf.WithFont("NotoSansSC", scFont),
+	gpdf.WithFont("NotoSansKR", krFont),
+	gpdf.WithDefaultFont("NotoSansKR", 12),
+)
+
+page := doc.AddPage()
+page.AutoRow(func(r *template.RowBuilder) {
+	r.Col(4, func(c *template.ColBuilder) {
+		c.Text("日本語", template.FontFamily("NotoSansJP"))
+	})
+	r.Col(4, func(c *template.ColBuilder) {
+		c.Text("中文", template.FontFamily("NotoSansSC"))
+	})
+	r.Col(4, func(c *template.ColBuilder) {
+		c.Text("한국어", template.FontFamily("NotoSansKR"))
+	})
+})
+```
+
+추천 폰트 (모두 무료, OFL 라이선스):
+
+| 폰트 | 언어 |
+|---|---|
+| [Noto Sans JP](https://fonts.google.com/noto/specimen/Noto+Sans+JP) | 일본어 |
+| [Noto Sans SC](https://fonts.google.com/noto/specimen/Noto+Sans+SC) | 간체 중국어 |
+| [Noto Sans KR](https://fonts.google.com/noto/specimen/Noto+Sans+KR) | 한국어 |
 
 ### 12컬럼 그리드 레이아웃
 
@@ -326,6 +384,33 @@ doc := template.Letter(template.LetterData{
 })
 ```
 
+### 기존 PDF 오버레이
+
+기존 PDF를 열어 동일한 빌더 API로 콘텐츠를 오버레이:
+
+```go
+// 기존 PDF 열기
+doc, err := gpdf.Open(existingPDFBytes)
+
+// 1페이지에 "DRAFT" 워터마크 추가
+doc.Overlay(0, func(p *template.PageBuilder) {
+	p.Absolute(document.Mm(50), document.Mm(140), func(c *template.ColBuilder) {
+		c.Text("DRAFT", template.FontSize(72),
+			template.TextColor(pdf.Gray(0.85)))
+	})
+})
+
+// 모든 페이지에 페이지 번호 추가
+count, _ := doc.PageCount()
+doc.EachPage(func(i int, p *template.PageBuilder) {
+	p.Absolute(document.Mm(170), document.Mm(285), func(c *template.ColBuilder) {
+		c.Text(fmt.Sprintf("%d / %d", i+1, count), template.FontSize(10))
+	}, template.AbsoluteWidth(document.Mm(20)))
+})
+
+result, _ := doc.Save()
+```
+
 ### 문서 메타데이터
 
 ```go
@@ -420,6 +505,16 @@ doc.Render(f)
 | `gpdf.AbsoluteWidth(value)` | 명시적 너비 설정 (기본값: 남은 공간) |
 | `gpdf.AbsoluteHeight(value)` | 명시적 높이 설정 (기본값: 남은 공간) |
 | `gpdf.AbsoluteOriginPage()` | 콘텐츠 영역 대신 페이지 모서리를 원점으로 사용 |
+
+### 기존 PDF 작업
+
+| 함수 / 메서드 | 설명 |
+|---|---|
+| `gpdf.Open(data, opts...)` | 기존 PDF를 오버레이용으로 열기 |
+| `doc.PageCount()` | 페이지 수 가져오기 |
+| `doc.Overlay(page, fn)` | 특정 페이지에 콘텐츠 오버레이 |
+| `doc.EachPage(fn)` | 모든 페이지에 오버레이 적용 |
+| `doc.Save()` | 수정된 PDF 저장 |
 
 ### 텍스트 옵션
 
