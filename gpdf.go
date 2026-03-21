@@ -26,8 +26,8 @@ import (
 
 	"github.com/gpdf-dev/gpdf/document"
 	"github.com/gpdf-dev/gpdf/encrypt"
-	"github.com/gpdf-dev/gpdf/pdfa"
 	"github.com/gpdf-dev/gpdf/pdf"
+	"github.com/gpdf-dev/gpdf/pdfa"
 	"github.com/gpdf-dev/gpdf/signature"
 	"github.com/gpdf-dev/gpdf/template"
 )
