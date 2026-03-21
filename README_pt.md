@@ -32,6 +32,9 @@ Biblioteca de geração de PDF em Go puro, sem dependências externas, com arqui
 - **Posicionamento absoluto** — posicionar elementos em coordenadas XY exatas na página
 - **Sobreposição de PDF existente** — abrir PDFs existentes e adicionar texto, imagens, carimbos por cima
 - **Metadados do documento** — título, autor, assunto, criador
+- **Criptografia** — criptografia AES-256 (ISO 32000-2, Rev 6) com senhas de proprietário/usuário e permissões
+- **PDF/A** — conformidade PDF/A-1b e PDF/A-2b com perfis ICC e metadados XMP
+- **Assinaturas digitais** — assinaturas CMS/PKCS#7 com chaves RSA/ECDSA e carimbo de tempo RFC 3161 opcional
 
 ## Benchmark
 

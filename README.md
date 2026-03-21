@@ -33,6 +33,9 @@ A pure Go, zero-dependency PDF generation library with a layered architecture an
 - **Absolute positioning** — place elements at exact XY coordinates on the page
 - **Existing PDF overlay** — open existing PDFs and add text, images, stamps on top
 - **Document metadata** — title, author, subject, creator
+- **Encryption** — AES-256 encryption (ISO 32000-2, Rev 6) with owner/user passwords and permissions
+- **PDF/A** — PDF/A-1b and PDF/A-2b conformance with ICC profiles and XMP metadata
+- **Digital signatures** — CMS/PKCS#7 signatures with RSA/ECDSA keys and optional RFC 3161 timestamping
 
 ## Benchmark
 
@@ -611,6 +614,65 @@ doc := template.Letter(template.LetterData{
 })
 ```
 
+### Encryption
+
+AES-256 encryption with owner/user passwords and permission control:
+
+```go
+// Owner password only (PDF opens without password, editing restricted)
+doc := gpdf.NewDocument(
+	gpdf.WithPageSize(gpdf.A4),
+	gpdf.WithEncryption(
+		encrypt.WithOwnerPassword("owner-secret"),
+	),
+)
+
+// Both passwords with permission control
+doc := gpdf.NewDocument(
+	gpdf.WithPageSize(gpdf.A4),
+	gpdf.WithEncryption(
+		encrypt.WithOwnerPassword("owner-pass"),
+		encrypt.WithUserPassword("user-pass"),
+		encrypt.WithPermissions(encrypt.PermPrint|encrypt.PermCopy),
+	),
+)
+```
+
+### PDF/A Conformance
+
+Generate PDF/A-1b or PDF/A-2b compliant documents:
+
+```go
+doc := gpdf.NewDocument(
+	gpdf.WithPageSize(gpdf.A4),
+	gpdf.WithPDFA(
+		pdfa.WithLevel(pdfa.LevelA2b),
+		pdfa.WithMetadata(pdfa.MetadataInfo{
+			Title:  "Archived Report",
+			Author: "gpdf",
+		}),
+	),
+)
+```
+
+### Digital Signatures
+
+Sign PDFs with CMS/PKCS#7 using RSA or ECDSA keys:
+
+```go
+data, _ := doc.Generate()
+
+signed, err := gpdf.SignDocument(data, signature.Signer{
+	Certificate: cert,
+	PrivateKey:  key,
+	Chain:       intermediates,
+},
+	signature.WithReason("Approved"),
+	signature.WithLocation("Tokyo"),
+	signature.WithTimestamp("http://tsa.example.com"),
+)
+```
+
 ### Document Metadata
 
 ```go
@@ -673,6 +735,8 @@ doc.Render(f)
 | `WithFont(family, data)` | Register a TrueType font |
 | `WithDefaultFont(family, size)` | Set the default font |
 | `WithMetadata(meta)` | Set document metadata |
+| `WithEncryption(opts...)` | Enable AES-256 encryption |
+| `WithPDFA(opts...)` | Enable PDF/A conformance |
 
 ### Column Content
 
@@ -765,6 +829,31 @@ doc.Render(f)
 | `template.BarcodeWidth(value)` | Set barcode width |
 | `template.BarcodeHeight(value)` | Set barcode height |
 | `template.BarcodeFormat(fmt)` | Set barcode format (Code 128) |
+
+### Encryption Options
+
+| Option | Description |
+|---|---|
+| `encrypt.WithOwnerPassword(pw)` | Set owner password |
+| `encrypt.WithUserPassword(pw)` | Set user password |
+| `encrypt.WithPermissions(perm)` | Set document permissions (PermPrint, PermCopy, PermModify, etc.) |
+
+### PDF/A Options
+
+| Option | Description |
+|---|---|
+| `pdfa.WithLevel(level)` | Set conformance level (LevelA1b, LevelA2b) |
+| `pdfa.WithMetadata(info)` | Set XMP metadata (Title, Author, Subject, etc.) |
+
+### Digital Signature
+
+| Function / Option | Description |
+|---|---|
+| `gpdf.SignDocument(data, signer, opts...)` | Sign a PDF with a digital signature |
+| `signature.WithReason(reason)` | Set signing reason |
+| `signature.WithLocation(location)` | Set signing location |
+| `signature.WithTimestamp(tsaURL)` | Enable RFC 3161 timestamping |
+| `signature.WithSignTime(t)` | Set signing time |
 
 ### Template Generation
 
