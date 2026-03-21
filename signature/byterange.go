@@ -10,8 +10,11 @@ import (
 
 const (
 	// signatureMaxLength is the maximum size of the hex-encoded CMS signature.
-	// 8192 bytes = 4096 bytes of raw signature data, sufficient for RSA-4096 + cert chain.
+	// 8192 hex chars = 4096 bytes of raw signature data, sufficient for RSA-4096 + cert chain.
 	signatureMaxLength = 8192
+	// signatureMaxLengthTSA is the maximum size when RFC 3161 timestamping is enabled.
+	// 20480 hex chars = 10240 bytes, accommodates signature + TSA certificate + timestamp token.
+	signatureMaxLengthTSA = 20480
 )
 
 // buildSignedPDF prepares a PDF with signature placeholder.
@@ -70,10 +73,14 @@ func buildSignedPDF(pdfData []byte, signer Signer, cfg *signConfig) (*signResult
 	appendBuf.WriteByte('\n')
 
 	// Contents placeholder (hex string with zeros)
+	maxLen := signatureMaxLength
+	if cfg.tsaURL != "" {
+		maxLen = signatureMaxLengthTSA
+	}
 	contentsPrefix := "/Contents <"
 	contentsOffset := len(data) + appendBuf.Len() + len(contentsPrefix)
 	appendBuf.WriteString(contentsPrefix)
-	placeholder := strings.Repeat("0", signatureMaxLength)
+	placeholder := strings.Repeat("0", maxLen)
 	appendBuf.WriteString(placeholder)
 	appendBuf.WriteString(">\n")
 
