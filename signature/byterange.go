@@ -112,8 +112,8 @@ func buildSignedPDF(pdfData []byte, signer Signer, cfg *signConfig) (*signResult
 
 	br := [4]int64{
 		0,
-		int64(sigStart) - 1,                   // up to and excluding '<'
-		int64(sigEnd) + 1,                     // after '>'
+		int64(sigStart) - 1, // up to and excluding '<'
+		int64(sigEnd) + 1,   // after '>'
 		int64(len(result)) - int64(sigEnd) - 1,
 	}
 
