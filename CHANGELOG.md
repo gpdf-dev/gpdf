@@ -102,8 +102,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Reed-Solomon coefficient order in QR code encoder
 - binary.Write return value handling for errcheck lint
 
-[Unreleased]: https://github.com/gpdf-dev/gpdf/compare/v1.0.2...HEAD
-[1.0.2]: https://github.com/gpdf-dev/gpdf/compare/v1.0.0...v1.0.2
+[Unreleased]: https://github.com/gpdf-dev/gpdf/compare/v1.0.3...HEAD
+[1.0.2]: https://github.com/gpdf-dev/gpdf/compare/v1.0.0...v1.0.3
 [1.0.0]: https://github.com/gpdf-dev/gpdf/compare/v0.9.0...v1.0.0
 [0.9.0]: https://github.com/gpdf-dev/gpdf/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/gpdf-dev/gpdf/compare/v0.5.0...v0.8.0

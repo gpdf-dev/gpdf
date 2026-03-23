@@ -330,8 +330,10 @@ func (bl *BlockLayout) layoutHorizontal(node document.DocumentNode, constraints 
 	}
 
 	var placed []PlacedNode
+	childResults := make([]Result, len(children))
 	cursorX := 0.0
 	maxHeight := 0.0
+	hasOverflow := false
 
 	for i, child := range children {
 		if child == nil {
@@ -345,6 +347,10 @@ func (bl *BlockLayout) layoutHorizontal(node document.DocumentNode, constraints 
 		}
 
 		childResult := bl.layoutChild(child, childConstraints)
+		childResults[i] = childResult
+		if childResult.Overflow != nil {
+			hasOverflow = true
+		}
 
 		placed = append(placed, PlacedNode{
 			Node: child,
@@ -373,6 +379,40 @@ func (bl *BlockLayout) layoutHorizontal(node document.DocumentNode, constraints 
 	stretchPlacedNodes(placed, finalContentHeight)
 
 	totalHeight := margin.Top + borderWidths.Top + padding.Top + finalContentHeight + padding.Bottom + borderWidths.Bottom + margin.Bottom
+
+	// Build overflow: if any column overflowed, create a new horizontal box
+	// mirroring the column structure with overflow content (or empty boxes for
+	// columns that fit entirely).
+	var overflow document.DocumentNode
+	if hasOverflow {
+		overflowChildren := make([]document.DocumentNode, len(children))
+		for i, child := range children {
+			if child == nil {
+				continue
+			}
+			if childResults[i].Overflow != nil {
+				// Column had overflow — carry it forward.
+				overflowChildren[i] = childResults[i].Overflow
+			} else {
+				// Column fit entirely — use an empty placeholder with the same width.
+				placeholder := &document.Box{}
+				if box, ok := child.(*document.Box); ok {
+					placeholder.BoxStyle.Width = box.BoxStyle.Width
+				}
+				overflowChildren[i] = placeholder
+			}
+		}
+		overflow = &document.Box{
+			Content: overflowChildren,
+			BoxStyle: document.BoxStyle{
+				Direction: document.DirectionHorizontal,
+				Margin:    style.Margin,
+				Padding:   style.Padding,
+				Border:    style.Border,
+			},
+		}
+	}
+
 	return Result{
 		Bounds: document.Rectangle{
 			X:      0,
@@ -381,6 +421,7 @@ func (bl *BlockLayout) layoutHorizontal(node document.DocumentNode, constraints 
 			Height: totalHeight,
 		},
 		Children: placed,
+		Overflow: overflow,
 	}
 }
 
