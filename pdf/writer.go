@@ -152,6 +152,18 @@ func (pw *Writer) AddPage(page PageObject) error {
 	return nil
 }
 
+// AddRawPage registers a pre-written page object reference in the page tree.
+// The caller is responsible for writing the page dict with the correct /Parent.
+func (pw *Writer) AddRawPage(ref ObjectRef) {
+	pw.pages = append(pw.pages, ref)
+}
+
+// PageTreeRef returns the page tree object reference.
+// This is used as the /Parent value for pages added via AddRawPage.
+func (pw *Writer) PageTreeRef() ObjectRef {
+	return pw.pageTree
+}
+
 // ReserveFontRef reserves a font resource name and object reference for the
 // given font name without writing any PDF objects. This allows Type0/CIDFont
 // structures to be written later via OnBeforeClose hooks.
