@@ -32,6 +32,7 @@ Biblioteca de geração de PDF em Go puro, sem dependências externas, com arqui
 - **Imagens** — incorporação de JPEG e PNG com opções de ajuste
 - **Posicionamento absoluto** — posicionar elementos em coordenadas XY exatas na página
 - **Sobreposição de PDF existente** — abrir PDFs existentes e adicionar texto, imagens, carimbos por cima
+- **Fusão de PDF** — combinar múltiplos PDFs em um com seleção de intervalo de páginas
 - **Metadados do documento** — título, autor, assunto, criador
 - **Criptografia** — criptografia AES-256 (ISO 32000-2, Rev 6) com senhas de proprietário/usuário e permissões
 - **PDF/A** — conformidade PDF/A-1b e PDF/A-2b com perfis ICC e metadados XMP
@@ -466,6 +467,22 @@ doc.EachPage(func(i int, p *template.PageBuilder) {
 result, _ := doc.Save()
 ```
 
+### Fusão de PDF
+
+Combine múltiplos PDFs em um único documento com seleção opcional de intervalo de páginas:
+
+```go
+// Fundir múltiplos PDFs
+merged, _ := gpdf.Merge(
+	[]gpdf.Source{
+		{Data: coverPage},
+		{Data: report},
+		{Data: appendix, Pages: gpdf.PageRange{From: 1, To: 3}}, // apenas as primeiras 3 páginas
+	},
+	gpdf.WithMergeMetadata("My Document", "Author", ""),
+)
+```
+
 ## Referência API
 
 ### Opções do documento
@@ -519,6 +536,8 @@ result, _ := doc.Save()
 | `doc.Overlay(page, fn)` | Sobrepor conteúdo em uma página específica |
 | `doc.EachPage(fn)` | Aplicar sobreposição em todas as páginas |
 | `doc.Save()` | Salvar o PDF modificado |
+| `gpdf.Merge(sources, opts...)` | Fundir múltiplos PDFs em um |
+| `WithMergeMetadata(title, author, producer)` | Definir metadados na saída fundida |
 
 ### Opções de texto
 

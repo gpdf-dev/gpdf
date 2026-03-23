@@ -32,6 +32,7 @@
 - **图片** — JPEG 和 PNG 嵌入（支持缩放选项）
 - **绝对定位** — 在页面上以精确 XY 坐标放置元素
 - **现有 PDF 叠加** — 打开现有 PDF 并在上面添加文字、图片、印章
+- **PDF 合并** — 将多个 PDF 合并为一个，支持页面范围选择
 - **文档元数据** — 标题、作者、主题、创建者
 - **加密** — AES-256 加密（ISO 32000-2, Rev 6），支持所有者/用户密码和权限控制
 - **PDF/A** — PDF/A-1b 和 PDF/A-2b 合规，包含 ICC 配置文件和 XMP 元数据
@@ -415,6 +416,22 @@ doc.EachPage(func(i int, p *template.PageBuilder) {
 result, _ := doc.Save()
 ```
 
+### PDF 合并
+
+将多个 PDF 合并为一个文档，支持页面范围选择：
+
+```go
+// 合并多个 PDF
+merged, _ := gpdf.Merge(
+	[]gpdf.Source{
+		{Data: coverPage},
+		{Data: report},
+		{Data: appendix, Pages: gpdf.PageRange{From: 1, To: 3}}, // 仅前 3 页
+	},
+	gpdf.WithMergeMetadata("My Document", "Author", ""),
+)
+```
+
 ### 文档元数据
 
 ```go
@@ -519,6 +536,8 @@ doc.Render(f)
 | `doc.Overlay(page, fn)` | 在指定页上叠加内容 |
 | `doc.EachPage(fn)` | 对每页应用叠加 |
 | `doc.Save()` | 保存修改后的 PDF |
+| `gpdf.Merge(sources, opts...)` | 将多个 PDF 合并为一个 |
+| `WithMergeMetadata(title, author, producer)` | 设置合并后的元数据 |
 
 ### 文本选项
 

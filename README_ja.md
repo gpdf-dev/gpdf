@@ -32,6 +32,7 @@
 - **画像** — JPEGとPNGの埋め込み（フィットオプション対応）
 - **絶対位置指定** — ページ上の任意のXY座標に要素を配置
 - **既存PDFオーバーレイ** — 既存PDFを開いてテキスト、画像、スタンプを上に追加
+- **PDFマージ** — 複数のPDFをページ範囲指定付きで1つに結合
 - **ドキュメントメタデータ** — タイトル、著者、件名、作成者
 - **暗号化** — AES-256暗号化（ISO 32000-2, Rev 6）、オーナー/ユーザーパスワードと権限制御
 - **PDF/A** — PDF/A-1bおよびPDF/A-2b準拠、ICCプロファイルとXMPメタデータ対応
@@ -424,6 +425,22 @@ doc.EachPage(func(i int, p *template.PageBuilder) {
 result, _ := doc.Save()
 ```
 
+### PDFマージ
+
+複数のPDFをページ範囲指定付きで1つのドキュメントに結合:
+
+```go
+// 複数のPDFを結合
+merged, _ := gpdf.Merge(
+	[]gpdf.Source{
+		{Data: coverPage},
+		{Data: report},
+		{Data: appendix, Pages: gpdf.PageRange{From: 1, To: 3}}, // 最初の3ページのみ
+	},
+	gpdf.WithMergeMetadata("My Document", "Author", ""),
+)
+```
+
 ### JSONスキーマ
 
 JSONのみでドキュメントを定義:
@@ -638,6 +655,8 @@ doc.Render(f)
 | `doc.Overlay(page, fn)` | 特定ページにコンテンツを重ねて配置 |
 | `doc.EachPage(fn)` | 全ページにオーバーレイを適用 |
 | `doc.Save()` | 変更したPDFを保存 |
+| `gpdf.Merge(sources, opts...)` | 複数のPDFを1つに結合 |
+| `WithMergeMetadata(title, author, producer)` | 結合後のメタデータを設定 |
 
 ### テキストオプション
 

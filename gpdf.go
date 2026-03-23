@@ -151,6 +151,83 @@ func Open(data []byte, opts ...template.Option) (*template.ExistingDocument, err
 	return template.OpenExisting(data, opts...)
 }
 
+// ---------------------------------------------------------------------------
+// PDF Merge
+// ---------------------------------------------------------------------------
+
+// PageRange specifies a 1-based inclusive range of pages.
+// Zero values mean "from start" / "to end".
+type PageRange struct {
+	From int // 1-based; 0 means first page
+	To   int // 1-based; 0 means last page
+}
+
+// Source represents one input PDF in a merge operation.
+type Source struct {
+	Data  []byte    // raw PDF bytes
+	Pages PageRange // which pages to include; zero value = all pages
+}
+
+// MergeOption configures the merge operation.
+type MergeOption func(*mergeConfig)
+
+type mergeConfig struct {
+	title    string
+	author   string
+	producer string
+}
+
+// WithMergeMetadata sets the document info on the merged output.
+func WithMergeMetadata(title, author, producer string) MergeOption {
+	return func(c *mergeConfig) {
+		c.title = title
+		c.author = author
+		c.producer = producer
+	}
+}
+
+// Merge combines pages from multiple PDF sources into a single PDF.
+//
+//	merged, err := gpdf.Merge(
+//	    []gpdf.Source{
+//	        {Data: coverPage},
+//	        {Data: generated},
+//	        {Data: attachment, Pages: gpdf.PageRange{From: 1, To: 3}},
+//	    },
+//	    gpdf.WithMergeMetadata("Policy Bundle", "Example Ltd", ""),
+//	)
+func Merge(sources []Source, opts ...MergeOption) ([]byte, error) {
+	cfg := mergeConfig{producer: "gpdf " + Version}
+	for _, opt := range opts {
+		opt(&cfg)
+	}
+
+	pdfSources := make([]pdf.MergeSource, len(sources))
+	for i, s := range sources {
+		from := s.Pages.From - 1
+		if s.Pages.From <= 0 {
+			from = 0
+		}
+		to := s.Pages.To - 1
+		if s.Pages.To <= 0 {
+			to = -1
+		}
+		pdfSources[i] = pdf.MergeSource{
+			Data:     s.Data,
+			FromPage: from,
+			ToPage:   to,
+		}
+	}
+
+	return pdf.MergePDFs(pdfSources, pdf.MergeConfig{
+		Info: pdf.DocumentInfo{
+			Title:    cfg.title,
+			Author:   cfg.author,
+			Producer: cfg.producer,
+		},
+	})
+}
+
 // NewDocumentFromJSON is an alias for FromJSON that creates a Document
 // from a JSON schema, optionally resolving Go template expressions with data.
 func NewDocumentFromJSON(schema []byte, data any, opts ...template.Option) (*template.Document, error) {

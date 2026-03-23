@@ -2,7 +2,7 @@
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/gpdf-dev/gpdf.svg)](https://pkg.go.dev/github.com/gpdf-dev/gpdf)
 [![CI](https://github.com/gpdf-dev/gpdf/actions/workflows/check-code.yml/badge.svg)](https://github.com/gpdf-dev/gpdf/actions/workflows/check-code.yml)
-![coverage](https://img.shields.io/badge/coverage-86.8%25-green)
+![coverage](https://img.shields.io/badge/coverage-86.5%25-green)
 [![Go Report Card](https://goreportcard.com/badge/github.com/gpdf-dev/gpdf)](https://goreportcard.com/report/github.com/gpdf-dev/gpdf)
 [![Go Version](https://img.shields.io/badge/Go-%3E%3D1.22-blue)](https://go.dev/)
 [![Website](https://img.shields.io/badge/Website-gpdf.dev-blue)](https://gpdf.dev/)
@@ -33,6 +33,7 @@ A pure Go, zero-dependency PDF generation library with a layered architecture an
 - **Images** — JPEG and PNG embedding with fit options
 - **Absolute positioning** — place elements at exact XY coordinates on the page
 - **Existing PDF overlay** — open existing PDFs and add text, images, stamps on top
+- **PDF merging** — combine multiple PDFs into one with page range selection
 - **Document metadata** — title, author, subject, creator
 - **Encryption** — AES-256 encryption (ISO 32000-2, Rev 6) with owner/user passwords and permissions
 - **PDF/A** — PDF/A-1b and PDF/A-2b conformance with ICC profiles and XMP metadata
@@ -498,6 +499,22 @@ doc.EachPage(func(i int, p *template.PageBuilder) {
 result, _ := doc.Save()
 ```
 
+### PDF Merging
+
+Combine multiple PDFs into a single document with optional page range selection:
+
+```go
+// Merge multiple PDFs
+merged, _ := gpdf.Merge(
+	[]gpdf.Source{
+		{Data: coverPage},
+		{Data: report},
+		{Data: appendix, Pages: gpdf.PageRange{From: 1, To: 3}}, // only first 3 pages
+	},
+	gpdf.WithMergeMetadata("My Document", "Author", ""),
+)
+```
+
 ### JSON Schema
 
 Define documents entirely in JSON:
@@ -780,6 +797,8 @@ doc.Render(f)
 | `doc.Overlay(page, fn)` | Add content on top of a specific page |
 | `doc.EachPage(fn)` | Apply overlay to every page |
 | `doc.Save()` | Save the modified PDF |
+| `gpdf.Merge(sources, opts...)` | Merge multiple PDFs into one |
+| `WithMergeMetadata(title, author, producer)` | Set metadata on merged output |
 
 ### Text Options
 

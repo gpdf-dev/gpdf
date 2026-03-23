@@ -32,6 +32,7 @@
 - **이미지** — JPEG 및 PNG 임베딩 (맞춤 옵션 지원)
 - **절대 위치 지정** — 페이지의 정확한 XY 좌표에 요소 배치
 - **기존 PDF 오버레이** — 기존 PDF를 열어 텍스트, 이미지, 스탬프를 위에 추가
+- **PDF 병합** — 여러 PDF를 페이지 범위 선택으로 하나로 결합
 - **문서 메타데이터** — 제목, 저자, 주제, 작성자
 - **암호화** — AES-256 암호화 (ISO 32000-2, Rev 6), 소유자/사용자 비밀번호 및 권한 제어
 - **PDF/A** — PDF/A-1b 및 PDF/A-2b 준수, ICC 프로파일 및 XMP 메타데이터 포함
@@ -415,6 +416,22 @@ doc.EachPage(func(i int, p *template.PageBuilder) {
 result, _ := doc.Save()
 ```
 
+### PDF 병합
+
+여러 PDF를 페이지 범위 선택으로 하나의 문서로 결합:
+
+```go
+// 여러 PDF 합치기
+merged, _ := gpdf.Merge(
+	[]gpdf.Source{
+		{Data: coverPage},
+		{Data: report},
+		{Data: appendix, Pages: gpdf.PageRange{From: 1, To: 3}}, // 처음 3페이지만
+	},
+	gpdf.WithMergeMetadata("My Document", "Author", ""),
+)
+```
+
 ### 문서 메타데이터
 
 ```go
@@ -519,6 +536,8 @@ doc.Render(f)
 | `doc.Overlay(page, fn)` | 특정 페이지에 콘텐츠 오버레이 |
 | `doc.EachPage(fn)` | 모든 페이지에 오버레이 적용 |
 | `doc.Save()` | 수정된 PDF 저장 |
+| `gpdf.Merge(sources, opts...)` | 여러 PDF를 하나로 병합 |
+| `WithMergeMetadata(title, author, producer)` | 병합된 출력의 메타데이터 설정 |
 
 ### 텍스트 옵션
 

@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.0.2] - 2026-03-23
+
+### Added
+- PDF document merging — combine pages from multiple PDFs into one (#11)
+  - `pdf.MergePDFs()`: Core merge engine with object reference remapping
+  - `gpdf.Merge()`: High-level facade with `Source`, `PageRange`, `WithMergeMetadata()`
+  - `pdf.Writer.AddRawPage()`, `PageTreeRef()`: Raw page insertion support
+  - Merge examples: basic merge, page range extraction, metadata, merge + overlay, issue #11 scenario
+
+## [1.0.0] - 2026-03-20
+
 ### Added
 - Existing PDF overlay — open, read, and modify existing PDFs
   - `pdf.Reader`: PDF parser with XRef table/stream parsing, page tree traversal, object caching
@@ -91,8 +102,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Reed-Solomon coefficient order in QR code encoder
 - binary.Write return value handling for errcheck lint
 
-[Unreleased]: https://github.com/gpdf-dev/gpdf/compare/v1.0.0...HEAD
-[0.9.0]: https://github.com/gpdf-dev/gpdf/compare/v0.8.0...v1.0.0
+[Unreleased]: https://github.com/gpdf-dev/gpdf/compare/v1.0.2...HEAD
+[1.0.2]: https://github.com/gpdf-dev/gpdf/compare/v1.0.0...v1.0.2
+[1.0.0]: https://github.com/gpdf-dev/gpdf/compare/v0.9.0...v1.0.0
+[0.9.0]: https://github.com/gpdf-dev/gpdf/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/gpdf-dev/gpdf/compare/v0.5.0...v0.8.0
 [0.7.0]: https://github.com/gpdf-dev/gpdf/releases/tag/v0.7.0
 [0.6.0]: https://github.com/gpdf-dev/gpdf/releases/tag/v0.6.0
