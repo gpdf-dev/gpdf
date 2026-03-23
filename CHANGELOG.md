@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- Multi-page table support — tables inside Row/Col now automatically split across pages
+  - `layoutHorizontal` propagates child overflow to the paginator
+  - Table headers repeat on each continuation page (existing `layoutTable` logic)
+
 ## [1.0.2] - 2026-03-23
 
 ### Added
@@ -102,8 +107,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Reed-Solomon coefficient order in QR code encoder
 - binary.Write return value handling for errcheck lint
 
-[Unreleased]: https://github.com/gpdf-dev/gpdf/compare/v1.0.2...HEAD
-[1.0.2]: https://github.com/gpdf-dev/gpdf/compare/v1.0.0...v1.0.2
+[Unreleased]: https://github.com/gpdf-dev/gpdf/compare/v1.0.3...HEAD
+[1.0.2]: https://github.com/gpdf-dev/gpdf/compare/v1.0.0...v1.0.3
 [1.0.0]: https://github.com/gpdf-dev/gpdf/compare/v0.9.0...v1.0.0
 [0.9.0]: https://github.com/gpdf-dev/gpdf/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/gpdf-dev/gpdf/compare/v0.5.0...v0.8.0
