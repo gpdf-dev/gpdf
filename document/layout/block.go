@@ -380,38 +380,7 @@ func (bl *BlockLayout) layoutHorizontal(node document.DocumentNode, constraints 
 
 	totalHeight := margin.Top + borderWidths.Top + padding.Top + finalContentHeight + padding.Bottom + borderWidths.Bottom + margin.Bottom
 
-	// Build overflow: if any column overflowed, create a new horizontal box
-	// mirroring the column structure with overflow content (or empty boxes for
-	// columns that fit entirely).
-	var overflow document.DocumentNode
-	if hasOverflow {
-		overflowChildren := make([]document.DocumentNode, len(children))
-		for i, child := range children {
-			if child == nil {
-				continue
-			}
-			if childResults[i].Overflow != nil {
-				// Column had overflow — carry it forward.
-				overflowChildren[i] = childResults[i].Overflow
-			} else {
-				// Column fit entirely — use an empty placeholder with the same width.
-				placeholder := &document.Box{}
-				if box, ok := child.(*document.Box); ok {
-					placeholder.BoxStyle.Width = box.BoxStyle.Width
-				}
-				overflowChildren[i] = placeholder
-			}
-		}
-		overflow = &document.Box{
-			Content: overflowChildren,
-			BoxStyle: document.BoxStyle{
-				Direction: document.DirectionHorizontal,
-				Margin:    style.Margin,
-				Padding:   style.Padding,
-				Border:    style.Border,
-			},
-		}
-	}
+	overflow := buildHorizontalOverflow(children, childResults, hasOverflow, style)
 
 	return Result{
 		Bounds: document.Rectangle{
@@ -422,6 +391,39 @@ func (bl *BlockLayout) layoutHorizontal(node document.DocumentNode, constraints 
 		},
 		Children: placed,
 		Overflow: overflow,
+	}
+}
+
+// buildHorizontalOverflow creates an overflow horizontal box when any column
+// child overflowed. Columns that fit entirely get an empty placeholder with
+// the same width; columns with overflow carry their overflow content.
+func buildHorizontalOverflow(children []document.DocumentNode, childResults []Result, hasOverflow bool, style document.Style) document.DocumentNode {
+	if !hasOverflow {
+		return nil
+	}
+	overflowChildren := make([]document.DocumentNode, len(children))
+	for i, child := range children {
+		if child == nil {
+			continue
+		}
+		if childResults[i].Overflow != nil {
+			overflowChildren[i] = childResults[i].Overflow
+		} else {
+			placeholder := &document.Box{}
+			if box, ok := child.(*document.Box); ok {
+				placeholder.BoxStyle.Width = box.BoxStyle.Width
+			}
+			overflowChildren[i] = placeholder
+		}
+	}
+	return &document.Box{
+		Content: overflowChildren,
+		BoxStyle: document.BoxStyle{
+			Direction: document.DirectionHorizontal,
+			Margin:    style.Margin,
+			Padding:   style.Padding,
+			Border:    style.Border,
+		},
 	}
 }
 
