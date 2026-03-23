@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- Multi-page table support — tables inside Row/Col now automatically split across pages
+  - `layoutHorizontal` propagates child overflow to the paginator
+  - Table headers repeat on each continuation page (existing `layoutTable` logic)
+
 ## [1.0.2] - 2026-03-23
 
 ### Added
