@@ -21,6 +21,8 @@ type OverlayResult struct {
 	FontObjects map[string]fontObject
 	// ImageObjects contains image objects that need to be written.
 	ImageObjects map[string]imageObject
+	// FormObjects contains Form XObject objects (e.g. SVGs) that need to be written.
+	FormObjects map[string]formObject
 }
 
 type fontObject struct {
@@ -37,6 +39,15 @@ type imageObject struct {
 	Height     int
 	ColorSpace string
 	Filter     string
+}
+
+type formObject struct {
+	ResName   string
+	Content   []byte
+	BBoxW     float64
+	BBoxH     float64
+	Matrix    [6]float64
+	Resources pdf.Dict
 }
 
 // OverlayRenderer renders document nodes to a content stream byte slice,
@@ -56,6 +67,10 @@ type OverlayRenderer struct {
 	imageCount   int
 	imageObjects map[string]imageObject
 
+	formMap     map[string]string // hash -> resource name (Fm1, Fm2, ...)
+	formCount   int
+	formObjects map[string]formObject
+
 	fontDataMap map[string][]byte
 	fonts       map[string]*font.TrueTypeFont
 }
@@ -71,6 +86,8 @@ func NewOverlayRenderer(pageWidth, pageHeight float64, fonts map[string]*font.Tr
 		fontObjects:  make(map[string]fontObject),
 		imageMap:     make(map[string]string),
 		imageObjects: make(map[string]imageObject),
+		formMap:      make(map[string]string),
+		formObjects:  make(map[string]formObject),
 		fontDataMap:  fontDataMap,
 		fonts:        fonts,
 	}
@@ -100,6 +117,7 @@ func (r *OverlayRenderer) RenderOverlay(nodes []layout.PlacedNode) (*OverlayResu
 		Resources:    resources,
 		FontObjects:  r.fontObjects,
 		ImageObjects: r.imageObjects,
+		FormObjects:  r.formObjects,
 	}, nil
 }
 
@@ -292,6 +310,26 @@ func (r *OverlayRenderer) ensureImage(key string, src document.ImageSource) stri
 			h = ph
 		}
 		colorSpace = "DeviceRGB"
+	case document.ImageSVG:
+		fc, svgErr := svgToFormContent(src.Data)
+		if svgErr == nil {
+			r.formCount++
+			fResName := fmt.Sprintf("OvFm%d", r.formCount)
+			r.formMap[key] = fResName
+			r.formObjects[key] = formObject{
+				ResName:   fResName,
+				Content:   fc.Content,
+				BBoxW:     fc.ViewW,
+				BBoxH:     fc.ViewH,
+				Matrix:    [6]float64{1 / fc.ViewW, 0, 0, -1 / fc.ViewH, 0, 1},
+				Resources: fc.Resources,
+			}
+			r.imageMap[key] = fResName
+			return fResName
+		}
+		// Fall through to empty default on parse error.
+		r.imageObjects[key] = imageObject{ResName: resName}
+		return resName
 	default:
 		data = src.Data
 		w = src.Width
@@ -414,8 +452,9 @@ func WriteOverlayToModifier(result *OverlayResult, m *pdf.Modifier) ([]byte, *pd
 	}
 
 	// Register images.
-	if len(result.ImageObjects) > 0 {
+	if len(result.ImageObjects) > 0 || len(result.FormObjects) > 0 {
 		xobjDict := make(pdf.Dict)
+
 		for _, io := range result.ImageObjects {
 			var smaskRef pdf.ObjectRef
 			if len(io.SmaskData) > 0 {
@@ -472,6 +511,33 @@ func WriteOverlayToModifier(result *OverlayResult, m *pdf.Modifier) ([]byte, *pd
 
 			xobjDict[pdf.Name(io.ResName)] = imgRef
 		}
+
+		for _, fo := range result.FormObjects {
+			formRef := m.AllocObject()
+			formDict := pdf.Dict{
+				pdf.Name("Type"):    pdf.Name("XObject"),
+				pdf.Name("Subtype"): pdf.Name("Form"),
+				pdf.Name("BBox"): pdf.Rectangle{
+					LLX: 0, LLY: 0, URX: fo.BBoxW, URY: fo.BBoxH,
+				},
+				pdf.Name("Matrix"): pdf.Array{
+					pdf.Real(fo.Matrix[0]), pdf.Real(fo.Matrix[1]),
+					pdf.Real(fo.Matrix[2]), pdf.Real(fo.Matrix[3]),
+					pdf.Real(fo.Matrix[4]), pdf.Real(fo.Matrix[5]),
+				},
+			}
+			if len(fo.Resources) > 0 {
+				formDict[pdf.Name("Resources")] = fo.Resources
+			}
+			compressed, err := pdf.CompressFlate(fo.Content)
+			if err != nil {
+				return nil, nil, fmt.Errorf("compress form XObject: %w", err)
+			}
+			formDict[pdf.Name("Filter")] = pdf.Name("FlateDecode")
+			m.SetObject(formRef, pdf.Stream{Dict: formDict, Content: compressed})
+			xobjDict[pdf.Name(fo.ResName)] = formRef
+		}
+
 		resources[pdf.Name("XObject")] = xobjDict
 	}
 
