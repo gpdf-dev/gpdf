@@ -23,6 +23,7 @@ type Writer struct {
 	pages      []ObjectRef
 	fonts      map[string]ObjectRef // font name -> object ref
 	images     map[string]ObjectRef // image name -> object ref
+	forms      map[string]ObjectRef // form XObject name -> object ref
 	info       DocumentInfo
 	catalog    ObjectRef
 	pageTree   ObjectRef
@@ -60,6 +61,7 @@ func NewWriter(w io.Writer) *Writer {
 		xref:       NewXRefTable(),
 		fonts:      make(map[string]ObjectRef),
 		images:     make(map[string]ObjectRef),
+		forms:      make(map[string]ObjectRef),
 		nextObjNum: 1,
 		compress:   true,
 	}
@@ -355,6 +357,61 @@ func (pw *Writer) RegisterImage(name string, data []byte, width, height int, col
 
 	pw.images[name] = imgRef
 	return resName, imgRef, nil
+}
+
+// RegisterFormXObject registers an SVG-derived PDF Form XObject and returns its
+// resource name (e.g., "Fm1") and object reference. The content is the PDF
+// content stream for the form. bbox defines the clipping rectangle in the
+// form's coordinate space. matrix is the six-element transformation matrix
+// [a b c d e f] applied before placing the form on the page. resources is an
+// optional PDF resource dictionary for the form (e.g., ExtGState for opacity).
+func (pw *Writer) RegisterFormXObject(name string, content []byte, bbox Rectangle, matrix [6]float64, resources Dict) (string, ObjectRef, error) {
+	if ref, ok := pw.forms[name]; ok {
+		idx := 1
+		for k := range pw.forms {
+			if k == name {
+				break
+			}
+			idx++
+		}
+		return fmt.Sprintf("Fm%d", idx), ref, nil
+	}
+
+	formRef := pw.AllocObject()
+	resName := fmt.Sprintf("Fm%d", len(pw.forms)+1)
+
+	formDict := Dict{
+		Name("Type"):    Name("XObject"),
+		Name("Subtype"): Name("Form"),
+		Name("BBox"):    bbox,
+		Name("Matrix"): Array{
+			Real(matrix[0]), Real(matrix[1]),
+			Real(matrix[2]), Real(matrix[3]),
+			Real(matrix[4]), Real(matrix[5]),
+		},
+	}
+
+	if len(resources) > 0 {
+		formDict[Name("Resources")] = resources
+	}
+
+	formContent := content
+	if pw.compress {
+		compressed, err := CompressFlate(content)
+		if err != nil {
+			return "", ObjectRef{}, fmt.Errorf("pdf: failed to compress form content: %w", err)
+		}
+		formDict[Name("Filter")] = Name("FlateDecode")
+		formContent = compressed
+	}
+
+	formStream := Stream{Dict: formDict, Content: formContent}
+	if err := pw.WriteObject(formRef, formStream); err != nil {
+		return "", ObjectRef{}, err
+	}
+
+	pw.forms[name] = formRef
+	return resName, formRef, nil
 }
 
 // SetCompression enables or disables flate compression for streams.

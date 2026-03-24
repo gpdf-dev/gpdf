@@ -21,6 +21,8 @@ const (
 	ImageJPEG ImageFormat = iota
 	// ImagePNG indicates PNG encoding.
 	ImagePNG
+	// ImageSVG indicates SVG vector graphics.
+	ImageSVG
 )
 
 // Image is a leaf document node that renders an image within the

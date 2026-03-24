@@ -839,6 +839,23 @@ func (r *PDFRenderer) ensureImage(key string, src document.ImageSource) (string,
 		h = ph
 		colorSpace = "DeviceRGB"
 		filter = ""
+	case document.ImageSVG:
+		fc, svgErr := svgToFormContent(src.Data)
+		if svgErr != nil {
+			return "", fmt.Errorf("render: failed to convert SVG: %w", svgErr)
+		}
+		// The Form XObject uses a normalizing matrix [1/viewW 0 0 -1/viewH 0 1]
+		// so that it maps to the [0,1]×[0,1] unit square with Y-flipped, making
+		// it compatible with the existing RenderImage placement code.
+		bbox := pdf.Rectangle{LLX: 0, LLY: 0, URX: fc.ViewW, URY: fc.ViewH}
+		matrix := [6]float64{1 / fc.ViewW, 0, 0, -1 / fc.ViewH, 0, 1}
+		resName, ref, fErr := r.writer.RegisterFormXObject(key, fc.Content, bbox, matrix, fc.Resources)
+		if fErr != nil {
+			return "", fmt.Errorf("render: failed to register SVG form XObject: %w", fErr)
+		}
+		r.imageMap[key] = resName
+		r.imageRefs[key] = ref
+		return resName, nil
 	default:
 		data = src.Data
 		w = src.Width

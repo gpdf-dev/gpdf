@@ -3,6 +3,7 @@ package testutil
 
 import (
 	"bytes"
+	"fmt"
 	"image"
 	"image/color"
 	"image/jpeg"
@@ -188,6 +189,24 @@ func WriteTestImageFile(t *testing.T, data []byte, name string) string {
 		t.Fatalf("Failed to write test image file: %v", err)
 	}
 	return path
+}
+
+// TestImageSVG returns a simple SVG document containing a colored rectangle.
+// The SVG has a viewBox of widthxheight and fills the viewport with c.
+func TestImageSVG(t *testing.T, width, height int, c color.Color) []byte {
+	t.Helper()
+	r, g, b, _ := c.RGBA()
+	rf := float64(r>>8) / 255
+	gf := float64(g>>8) / 255
+	bf := float64(b>>8) / 255
+	svg := []byte(fmt.Sprintf(
+		`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 %d %d">`+
+			`<rect x="0" y="0" width="%d" height="%d" fill="rgb(%d,%d,%d)"/>`+
+			`</svg>`,
+		width, height, width, height,
+		int(rf*255), int(gf*255), int(bf*255),
+	))
+	return svg
 }
 
 // TestImageJPEG creates a small test JPEG image (colored rectangle).

@@ -1,6 +1,12 @@
 package template
 
 import (
+	"bytes"
+	"encoding/xml"
+	"math"
+	"strconv"
+	"strings"
+
 	"github.com/gpdf-dev/gpdf/barcode"
 	"github.com/gpdf-dev/gpdf/document"
 	"github.com/gpdf-dev/gpdf/pdf"
@@ -488,7 +494,26 @@ func detectImageFormat(data []byte) document.ImageFormat {
 	if len(data) >= 3 && data[0] == 0xFF && data[1] == 0xD8 && data[2] == 0xFF {
 		return document.ImageJPEG
 	}
+	if isSVGData(data) {
+		return document.ImageSVG
+	}
 	return document.ImagePNG
+}
+
+// isSVGData returns true if data appears to be an SVG document.
+func isSVGData(data []byte) bool {
+	trimmed := bytes.TrimSpace(data)
+	if bytes.HasPrefix(trimmed, []byte("<?xml")) {
+		// Look for <svg within first 2KB.
+		search := trimmed
+		if len(search) > 2048 {
+			search = search[:2048]
+		}
+		lower := bytes.ToLower(search)
+		return bytes.Contains(lower, []byte("<svg"))
+	}
+	lower := bytes.ToLower(trimmed)
+	return bytes.HasPrefix(lower, []byte("<svg"))
 }
 
 // extractImageDimensions returns the pixel width and height from image binary data.
@@ -498,8 +523,81 @@ func extractImageDimensions(data []byte, format document.ImageFormat) (int, int)
 		return extractPNGDimensions(data)
 	case document.ImageJPEG:
 		return extractJPEGDimensions(data)
+	case document.ImageSVG:
+		return extractSVGDimensions(data)
 	}
 	return 0, 0
+}
+
+// extractSVGDimensions parses the SVG root element to get the viewport dimensions
+// (from viewBox, or from width/height attributes). Returns dimensions in user units
+// rounded to the nearest integer.
+func extractSVGDimensions(data []byte) (int, int) {
+	dec := xml.NewDecoder(bytes.NewReader(data))
+	for {
+		tok, err := dec.Token()
+		if err != nil {
+			break
+		}
+		se, ok := tok.(xml.StartElement)
+		if !ok {
+			continue
+		}
+		if strings.ToLower(se.Name.Local) != "svg" {
+			break
+		}
+		// Build attribute map (lowercase keys).
+		attrs := make(map[string]string, len(se.Attr))
+		for _, a := range se.Attr {
+			attrs[strings.ToLower(a.Name.Local)] = a.Value
+		}
+		// Try viewBox first.
+		if vb, ok2 := attrs["viewbox"]; ok2 {
+			parts := strings.Fields(strings.ReplaceAll(vb, ",", " "))
+			if len(parts) == 4 {
+				w, errW := strconv.ParseFloat(parts[2], 64)
+				h, errH := strconv.ParseFloat(parts[3], 64)
+				if errW == nil && errH == nil && w > 0 && h > 0 {
+					return int(math.Round(w)), int(math.Round(h))
+				}
+			}
+		}
+		// Fall back to width/height attributes.
+		w := parseSVGLengthAttr(attrs["width"])
+		h := parseSVGLengthAttr(attrs["height"])
+		if w > 0 && h > 0 {
+			return int(math.Round(w)), int(math.Round(h))
+		}
+		break
+	}
+	return 100, 100 // fallback
+}
+
+// parseSVGLengthAttr converts an SVG length string (e.g. "100px", "50mm") to px units.
+func parseSVGLengthAttr(s string) float64 {
+	s = strings.TrimSpace(s)
+	units := []struct {
+		suffix string
+		factor float64
+	}{
+		{"px", 1},
+		{"pt", 4.0 / 3},
+		{"mm", 96.0 / 25.4},
+		{"cm", 96.0 / 2.54},
+		{"in", 96},
+		{"rem", 16},
+		{"em", 16},
+	}
+	for _, u := range units {
+		if strings.HasSuffix(s, u.suffix) {
+			v, err := strconv.ParseFloat(strings.TrimSuffix(s, u.suffix), 64)
+			if err == nil {
+				return v * u.factor
+			}
+		}
+	}
+	v, _ := strconv.ParseFloat(s, 64)
+	return v
 }
 
 // extractPNGDimensions reads width and height from the PNG IHDR chunk.

@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- SVG vector graphics support — use SVGs in PDFs via the existing `c.Image()` API
+  - Auto-detected alongside JPEG/PNG; same fit-mode and alignment options apply
+  - Rendered as true PDF vector (Form XObject) — crisp at any scale, no rasterization
+  - Supported SVG elements: `<path>`, `<rect>` (incl. rounded corners), `<circle>`, `<ellipse>`, `<line>`, `<polyline>`, `<polygon>`, `<g>` groups
+  - Supported path commands: M/L/H/V/C/S/Q/T/A/Z (absolute and relative), arc-to-Bézier conversion
+  - Supported styling: `fill`, `stroke`, `stroke-width`, `opacity`, `fill-opacity`, `stroke-opacity`, inline `style` attribute
+  - Supported transforms: `translate`, `scale`, `rotate`, `matrix`, `skewX`, `skewY`
+  - Color formats: named colors, `#rrggbb`, `#rgb`, `rgb()`, `rgba()`
+  - Opacity via PDF ExtGState (`ca`/`CA`)
+  - `pdf.Writer.RegisterFormXObject()`: low-level Form XObject registration
+
 ### Fixed
 - Multi-page table support — tables inside Row/Col now automatically split across pages
   - `layoutHorizontal` propagates child overflow to the paginator
