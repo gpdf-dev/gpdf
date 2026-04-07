@@ -134,6 +134,13 @@ func (d *ExistingDocument) EachPage(fn func(pageIndex int, p *PageBuilder)) erro
 	return nil
 }
 
+// FlattenForms flattens AcroForm fields into page content streams,
+// making form data part of the static page content and removing
+// all interactive form elements. Returns nil if no forms are present.
+func (d *ExistingDocument) FlattenForms() error {
+	return d.modifier.FlattenForms()
+}
+
 // Save generates the modified PDF as a byte slice.
 func (d *ExistingDocument) Save() ([]byte, error) {
 	return d.modifier.Bytes()

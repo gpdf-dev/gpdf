@@ -1,0 +1,43 @@
+%PDF-1.7
+3 0 obj
+<< /Length 48 >>
+stream
+BT /F1 12 Tf 50 780 Td (Mixed Annotations) Tj ET
+endstream
+endobj
+4 0 obj
+<< /BBox [0 0 150 20] /Length 40 /Resources << >> /Subtype /Form /Type /XObject >>
+stream
+BT /Helv 10 Tf 2 5 Td (form field) Tj ET
+endstream
+endobj
+5 0 obj
+<< /AP << /N 4 0 R >> /FT /Tx /Rect [100 700 250 720] /Subtype /Widget /T (Field1) /Type /Annot >>
+endobj
+6 0 obj
+<< /A << /S /URI /Type /Action /URI (https://github.com/gpdf-dev/gpdf) >> /Rect [50 400 200 420] /Subtype /Link /Type /Annot >>
+endobj
+7 0 obj
+<< /Annots [5 0 R 6 0 R] /Contents 3 0 R /MediaBox [0 0 595 842] /Parent 2 0 R /Resources << >> /Type /Page >>
+endobj
+2 0 obj
+<< /Count 1 /Kids [7 0 R] /Type /Pages >>
+endobj
+1 0 obj
+<< /AcroForm << /Fields [5 0 R] >> /Pages 2 0 R /Type /Catalog >>
+endobj
+xref
+0 8
+0000000000 65535 f
+0000000703 00000 n
+0000000646 00000 n
+0000000009 00000 n
+0000000107 00000 n
+0000000263 00000 n
+0000000377 00000 n
+0000000520 00000 n
+trailer
+<< /Root 1 0 R /Size 8 >>
+startxref
+784
+%%EOF

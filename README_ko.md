@@ -32,6 +32,7 @@
 - **이미지** — JPEG 및 PNG 임베딩 (맞춤 옵션 지원)
 - **절대 위치 지정** — 페이지의 정확한 XY 좌표에 요소 배치
 - **기존 PDF 오버레이** — 기존 PDF를 열어 텍스트, 이미지, 스탬프를 위에 추가
+- **폼 플래트닝** — AcroForm 필드를 정적 페이지 콘텐츠로 변환, 비위젯 주석은 보존
 - **PDF 병합** — 여러 PDF를 페이지 범위 선택으로 하나로 결합
 - **문서 메타데이터** — 제목, 저자, 주제, 작성자
 - **암호화** — AES-256 암호화 (ISO 32000-2, Rev 6), 소유자/사용자 비밀번호 및 권한 제어
@@ -297,6 +298,80 @@ c.Line(template.LineThickness(document.Pt(3)))      // 굵은 선
 c.Spacer(document.Mm(5))                            // 5mm 세로 간격
 ```
 
+### 리스트
+
+글머리 기호 목록 및 번호 목록:
+
+```go
+// 글머리 기호 목록
+c.List([]string{"첫 번째 항목", "두 번째 항목", "세 번째 항목"})
+
+// 번호 목록
+c.OrderedList([]string{"단계 1", "단계 2", "단계 3"})
+```
+
+### QR 코드
+
+크기와 오류 정정 레벨을 설정할 수 있는 QR 코드 생성:
+
+```go
+// 기본 QR 코드
+c.QRCode("https://gpdf.dev")
+
+// 크기와 오류 정정 레벨 지정
+c.QRCode("https://gpdf.dev",
+	template.QRSize(document.Mm(30)),
+	template.QRErrorCorrection(qrcode.LevelH))
+```
+
+### 바코드
+
+Code 128 바코드 생성:
+
+```go
+// 기본 바코드
+c.Barcode("INV-2026-0001")
+
+// 너비 지정
+c.Barcode("INV-2026-0001", template.BarcodeWidth(document.Mm(80)))
+```
+
+### 페이지 번호
+
+자동 페이지 번호 및 전체 페이지 수:
+
+```go
+doc.Footer(func(p *template.PageBuilder) {
+	p.AutoRow(func(r *template.RowBuilder) {
+		r.Col(6, func(c *template.ColBuilder) {
+			c.Text("gpdf로 생성", template.FontSize(8))
+		})
+		r.Col(6, func(c *template.ColBuilder) {
+			c.PageNumber(template.AlignRight(), template.FontSize(8))
+		})
+	})
+})
+
+doc.Header(func(p *template.PageBuilder) {
+	p.AutoRow(func(r *template.RowBuilder) {
+		r.Col(12, func(c *template.ColBuilder) {
+			c.TotalPages(template.AlignRight(), template.FontSize(9))
+		})
+	})
+})
+```
+
+### 텍스트 장식
+
+밑줄, 취소선, 자간, 들여쓰기:
+
+```go
+c.Text("밑줄 텍스트", template.Underline())
+c.Text("취소선 텍스트", template.Strikethrough())
+c.Text("넓은 자간", template.LetterSpacing(3))
+c.Text("들여쓰기 단락...", template.TextIndent(document.Pt(24)))
+```
+
 ### 머리글 및 바닥글
 
 모든 페이지에 반복 표시되는 머리글과 바닥글:
@@ -322,6 +397,19 @@ doc.Footer(func(p *template.PageBuilder) {
 		})
 	})
 })
+```
+
+### 다중 페이지 문서
+
+```go
+for i := 1; i <= 5; i++ {
+	page := doc.AddPage()
+	page.AutoRow(func(r *template.RowBuilder) {
+		r.Col(12, func(c *template.ColBuilder) {
+			c.Text("페이지 콘텐츠")
+		})
+	})
+}
 ```
 
 ### 재사용 가능 컴포넌트
@@ -389,6 +477,65 @@ doc := template.Letter(template.LetterData{
 })
 ```
 
+### 암호화
+
+AES-256 암호화, 소유자/사용자 비밀번호 및 권한 제어:
+
+```go
+// 소유자 비밀번호만 (비밀번호 없이 PDF를 열 수 있지만 편집은 제한)
+doc := gpdf.NewDocument(
+	gpdf.WithPageSize(gpdf.A4),
+	gpdf.WithEncryption(
+		encrypt.WithOwnerPassword("owner-secret"),
+	),
+)
+
+// 양쪽 비밀번호와 권한 제어
+doc := gpdf.NewDocument(
+	gpdf.WithPageSize(gpdf.A4),
+	gpdf.WithEncryption(
+		encrypt.WithOwnerPassword("owner-pass"),
+		encrypt.WithUserPassword("user-pass"),
+		encrypt.WithPermissions(encrypt.PermPrint|encrypt.PermCopy),
+	),
+)
+```
+
+### PDF/A 준수
+
+PDF/A-1b 또는 PDF/A-2b 준수 문서 생성:
+
+```go
+doc := gpdf.NewDocument(
+	gpdf.WithPageSize(gpdf.A4),
+	gpdf.WithPDFA(
+		pdfa.WithLevel(pdfa.LevelA2b),
+		pdfa.WithMetadata(pdfa.MetadataInfo{
+			Title:  "아카이브 보고서",
+			Author: "gpdf",
+		}),
+	),
+)
+```
+
+### 디지털 서명
+
+RSA 또는 ECDSA 키로 CMS/PKCS#7 서명:
+
+```go
+data, _ := doc.Generate()
+
+signed, err := gpdf.SignDocument(data, signature.Signer{
+	Certificate: cert,
+	PrivateKey:  key,
+	Chain:       intermediates,
+},
+	signature.WithReason("승인됨"),
+	signature.WithLocation("서울"),
+	signature.WithTimestamp("http://tsa.example.com"),
+)
+```
+
 ### 기존 PDF 오버레이
 
 기존 PDF를 열어 동일한 빌더 API로 콘텐츠를 오버레이:
@@ -412,6 +559,74 @@ doc.EachPage(func(i int, p *template.PageBuilder) {
 		c.Text(fmt.Sprintf("%d / %d", i+1, count), template.FontSize(10))
 	}, template.AbsoluteWidth(document.Mm(20)))
 })
+
+result, _ := doc.Save()
+```
+
+### JSON 스키마
+
+JSON으로만 문서를 정의:
+
+```go
+schema := []byte(`{
+	"page": {"size": "A4", "margins": "20mm"},
+	"metadata": {"title": "보고서", "author": "gpdf"},
+	"body": [
+		{"row": {"cols": [
+			{"span": 12, "text": "JSON에서 안녕하세요", "style": {"size": 24, "bold": true}}
+		]}},
+		{"row": {"cols": [
+			{"span": 12, "table": {
+				"header": ["이름", "값"],
+				"rows": [["Alpha", "100"], ["Beta", "200"]],
+				"headerStyle": {"bold": true, "color": "white", "background": "#1A237E"}
+			}}
+		]}}
+	]
+}`)
+
+doc, err := template.FromJSON(schema, nil)
+data, _ := doc.Generate()
+```
+
+### Go 템플릿 통합
+
+Go 템플릿과 JSON 스키마로 동적 콘텐츠 생성:
+
+```go
+schema := []byte(`{
+	"page": {"size": "A4", "margins": "20mm"},
+	"metadata": {"title": "{{.Title}}"},
+	"body": [
+		{"row": {"cols": [
+			{"span": 12, "text": "{{.Title}}", "style": {"size": 24, "bold": true}}
+		]}}
+	]
+}`)
+
+data := map[string]any{"Title": "동적 보고서"}
+doc, err := template.FromJSON(schema, data)
+```
+
+사전 파싱된 Go 템플릿으로 더 세밀한 제어:
+
+```go
+tmpl, _ := gotemplate.New("doc").Funcs(template.TemplateFuncMap()).Parse(schemaStr)
+doc, err := template.FromTemplate(tmpl, data)
+```
+
+### 폼 플래트닝
+
+인터랙티브 AcroForm 필드를 정적 페이지 콘텐츠로 플래트닝. 링크, 댓글 등 비위젯 주석은 보존됩니다:
+
+```go
+// 폼 필드가 있는 PDF 열기
+doc, err := gpdf.Open(filledFormPDF)
+
+// 모든 폼 필드를 정적 콘텐츠로 플래트닝
+if err := doc.FlattenForms(); err != nil {
+	log.Fatal(err)
+}
 
 result, _ := doc.Save()
 ```
@@ -494,6 +709,8 @@ doc.Render(f)
 | `WithFont(family, data)` | TrueType 폰트 등록 |
 | `WithDefaultFont(family, size)` | 기본 폰트 설정 |
 | `WithMetadata(meta)` | 문서 메타데이터 설정 |
+| `WithEncryption(opts...)` | AES-256 암호화 활성화 |
+| `WithPDFA(opts...)` | PDF/A 준수 활성화 |
 
 ### 컬럼 콘텐츠
 
@@ -535,6 +752,7 @@ doc.Render(f)
 | `doc.PageCount()` | 페이지 수 가져오기 |
 | `doc.Overlay(page, fn)` | 특정 페이지에 콘텐츠 오버레이 |
 | `doc.EachPage(fn)` | 모든 페이지에 오버레이 적용 |
+| `doc.FlattenForms()` | AcroForm 필드를 정적 페이지 콘텐츠로 플래트닝 |
 | `doc.Save()` | 수정된 PDF 저장 |
 | `gpdf.Merge(sources, opts...)` | 여러 PDF를 하나로 병합 |
 | `WithMergeMetadata(title, author, producer)` | 병합된 출력의 메타데이터 설정 |
@@ -588,6 +806,31 @@ doc.Render(f)
 | `template.BarcodeWidth(value)` | 바코드 너비 설정 |
 | `template.BarcodeHeight(value)` | 바코드 높이 설정 |
 | `template.BarcodeFormat(fmt)` | 바코드 형식 설정 (Code 128) |
+
+### 암호화 옵션
+
+| 옵션 | 설명 |
+|---|---|
+| `encrypt.WithOwnerPassword(pw)` | 소유자 비밀번호 설정 |
+| `encrypt.WithUserPassword(pw)` | 사용자 비밀번호 설정 |
+| `encrypt.WithPermissions(perm)` | 문서 권한 설정 (PermPrint, PermCopy, PermModify 등) |
+
+### PDF/A 옵션
+
+| 옵션 | 설명 |
+|---|---|
+| `pdfa.WithLevel(level)` | 준수 레벨 설정 (LevelA1b, LevelA2b) |
+| `pdfa.WithMetadata(info)` | XMP 메타데이터 설정 (Title, Author, Subject 등) |
+
+### 디지털 서명
+
+| 함수 / 옵션 | 설명 |
+|---|---|
+| `gpdf.SignDocument(data, signer, opts...)` | 디지털 서명으로 PDF 서명 |
+| `signature.WithReason(reason)` | 서명 사유 설정 |
+| `signature.WithLocation(location)` | 서명 위치 설정 |
+| `signature.WithTimestamp(tsaURL)` | RFC 3161 타임스탬프 활성화 |
+| `signature.WithSignTime(t)` | 서명 시각 설정 |
 
 ### 템플릿 생성
 

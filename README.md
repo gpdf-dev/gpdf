@@ -2,7 +2,7 @@
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/gpdf-dev/gpdf.svg)](https://pkg.go.dev/github.com/gpdf-dev/gpdf)
 [![CI](https://github.com/gpdf-dev/gpdf/actions/workflows/check-code.yml/badge.svg)](https://github.com/gpdf-dev/gpdf/actions/workflows/check-code.yml)
-![coverage](https://img.shields.io/badge/coverage-86.3%25-green)
+![coverage](https://img.shields.io/badge/coverage-86.1%25-green)
 [![Go Report Card](https://goreportcard.com/badge/github.com/gpdf-dev/gpdf)](https://goreportcard.com/report/github.com/gpdf-dev/gpdf)
 [![Go Version](https://img.shields.io/badge/Go-%3E%3D1.22-blue)](https://go.dev/)
 [![Website](https://img.shields.io/badge/Website-gpdf.dev-blue)](https://gpdf.dev/)
@@ -33,6 +33,7 @@ A pure Go, zero-dependency PDF generation library with a layered architecture an
 - **Images** — JPEG and PNG embedding with fit options
 - **Absolute positioning** — place elements at exact XY coordinates on the page
 - **Existing PDF overlay** — open existing PDFs and add text, images, stamps on top
+- **Form flattening** — flatten AcroForm fields into static page content, preserving non-widget annotations
 - **PDF merging** — combine multiple PDFs into one with page range selection
 - **Document metadata** — title, author, subject, creator
 - **Encryption** — AES-256 encryption (ISO 32000-2, Rev 6) with owner/user passwords and permissions
@@ -499,6 +500,22 @@ doc.EachPage(func(i int, p *template.PageBuilder) {
 result, _ := doc.Save()
 ```
 
+### Form Flattening
+
+Flatten interactive AcroForm fields into static page content. Non-widget annotations (links, comments) are preserved:
+
+```go
+// Open a PDF with form fields
+doc, err := gpdf.Open(filledFormPDF)
+
+// Flatten all form fields into static content
+if err := doc.FlattenForms(); err != nil {
+	log.Fatal(err)
+}
+
+result, _ := doc.Save()
+```
+
 ### PDF Merging
 
 Combine multiple PDFs into a single document with optional page range selection:
@@ -796,6 +813,7 @@ doc.Render(f)
 | `doc.PageCount()` | Get the number of pages |
 | `doc.Overlay(page, fn)` | Add content on top of a specific page |
 | `doc.EachPage(fn)` | Apply overlay to every page |
+| `doc.FlattenForms()` | Flatten AcroForm fields into static page content |
 | `doc.Save()` | Save the modified PDF |
 | `gpdf.Merge(sources, opts...)` | Merge multiple PDFs into one |
 | `WithMergeMetadata(title, author, producer)` | Set metadata on merged output |

@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.0.4] - 2026-04-07
+
+### Added
+- AcroForm flatten support — flatten form fields into static content (#17)
+
+## [1.0.3] - 2026-03-23
+
 ### Fixed
 - Multi-page table support — tables inside Row/Col now automatically split across pages
   - `layoutHorizontal` propagates child overflow to the paginator
@@ -21,7 +28,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   - `pdf.Writer.AddRawPage()`, `PageTreeRef()`: Raw page insertion support
   - Merge examples: basic merge, page range extraction, metadata, merge + overlay, issue #11 scenario
 
-## [1.0.0] - 2026-03-20
+## [1.0.1] - 2026-03-22
+
+### Added
+- RFC 3161 timestamping for digital signatures
+
+## [1.0.0] - 2026-03-22
 
 ### Added
 - Existing PDF overlay — open, read, and modify existing PDFs
@@ -107,8 +119,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Reed-Solomon coefficient order in QR code encoder
 - binary.Write return value handling for errcheck lint
 
-[Unreleased]: https://github.com/gpdf-dev/gpdf/compare/v1.0.3...HEAD
-[1.0.2]: https://github.com/gpdf-dev/gpdf/compare/v1.0.0...v1.0.3
+[Unreleased]: https://github.com/gpdf-dev/gpdf/compare/v1.0.4...HEAD
+[1.0.4]: https://github.com/gpdf-dev/gpdf/compare/v1.0.3...v1.0.4
+[1.0.3]: https://github.com/gpdf-dev/gpdf/compare/v1.0.2...v1.0.3
+[1.0.2]: https://github.com/gpdf-dev/gpdf/compare/v1.0.1...v1.0.2
+[1.0.1]: https://github.com/gpdf-dev/gpdf/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/gpdf-dev/gpdf/compare/v0.9.0...v1.0.0
 [0.9.0]: https://github.com/gpdf-dev/gpdf/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/gpdf-dev/gpdf/compare/v0.5.0...v0.8.0

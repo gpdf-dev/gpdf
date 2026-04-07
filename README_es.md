@@ -32,6 +32,7 @@ Biblioteca de generación de PDF en Go puro, sin dependencias externas, con arqu
 - **Imágenes** — incrustación de JPEG y PNG con opciones de ajuste
 - **Posicionamiento absoluto** — colocar elementos en coordenadas XY exactas en la página
 - **Superposición de PDF existente** — abrir PDFs existentes y agregar texto, imágenes, sellos encima
+- **Aplanamiento de formularios** — aplanar campos AcroForm en contenido de página estático, preservando anotaciones que no son widgets
 - **Fusión de PDF** — combinar múltiples PDFs en uno con selección de rango de páginas
 - **Metadatos del documento** — título, autor, asunto, creador
 - **Encriptación** — encriptación AES-256 (ISO 32000-2, Rev 6) con contraseñas de propietario/usuario y permisos
@@ -297,6 +298,80 @@ c.Line(template.LineThickness(document.Pt(3)))      // Gruesa
 c.Spacer(document.Mm(5))                            // Espacio vertical de 5mm
 ```
 
+### Listas
+
+Listas con viñetas y numeradas:
+
+```go
+// Lista con viñetas
+c.List([]string{"Primer elemento", "Segundo elemento", "Tercer elemento"})
+
+// Lista numerada
+c.OrderedList([]string{"Paso uno", "Paso dos", "Paso tres"})
+```
+
+### Códigos QR
+
+Generar códigos QR con tamaño y nivel de corrección configurables:
+
+```go
+// Código QR básico
+c.QRCode("https://gpdf.dev")
+
+// Tamaño y nivel de corrección personalizados
+c.QRCode("https://gpdf.dev",
+	template.QRSize(document.Mm(30)),
+	template.QRErrorCorrection(qrcode.LevelH))
+```
+
+### Códigos de barras
+
+Generación de Code 128:
+
+```go
+// Código de barras básico
+c.Barcode("INV-2026-0001")
+
+// Ancho personalizado
+c.Barcode("INV-2026-0001", template.BarcodeWidth(document.Mm(80)))
+```
+
+### Números de página
+
+Número de página automático y total de páginas:
+
+```go
+doc.Footer(func(p *template.PageBuilder) {
+	p.AutoRow(func(r *template.RowBuilder) {
+		r.Col(6, func(c *template.ColBuilder) {
+			c.Text("Generado con gpdf", template.FontSize(8))
+		})
+		r.Col(6, func(c *template.ColBuilder) {
+			c.PageNumber(template.AlignRight(), template.FontSize(8))
+		})
+	})
+})
+
+doc.Header(func(p *template.PageBuilder) {
+	p.AutoRow(func(r *template.RowBuilder) {
+		r.Col(12, func(c *template.ColBuilder) {
+			c.TotalPages(template.AlignRight(), template.FontSize(9))
+		})
+	})
+})
+```
+
+### Decoraciones de texto
+
+Subrayado, tachado, espaciado de letras y sangría:
+
+```go
+c.Text("Texto subrayado", template.Underline())
+c.Text("Texto tachado", template.Strikethrough())
+c.Text("Espaciado amplio", template.LetterSpacing(3))
+c.Text("Párrafo con sangría...", template.TextIndent(document.Pt(24)))
+```
+
 ### Encabezados y pies de página
 
 Defina encabezados y pies de página que se repiten en cada página:
@@ -322,6 +397,19 @@ doc.Footer(func(p *template.PageBuilder) {
 		})
 	})
 })
+```
+
+### Documentos de múltiples páginas
+
+```go
+for i := 1; i <= 5; i++ {
+	page := doc.AddPage()
+	page.AutoRow(func(r *template.RowBuilder) {
+		r.Col(12, func(c *template.ColBuilder) {
+			c.Text("Contenido de la página")
+		})
+	})
+}
 ```
 
 ### Componentes reutilizables
@@ -389,6 +477,65 @@ doc := template.Letter(template.LetterData{
 })
 ```
 
+### Encriptación
+
+Encriptación AES-256 con contraseñas de propietario/usuario y control de permisos:
+
+```go
+// Solo contraseña de propietario (el PDF se abre sin contraseña, la edición está restringida)
+doc := gpdf.NewDocument(
+	gpdf.WithPageSize(gpdf.A4),
+	gpdf.WithEncryption(
+		encrypt.WithOwnerPassword("owner-secret"),
+	),
+)
+
+// Ambas contraseñas con control de permisos
+doc := gpdf.NewDocument(
+	gpdf.WithPageSize(gpdf.A4),
+	gpdf.WithEncryption(
+		encrypt.WithOwnerPassword("owner-pass"),
+		encrypt.WithUserPassword("user-pass"),
+		encrypt.WithPermissions(encrypt.PermPrint|encrypt.PermCopy),
+	),
+)
+```
+
+### Conformidad PDF/A
+
+Generar documentos conformes a PDF/A-1b o PDF/A-2b:
+
+```go
+doc := gpdf.NewDocument(
+	gpdf.WithPageSize(gpdf.A4),
+	gpdf.WithPDFA(
+		pdfa.WithLevel(pdfa.LevelA2b),
+		pdfa.WithMetadata(pdfa.MetadataInfo{
+			Title:  "Informe Archivado",
+			Author: "gpdf",
+		}),
+	),
+)
+```
+
+### Firmas digitales
+
+Firmas CMS/PKCS#7 con claves RSA o ECDSA:
+
+```go
+data, _ := doc.Generate()
+
+signed, err := gpdf.SignDocument(data, signature.Signer{
+	Certificate: cert,
+	PrivateKey:  key,
+	Chain:       intermediates,
+},
+	signature.WithReason("Aprobado"),
+	signature.WithLocation("Madrid"),
+	signature.WithTimestamp("http://tsa.example.com"),
+)
+```
+
 ### Superposición de PDF existente
 
 Abrir un PDF existente y superponer contenido usando la misma API de constructores:
@@ -416,6 +563,22 @@ doc.EachPage(func(i int, p *template.PageBuilder) {
 result, _ := doc.Save()
 ```
 
+### Aplanamiento de formularios
+
+Aplanar campos AcroForm interactivos en contenido de página estático. Las anotaciones que no son widgets (enlaces, comentarios) se preservan:
+
+```go
+// Abrir un PDF con campos de formulario
+doc, err := gpdf.Open(filledFormPDF)
+
+// Aplanar todos los campos de formulario en contenido estático
+if err := doc.FlattenForms(); err != nil {
+	log.Fatal(err)
+}
+
+result, _ := doc.Save()
+```
+
 ### Fusión de PDF
 
 Combine múltiples PDFs en un solo documento con selección opcional de rango de páginas:
@@ -430,6 +593,58 @@ merged, _ := gpdf.Merge(
 	},
 	gpdf.WithMergeMetadata("My Document", "Author", ""),
 )
+```
+
+### Esquema JSON
+
+Defina documentos completamente en JSON:
+
+```go
+schema := []byte(`{
+	"page": {"size": "A4", "margins": "20mm"},
+	"metadata": {"title": "Informe", "author": "gpdf"},
+	"body": [
+		{"row": {"cols": [
+			{"span": 12, "text": "Hola desde JSON", "style": {"size": 24, "bold": true}}
+		]}},
+		{"row": {"cols": [
+			{"span": 12, "table": {
+				"header": ["Nombre", "Valor"],
+				"rows": [["Alpha", "100"], ["Beta", "200"]],
+				"headerStyle": {"bold": true, "color": "white", "background": "#1A237E"}
+			}}
+		]}}
+	]
+}`)
+
+doc, err := template.FromJSON(schema, nil)
+data, _ := doc.Generate()
+```
+
+### Integración con Go Templates
+
+Use plantillas Go con esquemas JSON para contenido dinámico:
+
+```go
+schema := []byte(`{
+	"page": {"size": "A4", "margins": "20mm"},
+	"metadata": {"title": "{{.Title}}"},
+	"body": [
+		{"row": {"cols": [
+			{"span": 12, "text": "{{.Title}}", "style": {"size": 24, "bold": true}}
+		]}}
+	]
+}`)
+
+data := map[string]any{"Title": "Informe Dinámico"}
+doc, err := template.FromJSON(schema, data)
+```
+
+Para más control, use una plantilla Go pre-parseada:
+
+```go
+tmpl, _ := gotemplate.New("doc").Funcs(template.TemplateFuncMap()).Parse(schemaStr)
+doc, err := template.FromTemplate(tmpl, data)
 ```
 
 ### Metadatos del documento
@@ -494,6 +709,8 @@ doc.Render(f)
 | `WithFont(family, data)` | Registrar una fuente TrueType |
 | `WithDefaultFont(family, size)` | Establecer la fuente predeterminada |
 | `WithMetadata(meta)` | Establecer metadatos del documento |
+| `WithEncryption(opts...)` | Habilitar encriptación AES-256 |
+| `WithPDFA(opts...)` | Habilitar conformidad PDF/A |
 
 ### Contenido de columna
 
@@ -535,6 +752,7 @@ doc.Render(f)
 | `doc.PageCount()` | Obtener el número de páginas |
 | `doc.Overlay(page, fn)` | Superponer contenido en una página específica |
 | `doc.EachPage(fn)` | Aplicar superposición a todas las páginas |
+| `doc.FlattenForms()` | Aplanar campos AcroForm en contenido de página estático |
 | `doc.Save()` | Guardar el PDF modificado |
 | `gpdf.Merge(sources, opts...)` | Fusionar múltiples PDFs en uno |
 | `WithMergeMetadata(title, author, producer)` | Establecer metadatos en la salida fusionada |
@@ -589,6 +807,31 @@ doc.Render(f)
 | `template.BarcodeHeight(value)` | Altura del código de barras |
 | `template.BarcodeFormat(fmt)` | Formato del código de barras (Code 128) |
 
+### Opciones de encriptación
+
+| Opción | Descripción |
+|---|---|
+| `encrypt.WithOwnerPassword(pw)` | Establecer contraseña de propietario |
+| `encrypt.WithUserPassword(pw)` | Establecer contraseña de usuario |
+| `encrypt.WithPermissions(perm)` | Establecer permisos del documento (PermPrint, PermCopy, PermModify, etc.) |
+
+### Opciones de PDF/A
+
+| Opción | Descripción |
+|---|---|
+| `pdfa.WithLevel(level)` | Establecer nivel de conformidad (LevelA1b, LevelA2b) |
+| `pdfa.WithMetadata(info)` | Establecer metadatos XMP (Title, Author, Subject, etc.) |
+
+### Firma digital
+
+| Función / Opción | Descripción |
+|---|---|
+| `gpdf.SignDocument(data, signer, opts...)` | Firmar un PDF con firma digital |
+| `signature.WithReason(reason)` | Establecer razón de la firma |
+| `signature.WithLocation(location)` | Establecer ubicación de la firma |
+| `signature.WithTimestamp(tsaURL)` | Habilitar sellado de tiempo RFC 3161 |
+| `signature.WithSignTime(t)` | Establecer hora de la firma |
+
 ### Generación de plantillas
 
 | Función | Descripción |
@@ -596,6 +839,14 @@ doc.Render(f)
 | `template.FromJSON(schema, data)` | Generar documento desde esquema JSON |
 | `template.FromTemplate(tmpl, data)` | Generar documento desde plantilla Go |
 | `template.TemplateFuncMap()` | Obtener funciones auxiliares de plantilla (incluye `toJSON`) |
+
+### Componentes reutilizables
+
+| Función | Descripción |
+|---|---|
+| `template.Invoice(data)` | Generar una factura PDF profesional |
+| `template.Report(data)` | Generar un informe PDF estructurado |
+| `template.Letter(data)` | Generar una carta comercial PDF |
 
 ### Opciones de línea
 
