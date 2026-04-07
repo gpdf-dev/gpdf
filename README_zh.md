@@ -32,6 +32,7 @@
 - **图片** — JPEG 和 PNG 嵌入（支持缩放选项）
 - **绝对定位** — 在页面上以精确 XY 坐标放置元素
 - **现有 PDF 叠加** — 打开现有 PDF 并在上面添加文字、图片、印章
+- **表单扁平化** — 将 AcroForm 字段扁平化为静态页面内容，保留非控件注释
 - **PDF 合并** — 将多个 PDF 合并为一个，支持页面范围选择
 - **文档元数据** — 标题、作者、主题、创建者
 - **加密** — AES-256 加密（ISO 32000-2, Rev 6），支持所有者/用户密码和权限控制
@@ -297,6 +298,80 @@ c.Line(template.LineThickness(document.Pt(3)))      // 粗线
 c.Spacer(document.Mm(5))                            // 5mm 垂直间距
 ```
 
+### 列表
+
+无序列表和有序列表：
+
+```go
+// 无序列表
+c.List([]string{"第一项", "第二项", "第三项"})
+
+// 有序列表
+c.OrderedList([]string{"步骤一", "步骤二", "步骤三"})
+```
+
+### 二维码
+
+可配置大小和纠错等级的二维码生成：
+
+```go
+// 基本二维码
+c.QRCode("https://gpdf.dev")
+
+// 自定义大小和纠错等级
+c.QRCode("https://gpdf.dev",
+	template.QRSize(document.Mm(30)),
+	template.QRErrorCorrection(qrcode.LevelH))
+```
+
+### 条形码
+
+Code 128 条形码生成：
+
+```go
+// 基本条形码
+c.Barcode("INV-2026-0001")
+
+// 自定义宽度
+c.Barcode("INV-2026-0001", template.BarcodeWidth(document.Mm(80)))
+```
+
+### 页码
+
+自动页码和总页数：
+
+```go
+doc.Footer(func(p *template.PageBuilder) {
+	p.AutoRow(func(r *template.RowBuilder) {
+		r.Col(6, func(c *template.ColBuilder) {
+			c.Text("由 gpdf 生成", template.FontSize(8))
+		})
+		r.Col(6, func(c *template.ColBuilder) {
+			c.PageNumber(template.AlignRight(), template.FontSize(8))
+		})
+	})
+})
+
+doc.Header(func(p *template.PageBuilder) {
+	p.AutoRow(func(r *template.RowBuilder) {
+		r.Col(12, func(c *template.ColBuilder) {
+			c.TotalPages(template.AlignRight(), template.FontSize(9))
+		})
+	})
+})
+```
+
+### 文本装饰
+
+下划线、删除线、字间距和首行缩进：
+
+```go
+c.Text("下划线文本", template.Underline())
+c.Text("删除线文本", template.Strikethrough())
+c.Text("宽字间距", template.LetterSpacing(3))
+c.Text("首行缩进段落...", template.TextIndent(document.Pt(24)))
+```
+
 ### 页眉和页脚
 
 定义在每一页重复显示的页眉和页脚：
@@ -322,6 +397,19 @@ doc.Footer(func(p *template.PageBuilder) {
 		})
 	})
 })
+```
+
+### 多页文档
+
+```go
+for i := 1; i <= 5; i++ {
+	page := doc.AddPage()
+	page.AutoRow(func(r *template.RowBuilder) {
+		r.Col(12, func(c *template.ColBuilder) {
+			c.Text("页面内容")
+		})
+	})
+}
 ```
 
 ### 可复用组件
@@ -389,6 +477,65 @@ doc := template.Letter(template.LetterData{
 })
 ```
 
+### 加密
+
+AES-256 加密，支持所有者/用户密码和权限控制：
+
+```go
+// 仅所有者密码（无需密码即可打开 PDF，但编辑受限）
+doc := gpdf.NewDocument(
+	gpdf.WithPageSize(gpdf.A4),
+	gpdf.WithEncryption(
+		encrypt.WithOwnerPassword("owner-secret"),
+	),
+)
+
+// 双密码和权限控制
+doc := gpdf.NewDocument(
+	gpdf.WithPageSize(gpdf.A4),
+	gpdf.WithEncryption(
+		encrypt.WithOwnerPassword("owner-pass"),
+		encrypt.WithUserPassword("user-pass"),
+		encrypt.WithPermissions(encrypt.PermPrint|encrypt.PermCopy),
+	),
+)
+```
+
+### PDF/A 合规
+
+生成 PDF/A-1b 或 PDF/A-2b 合规文档：
+
+```go
+doc := gpdf.NewDocument(
+	gpdf.WithPageSize(gpdf.A4),
+	gpdf.WithPDFA(
+		pdfa.WithLevel(pdfa.LevelA2b),
+		pdfa.WithMetadata(pdfa.MetadataInfo{
+			Title:  "归档报告",
+			Author: "gpdf",
+		}),
+	),
+)
+```
+
+### 数字签名
+
+使用 RSA 或 ECDSA 密钥的 CMS/PKCS#7 签名：
+
+```go
+data, _ := doc.Generate()
+
+signed, err := gpdf.SignDocument(data, signature.Signer{
+	Certificate: cert,
+	PrivateKey:  key,
+	Chain:       intermediates,
+},
+	signature.WithReason("已批准"),
+	signature.WithLocation("北京"),
+	signature.WithTimestamp("http://tsa.example.com"),
+)
+```
+
 ### 现有 PDF 叠加
 
 打开现有 PDF，使用同一构建器 API 叠加内容：
@@ -416,6 +563,22 @@ doc.EachPage(func(i int, p *template.PageBuilder) {
 result, _ := doc.Save()
 ```
 
+### 表单扁平化
+
+将交互式 AcroForm 字段扁平化为静态页面内容。链接、批注等非控件注释会被保留：
+
+```go
+// 打开包含表单字段的 PDF
+doc, err := gpdf.Open(filledFormPDF)
+
+// 将所有表单字段扁平化为静态内容
+if err := doc.FlattenForms(); err != nil {
+	log.Fatal(err)
+}
+
+result, _ := doc.Save()
+```
+
 ### PDF 合并
 
 将多个 PDF 合并为一个文档，支持页面范围选择：
@@ -430,6 +593,58 @@ merged, _ := gpdf.Merge(
 	},
 	gpdf.WithMergeMetadata("My Document", "Author", ""),
 )
+```
+
+### JSON 模式
+
+完全用 JSON 定义文档：
+
+```go
+schema := []byte(`{
+	"page": {"size": "A4", "margins": "20mm"},
+	"metadata": {"title": "报告", "author": "gpdf"},
+	"body": [
+		{"row": {"cols": [
+			{"span": 12, "text": "来自 JSON 的问候", "style": {"size": 24, "bold": true}}
+		]}},
+		{"row": {"cols": [
+			{"span": 12, "table": {
+				"header": ["名称", "值"],
+				"rows": [["Alpha", "100"], ["Beta", "200"]],
+				"headerStyle": {"bold": true, "color": "white", "background": "#1A237E"}
+			}}
+		]}}
+	]
+}`)
+
+doc, err := template.FromJSON(schema, nil)
+data, _ := doc.Generate()
+```
+
+### Go 模板集成
+
+使用 Go 模板和 JSON 模式生成动态内容：
+
+```go
+schema := []byte(`{
+	"page": {"size": "A4", "margins": "20mm"},
+	"metadata": {"title": "{{.Title}}"},
+	"body": [
+		{"row": {"cols": [
+			{"span": 12, "text": "{{.Title}}", "style": {"size": 24, "bold": true}}
+		]}}
+	]
+}`)
+
+data := map[string]any{"Title": "动态报告"}
+doc, err := template.FromJSON(schema, data)
+```
+
+使用预解析的 Go 模板实现更多控制：
+
+```go
+tmpl, _ := gotemplate.New("doc").Funcs(template.TemplateFuncMap()).Parse(schemaStr)
+doc, err := template.FromTemplate(tmpl, data)
 ```
 
 ### 文档元数据
@@ -494,6 +709,8 @@ doc.Render(f)
 | `WithFont(family, data)` | 注册 TrueType 字体 |
 | `WithDefaultFont(family, size)` | 设置默认字体 |
 | `WithMetadata(meta)` | 设置文档元数据 |
+| `WithEncryption(opts...)` | 启用 AES-256 加密 |
+| `WithPDFA(opts...)` | 启用 PDF/A 合规 |
 
 ### 列内容
 
@@ -535,6 +752,7 @@ doc.Render(f)
 | `doc.PageCount()` | 获取页数 |
 | `doc.Overlay(page, fn)` | 在指定页上叠加内容 |
 | `doc.EachPage(fn)` | 对每页应用叠加 |
+| `doc.FlattenForms()` | 将 AcroForm 字段扁平化为静态页面内容 |
 | `doc.Save()` | 保存修改后的 PDF |
 | `gpdf.Merge(sources, opts...)` | 将多个 PDF 合并为一个 |
 | `WithMergeMetadata(title, author, producer)` | 设置合并后的元数据 |
@@ -588,6 +806,31 @@ doc.Render(f)
 | `template.BarcodeWidth(value)` | 设置条形码宽度 |
 | `template.BarcodeHeight(value)` | 设置条形码高度 |
 | `template.BarcodeFormat(fmt)` | 设置条形码格式（Code 128） |
+
+### 加密选项
+
+| 选项 | 说明 |
+|---|---|
+| `encrypt.WithOwnerPassword(pw)` | 设置所有者密码 |
+| `encrypt.WithUserPassword(pw)` | 设置用户密码 |
+| `encrypt.WithPermissions(perm)` | 设置文档权限 (PermPrint, PermCopy, PermModify 等) |
+
+### PDF/A 选项
+
+| 选项 | 说明 |
+|---|---|
+| `pdfa.WithLevel(level)` | 设置合规级别 (LevelA1b, LevelA2b) |
+| `pdfa.WithMetadata(info)` | 设置 XMP 元数据 (Title, Author, Subject 等) |
+
+### 数字签名
+
+| 函数 / 选项 | 说明 |
+|---|---|
+| `gpdf.SignDocument(data, signer, opts...)` | 使用数字签名签署 PDF |
+| `signature.WithReason(reason)` | 设置签名原因 |
+| `signature.WithLocation(location)` | 设置签名位置 |
+| `signature.WithTimestamp(tsaURL)` | 启用 RFC 3161 时间戳 |
+| `signature.WithSignTime(t)` | 设置签名时间 |
 
 ### 模板生成
 

@@ -32,6 +32,7 @@
 - **画像** — JPEGとPNGの埋め込み（フィットオプション対応）
 - **絶対位置指定** — ページ上の任意のXY座標に要素を配置
 - **既存PDFオーバーレイ** — 既存PDFを開いてテキスト、画像、スタンプを上に追加
+- **フォームフラット化** — AcroFormフィールドを静的ページコンテンツに変換、非ウィジェット注釈は保持
 - **PDFマージ** — 複数のPDFをページ範囲指定付きで1つに結合
 - **ドキュメントメタデータ** — タイトル、著者、件名、作成者
 - **暗号化** — AES-256暗号化（ISO 32000-2, Rev 6）、オーナー/ユーザーパスワードと権限制御
@@ -398,6 +399,19 @@ doc.Footer(func(p *template.PageBuilder) {
 })
 ```
 
+### 複数ページドキュメント
+
+```go
+for i := 1; i <= 5; i++ {
+	page := doc.AddPage()
+	page.AutoRow(func(r *template.RowBuilder) {
+		r.Col(12, func(c *template.ColBuilder) {
+			c.Text("ページコンテンツ")
+		})
+	})
+}
+```
+
 ### 既存PDFオーバーレイ
 
 既存のPDFを開いて、同じビルダーAPIでコンテンツを重ねて配置:
@@ -421,6 +435,22 @@ doc.EachPage(func(i int, p *template.PageBuilder) {
 		c.Text(fmt.Sprintf("%d / %d", i+1, count), template.FontSize(10))
 	}, template.AbsoluteWidth(document.Mm(20)))
 })
+
+result, _ := doc.Save()
+```
+
+### フォームフラット化
+
+インタラクティブなAcroFormフィールドを静的ページコンテンツにフラット化。リンクやコメントなどの非ウィジェット注釈は保持されます:
+
+```go
+// フォームフィールドを含むPDFを開く
+doc, err := gpdf.Open(filledFormPDF)
+
+// すべてのフォームフィールドを静的コンテンツにフラット化
+if err := doc.FlattenForms(); err != nil {
+	log.Fatal(err)
+}
 
 result, _ := doc.Save()
 ```
@@ -551,6 +581,65 @@ doc := template.Letter(template.LetterData{
 })
 ```
 
+### 暗号化
+
+AES-256暗号化、オーナー/ユーザーパスワードと権限制御:
+
+```go
+// オーナーパスワードのみ（パスワードなしでPDFを開けるが、編集は制限）
+doc := gpdf.NewDocument(
+	gpdf.WithPageSize(gpdf.A4),
+	gpdf.WithEncryption(
+		encrypt.WithOwnerPassword("owner-secret"),
+	),
+)
+
+// 両方のパスワードと権限制御
+doc := gpdf.NewDocument(
+	gpdf.WithPageSize(gpdf.A4),
+	gpdf.WithEncryption(
+		encrypt.WithOwnerPassword("owner-pass"),
+		encrypt.WithUserPassword("user-pass"),
+		encrypt.WithPermissions(encrypt.PermPrint|encrypt.PermCopy),
+	),
+)
+```
+
+### PDF/A準拠
+
+PDF/A-1bまたはPDF/A-2b準拠ドキュメントの生成:
+
+```go
+doc := gpdf.NewDocument(
+	gpdf.WithPageSize(gpdf.A4),
+	gpdf.WithPDFA(
+		pdfa.WithLevel(pdfa.LevelA2b),
+		pdfa.WithMetadata(pdfa.MetadataInfo{
+			Title:  "アーカイブレポート",
+			Author: "gpdf",
+		}),
+	),
+)
+```
+
+### デジタル署名
+
+RSAまたはECDSA鍵によるCMS/PKCS#7署名:
+
+```go
+data, _ := doc.Generate()
+
+signed, err := gpdf.SignDocument(data, signature.Signer{
+	Certificate: cert,
+	PrivateKey:  key,
+	Chain:       intermediates,
+},
+	signature.WithReason("承認済み"),
+	signature.WithLocation("東京"),
+	signature.WithTimestamp("http://tsa.example.com"),
+)
+```
+
 ### ドキュメントメタデータ
 
 ```go
@@ -613,6 +702,8 @@ doc.Render(f)
 | `WithFont(family, data)` | TrueTypeフォントを登録 |
 | `WithDefaultFont(family, size)` | デフォルトフォントを設定 |
 | `WithMetadata(meta)` | ドキュメントメタデータを設定 |
+| `WithEncryption(opts...)` | AES-256暗号化を有効化 |
+| `WithPDFA(opts...)` | PDF/A準拠を有効化 |
 
 ### カラムコンテンツ
 
@@ -654,6 +745,7 @@ doc.Render(f)
 | `doc.PageCount()` | ページ数を取得 |
 | `doc.Overlay(page, fn)` | 特定ページにコンテンツを重ねて配置 |
 | `doc.EachPage(fn)` | 全ページにオーバーレイを適用 |
+| `doc.FlattenForms()` | AcroFormフィールドを静的ページコンテンツにフラット化 |
 | `doc.Save()` | 変更したPDFを保存 |
 | `gpdf.Merge(sources, opts...)` | 複数のPDFを1つに結合 |
 | `WithMergeMetadata(title, author, producer)` | 結合後のメタデータを設定 |
@@ -707,6 +799,31 @@ doc.Render(f)
 | `template.BarcodeWidth(value)` | バーコードの幅を設定 |
 | `template.BarcodeHeight(value)` | バーコードの高さを設定 |
 | `template.BarcodeFormat(fmt)` | バーコードフォーマットを設定 (Code 128) |
+
+### 暗号化オプション
+
+| オプション | 説明 |
+|---|---|
+| `encrypt.WithOwnerPassword(pw)` | オーナーパスワードを設定 |
+| `encrypt.WithUserPassword(pw)` | ユーザーパスワードを設定 |
+| `encrypt.WithPermissions(perm)` | ドキュメント権限を設定 (PermPrint, PermCopy, PermModify等) |
+
+### PDF/Aオプション
+
+| オプション | 説明 |
+|---|---|
+| `pdfa.WithLevel(level)` | 準拠レベルを設定 (LevelA1b, LevelA2b) |
+| `pdfa.WithMetadata(info)` | XMPメタデータを設定 (Title, Author, Subject等) |
+
+### デジタル署名
+
+| 関数 / オプション | 説明 |
+|---|---|
+| `gpdf.SignDocument(data, signer, opts...)` | デジタル署名でPDFに署名 |
+| `signature.WithReason(reason)` | 署名理由を設定 |
+| `signature.WithLocation(location)` | 署名場所を設定 |
+| `signature.WithTimestamp(tsaURL)` | RFC 3161タイムスタンプを有効化 |
+| `signature.WithSignTime(t)` | 署名時刻を設定 |
 
 ### テンプレート生成
 
