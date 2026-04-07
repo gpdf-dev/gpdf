@@ -1,7 +1,7 @@
-github.com/hhrutter/lzw v1.0.3 h1:laL89Llp86W3rRs83LvKbwYRx6INE8gDn0XNb1oXtm0=
-github.com/hhrutter/lzw v1.0.3/go.mod h1:2HC6DJSn/n6iAZfgM3Pg+cP1KxeWc3ezG8bBqW5+WEo=
-github.com/hhrutter/tiff v1.0.3 h1:MIus8caHU5U6823gx7C6jrfoEvfSTGtEFRiM8/LOzC0=
-github.com/hhrutter/tiff v1.0.3/go.mod h1:zU/dNgDm0cMIa8y8YwcYBeuEEveI4B0owqHyiPpJPHc=
+github.com/hhrutter/lzw v1.0.4 h1:laL89Llp86W3rRs83LvKbwYRx6INE8gDn0XNb1oXtm0=
+github.com/hhrutter/lzw v1.0.4/go.mod h1:2HC6DJSn/n6iAZfgM3Pg+cP1KxeWc3ezG8bBqW5+WEo=
+github.com/hhrutter/tiff v1.0.4 h1:MIus8caHU5U6823gx7C6jrfoEvfSTGtEFRiM8/LOzC0=
+github.com/hhrutter/tiff v1.0.4/go.mod h1:zU/dNgDm0cMIa8y8YwcYBeuEEveI4B0owqHyiPpJPHc=
 github.com/mattn/go-runewidth v0.0.16 h1:E5ScNMtiwvlvB5paMFdw9p4kSQzbXFikJ5SQO6TULQc=
 github.com/mattn/go-runewidth v0.0.16/go.mod h1:Jdepj2loyihRzMpdS35Xk/zdY8IAYHsh153qUoGf23w=
 github.com/pdfcpu/pdfcpu v0.9.1 h1:q8/KlBdHjkE7ZJU4ofhKG5Rjf7M6L324CVM6BMDySao=
