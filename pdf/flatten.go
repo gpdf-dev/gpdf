@@ -93,67 +93,11 @@ func (m *Modifier) flattenPageAnnotations(pageIndex int) error {
 	xobjIndex := 0
 
 	for _, annotObj := range annotsArr {
-		annotDict, err := r.ResolveDict(annotObj)
-		if err != nil {
+		ops, kept := m.flattenAnnotation(annotObj, xobjDict, &xobjIndex)
+		if kept {
 			remainingAnnots = append(remainingAnnots, annotObj)
-			continue
 		}
-
-		// Check if this is a widget annotation (form field).
-		if !m.isWidgetAnnotation(annotDict) {
-			remainingAnnots = append(remainingAnnots, annotObj)
-			continue
-		}
-
-		// Get appearance stream.
-		apStream, err := m.resolveAppearanceStream(annotDict)
-		if err != nil || apStream == nil {
-			// No appearance stream — just remove the annotation.
-			continue
-		}
-
-		// Get annotation rect.
-		rect, err := m.resolveAnnotRect(annotDict)
-		if err != nil {
-			remainingAnnots = append(remainingAnnots, annotObj)
-			continue
-		}
-
-		// Register the appearance stream as an XObject.
-		xobjName := Name(fmt.Sprintf("_Flat%d", xobjIndex))
-		xobjIndex++
-
-		xobjRef := m.AllocObject()
-
-		// Build the Form XObject from the appearance stream.
-		formXObj := m.buildFormXObject(apStream, rect)
-		m.SetObject(xobjRef, formXObj)
-		xobjDict[xobjName] = xobjRef
-
-		// Generate content stream operators to draw the XObject.
-		// Position at the annotation's rect origin, scaling BBox to fit Rect.
-		rectW := rect.URX - rect.LLX
-		rectH := rect.URY - rect.LLY
-		if rectW <= 0 || rectH <= 0 {
-			continue
-		}
-
-		// Determine scale from BBox to Rect.
-		sx, sy := 1.0, 1.0
-		bbox := m.resolveFormBBox(formXObj)
-		bboxW := bbox.URX - bbox.LLX
-		bboxH := bbox.URY - bbox.LLY
-		if bboxW > 0 && bboxH > 0 {
-			sx = rectW / bboxW
-			sy = rectH / bboxH
-		}
-
-		// Translate to rect origin, offset by BBox origin, scale to fit.
-		ops := fmt.Sprintf("q %.4f 0 0 %.4f %.4f %.4f cm /%s Do Q\n",
-			sx, sy,
-			rect.LLX-bbox.LLX*sx, rect.LLY-bbox.LLY*sy,
-			string(xobjName))
-		overlayContent = append(overlayContent, []byte(ops)...)
+		overlayContent = append(overlayContent, ops...)
 	}
 
 	if len(overlayContent) == 0 && len(remainingAnnots) == len(annotsArr) {
@@ -181,6 +125,66 @@ func (m *Modifier) flattenPageAnnotations(pageIndex int) error {
 	}
 
 	return nil
+}
+
+// flattenAnnotation processes a single annotation for flattening.
+// It returns the content stream operators (nil if none) and whether the annotation should be kept.
+func (m *Modifier) flattenAnnotation(annotObj Object, xobjDict Dict, xobjIndex *int) (ops []byte, keep bool) {
+	annotDict, err := m.reader.ResolveDict(annotObj)
+	if err != nil {
+		return nil, true
+	}
+
+	// Non-widget annotations are preserved.
+	if !m.isWidgetAnnotation(annotDict) {
+		return nil, true
+	}
+
+	// Get appearance stream.
+	apStream, err := m.resolveAppearanceStream(annotDict)
+	if err != nil || apStream == nil {
+		// No appearance stream — just remove the annotation.
+		return nil, false
+	}
+
+	// Get annotation rect.
+	rect, err := m.resolveAnnotRect(annotDict)
+	if err != nil {
+		return nil, true
+	}
+
+	// Register the appearance stream as an XObject.
+	xobjName := Name(fmt.Sprintf("_Flat%d", *xobjIndex))
+	*xobjIndex++
+
+	xobjRef := m.AllocObject()
+	formXObj := m.buildFormXObject(apStream, rect)
+	m.SetObject(xobjRef, formXObj)
+	xobjDict[xobjName] = xobjRef
+
+	// Generate content stream operators to draw the XObject.
+	rectW := rect.URX - rect.LLX
+	rectH := rect.URY - rect.LLY
+	if rectW <= 0 || rectH <= 0 {
+		return nil, false
+	}
+
+	// Determine scale from BBox to Rect.
+	sx, sy := 1.0, 1.0
+	bbox := m.resolveFormBBox(formXObj)
+	bboxW := bbox.URX - bbox.LLX
+	bboxH := bbox.URY - bbox.LLY
+	if bboxW > 0 && bboxH > 0 {
+		sx = rectW / bboxW
+		sy = rectH / bboxH
+	}
+
+	// Translate to rect origin, offset by BBox origin, scale to fit.
+	content := fmt.Sprintf("q %.4f 0 0 %.4f %.4f %.4f cm /%s Do Q\n",
+		sx, sy,
+		rect.LLX-bbox.LLX*sx, rect.LLY-bbox.LLY*sy,
+		string(xobjName))
+	return []byte(content), false
 }
 
 // isWidgetAnnotation checks if an annotation dict is a widget (form field).

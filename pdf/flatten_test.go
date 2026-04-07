@@ -306,75 +306,7 @@ func TestFlattenFormsCheckbox(t *testing.T) {
 
 func TestFlattenFormsMixedAnnotations(t *testing.T) {
 	// Build a PDF with both a widget and a non-widget annotation.
-	var buf bytes.Buffer
-	w := NewWriter(&buf)
-	w.SetCompression(false)
-
-	contentRef := w.AllocObject()
-	if err := w.WriteObject(contentRef, Stream{
-		Dict:    Dict{},
-		Content: []byte("BT /F1 12 Tf 100 700 Td (Mixed) Tj ET"),
-	}); err != nil {
-		t.Fatal(err)
-	}
-
-	// Widget annotation.
-	apRef := w.AllocObject()
-	if err := w.WriteObject(apRef, Stream{
-		Dict: Dict{
-			Name("Type"):      Name("XObject"),
-			Name("Subtype"):   Name("Form"),
-			Name("BBox"):      Array{Real(0), Real(0), Real(100), Real(20)},
-			Name("Resources"): Dict{},
-		},
-		Content: []byte("BT /Helv 12 Tf 2 5 Td (Test) Tj ET"),
-	}); err != nil {
-		t.Fatal(err)
-	}
-
-	widgetRef := w.AllocObject()
-	if err := w.WriteObject(widgetRef, Dict{
-		Name("Type"):    Name("Annot"),
-		Name("Subtype"): Name("Widget"),
-		Name("FT"):      Name("Tx"),
-		Name("T"):       LiteralString("Field1"),
-		Name("Rect"):    Array{Real(100), Real(600), Real(200), Real(620)},
-		Name("AP"):      Dict{Name("N"): apRef},
-	}); err != nil {
-		t.Fatal(err)
-	}
-
-	// Link annotation (non-widget, should be preserved).
-	linkRef := w.AllocObject()
-	if err := w.WriteObject(linkRef, Dict{
-		Name("Type"):    Name("Annot"),
-		Name("Subtype"): Name("Link"),
-		Name("Rect"):    Array{Real(50), Real(400), Real(200), Real(420)},
-	}); err != nil {
-		t.Fatal(err)
-	}
-
-	w.AddCatalogEntry(Name("AcroForm"), Dict{
-		Name("Fields"): Array{widgetRef},
-	})
-
-	pageRef := w.AllocObject()
-	if err := w.WriteObject(pageRef, Dict{
-		Name("Type"):      Name("Page"),
-		Name("Parent"):    w.PageTreeRef(),
-		Name("MediaBox"):  Array{Real(0), Real(0), Real(595), Real(842)},
-		Name("Contents"):  contentRef,
-		Name("Resources"): Dict{},
-		Name("Annots"):    Array{widgetRef, linkRef},
-	}); err != nil {
-		t.Fatal(err)
-	}
-	w.AddRawPage(pageRef)
-
-	if err := w.Close(); err != nil {
-		t.Fatal(err)
-	}
-	data := buf.Bytes()
+	data := buildTestPDFWithMixedAnnotations(t)
 
 	r, err := NewReader(data)
 	if err != nil {
@@ -425,6 +357,76 @@ func TestFlattenFormsMixedAnnotations(t *testing.T) {
 	}
 	if subtype, ok := linkDict[Name("Subtype")].(Name); !ok || string(subtype) != "Link" {
 		t.Error("remaining annotation should be the Link annotation")
+	}
+}
+
+// buildTestPDFWithMixedAnnotations creates a PDF with a widget and a link annotation.
+func buildTestPDFWithMixedAnnotations(t *testing.T) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	w := NewWriter(&buf)
+	w.SetCompression(false)
+
+	contentRef := w.AllocObject()
+	writeObj(t, w, contentRef, Stream{
+		Dict:    Dict{},
+		Content: []byte("BT /F1 12 Tf 100 700 Td (Mixed) Tj ET"),
+	})
+
+	apRef := w.AllocObject()
+	writeObj(t, w, apRef, Stream{
+		Dict: Dict{
+			Name("Type"):      Name("XObject"),
+			Name("Subtype"):   Name("Form"),
+			Name("BBox"):      Array{Real(0), Real(0), Real(100), Real(20)},
+			Name("Resources"): Dict{},
+		},
+		Content: []byte("BT /Helv 12 Tf 2 5 Td (Test) Tj ET"),
+	})
+
+	widgetRef := w.AllocObject()
+	writeObj(t, w, widgetRef, Dict{
+		Name("Type"):    Name("Annot"),
+		Name("Subtype"): Name("Widget"),
+		Name("FT"):      Name("Tx"),
+		Name("T"):       LiteralString("Field1"),
+		Name("Rect"):    Array{Real(100), Real(600), Real(200), Real(620)},
+		Name("AP"):      Dict{Name("N"): apRef},
+	})
+
+	linkRef := w.AllocObject()
+	writeObj(t, w, linkRef, Dict{
+		Name("Type"):    Name("Annot"),
+		Name("Subtype"): Name("Link"),
+		Name("Rect"):    Array{Real(50), Real(400), Real(200), Real(420)},
+	})
+
+	w.AddCatalogEntry(Name("AcroForm"), Dict{
+		Name("Fields"): Array{widgetRef},
+	})
+
+	pageRef := w.AllocObject()
+	writeObj(t, w, pageRef, Dict{
+		Name("Type"):      Name("Page"),
+		Name("Parent"):    w.PageTreeRef(),
+		Name("MediaBox"):  Array{Real(0), Real(0), Real(595), Real(842)},
+		Name("Contents"):  contentRef,
+		Name("Resources"): Dict{},
+		Name("Annots"):    Array{widgetRef, linkRef},
+	})
+	w.AddRawPage(pageRef)
+
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return buf.Bytes()
+}
+
+// writeObj is a test helper that writes an object and fails on error.
+func writeObj(t *testing.T, w *Writer, ref ObjectRef, obj Object) {
+	t.Helper()
+	if err := w.WriteObject(ref, obj); err != nil {
+		t.Fatal(err)
 	}
 }
 
