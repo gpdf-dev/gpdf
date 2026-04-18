@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.0.5] - 2026-04-19
+
+### Fixed
+- Text alignment precision for Standard 14 fonts — right/center alignment now lands at the true container edge instead of drifting up to ~17pt for large bold text
+  - `template/fontresolver.go`: `MeasureString` and `LineBreak` now use Adobe Core 14 AFM advance widths when no TTF is registered, instead of the `charCount × size × 0.5` approximation
+  - `Resolve` now normalizes an empty `FontFamily` to `Helvetica`, matching the PDF renderer's default
+  - Metrics (Ascender / Descender / CapHeight) from AFM are returned for Standard 14 fonts — previously hard-coded 0.8 / -0.2 / 0.7 fallback
+
+### Added
+- `pdf/font/standard14.go` — Adobe Standard 14 font constants, `IsStandard14`, `Standard14Metrics`, `Standard14Width`, `NewStandard14Font`
+- `pdf/font/standard14_data.go` — AFM-derived width tables and metrics for Helvetica / Times / Courier / Symbol / ZapfDingbats families (14 fonts, printable ASCII coverage)
+- Tests: `pdf/font/standard14_test.go`, `template/fontresolver_test.go`
+
 ## [1.0.4] - 2026-04-07
 
 ### Added
@@ -119,7 +132,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Reed-Solomon coefficient order in QR code encoder
 - binary.Write return value handling for errcheck lint
 
-[Unreleased]: https://github.com/gpdf-dev/gpdf/compare/v1.0.4...HEAD
+[Unreleased]: https://github.com/gpdf-dev/gpdf/compare/v1.0.5...HEAD
+[1.0.5]: https://github.com/gpdf-dev/gpdf/compare/v1.0.4...v1.0.5
 [1.0.4]: https://github.com/gpdf-dev/gpdf/compare/v1.0.3...v1.0.4
 [1.0.3]: https://github.com/gpdf-dev/gpdf/compare/v1.0.2...v1.0.3
 [1.0.2]: https://github.com/gpdf-dev/gpdf/compare/v1.0.1...v1.0.2
