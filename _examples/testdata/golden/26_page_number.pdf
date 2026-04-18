@@ -6,7 +6,7 @@ endobj
 << /BaseFont /Helvetica /Subtype /Type1 /Type /Font >>
 endobj
 5 0 obj
-<< /Length 799 >>
+<< /Length 798 >>
 stream
 0 g
 BT
@@ -17,7 +17,7 @@ ET
 0.5 g
 BT
 /F2 9 Tf
-484.587 776.197 Td
+474.57 776.197 Td
 (4) Tj
 ET
 q
@@ -35,19 +35,19 @@ ET
 BT
 /F2 12 Tf
 56.693 715.9198 Td
-(This is the content of the page. The footer displays the current page number,) Tj
+(This is the content of the page. The footer displays the current page number, and the) Tj
 ET
 0 g
 BT
 /F2 12 Tf
 56.693 701.5198 Td
-(and the header shows the total number of pages in the document. Both are) Tj
+(header shows the total number of pages in the document. Both are automatically updated) Tj
 ET
 0 g
 BT
 /F2 12 Tf
 56.693 687.1197999999999 Td
-(automatically updated after pagination, including on overflow pages.) Tj
+(after pagination, including on overflow pages.) Tj
 ET
 q
 0.7 g
@@ -63,7 +63,7 @@ ET
 0.5 g
 BT
 /F2 8 Tf
-494.587 58.29299999999989 Td
+485.235 58.29299999999989 Td
 (1) Tj
 ET
 
@@ -73,7 +73,7 @@ endobj
 << /Contents 5 0 R /MediaBox [0 0 595.28 841.89] /Parent 2 0 R /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Type /Page >>
 endobj
 7 0 obj
-<< /Length 797 >>
+<< /Length 796 >>
 stream
 0 g
 BT
@@ -84,7 +84,7 @@ ET
 0.5 g
 BT
 /F2 9 Tf
-484.587 776.197 Td
+474.57 776.197 Td
 (4) Tj
 ET
 q
@@ -102,19 +102,19 @@ ET
 BT
 /F2 12 Tf
 56.693 715.9198 Td
-(This is the content of the page. The footer displays the current page number,) Tj
+(This is the content of the page. The footer displays the current page number, and the) Tj
 ET
 0 g
 BT
 /F2 12 Tf
 56.693 701.5198 Td
-(and the header shows the total number of pages in the document. Both are) Tj
+(header shows the total number of pages in the document. Both are automatically updated) Tj
 ET
 0 g
 BT
 /F2 12 Tf
 56.693 687.1197999999999 Td
-(automatically updated after pagination, including on overflow pages.) Tj
+(after pagination, including on overflow pages.) Tj
 ET
 q
 0.7 g
@@ -130,7 +130,7 @@ ET
 0.5 g
 BT
 /F2 8 Tf
-494.587 58.29299999999989 Td
+485.235 58.29299999999989 Td
 (2) Tj
 ET
 
@@ -140,7 +140,7 @@ endobj
 << /Contents 7 0 R /MediaBox [0 0 595.28 841.89] /Parent 2 0 R /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Type /Page >>
 endobj
 9 0 obj
-<< /Length 795 >>
+<< /Length 794 >>
 stream
 0 g
 BT
@@ -151,7 +151,7 @@ ET
 0.5 g
 BT
 /F2 9 Tf
-484.587 776.197 Td
+474.57 776.197 Td
 (4) Tj
 ET
 q
@@ -169,19 +169,19 @@ ET
 BT
 /F2 12 Tf
 56.693 715.9198 Td
-(This is the content of the page. The footer displays the current page number,) Tj
+(This is the content of the page. The footer displays the current page number, and the) Tj
 ET
 0 g
 BT
 /F2 12 Tf
 56.693 701.5198 Td
-(and the header shows the total number of pages in the document. Both are) Tj
+(header shows the total number of pages in the document. Both are automatically updated) Tj
 ET
 0 g
 BT
 /F2 12 Tf
 56.693 687.1197999999999 Td
-(automatically updated after pagination, including on overflow pages.) Tj
+(after pagination, including on overflow pages.) Tj
 ET
 q
 0.7 g
@@ -197,7 +197,7 @@ ET
 0.5 g
 BT
 /F2 8 Tf
-494.587 58.29299999999989 Td
+485.235 58.29299999999989 Td
 (3) Tj
 ET
 
@@ -207,7 +207,7 @@ endobj
 << /Contents 9 0 R /MediaBox [0 0 595.28 841.89] /Parent 2 0 R /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Type /Page >>
 endobj
 11 0 obj
-<< /Length 797 >>
+<< /Length 796 >>
 stream
 0 g
 BT
@@ -218,7 +218,7 @@ ET
 0.5 g
 BT
 /F2 9 Tf
-484.587 776.197 Td
+474.57 776.197 Td
 (4) Tj
 ET
 q
@@ -236,19 +236,19 @@ ET
 BT
 /F2 12 Tf
 56.693 715.9198 Td
-(This is the content of the page. The footer displays the current page number,) Tj
+(This is the content of the page. The footer displays the current page number, and the) Tj
 ET
 0 g
 BT
 /F2 12 Tf
 56.693 701.5198 Td
-(and the header shows the total number of pages in the document. Both are) Tj
+(header shows the total number of pages in the document. Both are automatically updated) Tj
 ET
 0 g
 BT
 /F2 12 Tf
 56.693 687.1197999999999 Td
-(automatically updated after pagination, including on overflow pages.) Tj
+(after pagination, including on overflow pages.) Tj
 ET
 q
 0.7 g
@@ -264,7 +264,7 @@ ET
 0.5 g
 BT
 /F2 8 Tf
-494.587 58.29299999999989 Td
+485.235 58.29299999999989 Td
 (4) Tj
 ET
 
@@ -285,21 +285,21 @@ endobj
 xref
 0 14
 0000000000 65535 f
-0000004275 00000 n
-0000004118 00000 n
+0000004271 00000 n
+0000004114 00000 n
 0000000009 00000 n
 0000000084 00000 n
 0000000154 00000 n
-0000001004 00000 n
-0000001146 00000 n
-0000001994 00000 n
-0000002136 00000 n
-0000002982 00000 n
-0000003125 00000 n
-0000003974 00000 n
-0000004195 00000 n
+0000001003 00000 n
+0000001145 00000 n
+0000001992 00000 n
+0000002134 00000 n
+0000002979 00000 n
+0000003122 00000 n
+0000003970 00000 n
+0000004191 00000 n
 trailer
 << /Info 13 0 R /Root 1 0 R /Size 14 >>
 startxref
-4324
+4320
 %%EOF

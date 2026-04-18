@@ -18,19 +18,19 @@ ET
 BT
 /F2 12 Tf
 80.693 726.5198 Td
-(This paragraph has a 24pt first-line indent. The first line starts further) Tj
+(This paragraph has a 24pt first-line indent. The first line starts further to the right,) Tj
 ET
 0 g
 BT
 /F2 12 Tf
 56.693 712.1197999999999 Td
-(to the right, while subsequent lines wrap at the normal left margin. This is) Tj
+(while subsequent lines wrap at the normal left margin. This is commonly used in book) Tj
 ET
 0 g
 BT
 /F2 12 Tf
 56.693 697.7198 Td
-(commonly used in book typography to indicate new paragraphs.) Tj
+(typography to indicate new paragraphs.) Tj
 ET
 0 g
 BT
@@ -42,25 +42,25 @@ ET
 BT
 /F2 12 Tf
 56.693 654.74655 Td
-(indentation makes it easy to distinguish where a new paragraph begins without) Tj
+(indentation makes it easy to distinguish where a new paragraph begins without adding) Tj
 ET
 0 g
 BT
 /F2 12 Tf
 56.693 640.34655 Td
-(adding extra vertical space.) Tj
+(extra vertical space.) Tj
 ET
 0 g
 BT
 /F2 12 Tf
 56.693 611.7733000000001 Td
-(No indent on this paragraph for comparison. Standard left-aligned text without) Tj
+(No indent on this paragraph for comparison. Standard left-aligned text without any) Tj
 ET
 0 g
 BT
 /F2 12 Tf
 56.693 597.3733 Td
-(any first-line indentation starts flush with the left margin.) Tj
+(first-line indentation starts flush with the left margin.) Tj
 ET
 
 endstream

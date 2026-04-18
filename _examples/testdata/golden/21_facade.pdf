@@ -6,7 +6,7 @@ endobj
 << /BaseFont /Helvetica /Subtype /Type1 /Type /Font >>
 endobj
 5 0 obj
-<< /Length 325 >>
+<< /Length 272 >>
 stream
 0 g
 BT
@@ -18,18 +18,12 @@ ET
 BT
 /F2 14 Tf
 56.693 733.02375 Td
-(This document uses WithDefaultFont to set the base font size to) Tj
+(This document uses WithDefaultFont to set the base font size to 14pt.) Tj
 ET
 0 g
 BT
 /F2 14 Tf
 56.693 716.22375 Td
-(14pt.) Tj
-ET
-0 g
-BT
-/F2 14 Tf
-56.693 699.4237499999999 Td
 (All text in this document inherits the 14pt default.) Tj
 ET
 
@@ -50,15 +44,15 @@ endobj
 xref
 0 8
 0000000000 65535 f
-0000000806 00000 n
-0000000672 00000 n
+0000000753 00000 n
+0000000619 00000 n
 0000000009 00000 n
 0000000084 00000 n
 0000000154 00000 n
-0000000530 00000 n
-0000000729 00000 n
+0000000477 00000 n
+0000000676 00000 n
 trailer
 << /Info 7 0 R /Root 1 0 R /Size 8 >>
 startxref
-855
+802
 %%EOF
