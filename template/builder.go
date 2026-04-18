@@ -72,8 +72,9 @@ func WithMetadata(info document.DocumentMetadata) Option {
 }
 
 // WithWriterSetup registers a function that configures the PDF Writer
-// before rendering begins. This is used by extensions (e.g., gpdf-pro)
-// to set up hooks for PDF/A, encryption, or other features.
+// before rendering begins. This is used by built-in extensions
+// (PDF/A, encryption) and any external hook that needs to mutate
+// the Writer before rendering begins.
 func WithWriterSetup(fn func(pw *pdf.Writer)) Option {
 	return func(c *Config) { c.WriterSetup = fn }
 }

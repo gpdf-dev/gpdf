@@ -30,7 +30,7 @@ type Writer struct {
 	compress   bool
 	closed     bool
 
-	// Extension hooks for gpdf-pro features (PDF/A, encryption, signatures).
+	// Extension hooks for same-module features (PDF/A, encryption, signatures).
 	catalogExtra  Dict                                   // extra entries merged into catalog dict
 	trailerExtra  Dict                                   // extra entries merged into trailer dict
 	onWriteObject func(ref ObjectRef, obj Object) Object // object transformation hook

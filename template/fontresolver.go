@@ -25,6 +25,12 @@ func newBuiltinFontResolver(fonts map[string]*font.TrueTypeFont) *builtinFontRes
 // falls back to the base family for metrics.
 func (r *builtinFontResolver) Resolve(family string, weight document.FontWeight, italic bool) layout.ResolvedFont {
 	bold := weight >= document.WeightBold
+	// Empty family means "the PDF renderer default" — which is Helvetica
+	// (see document/render/pdftarget.go:resolvePDFFontName). Mirror that
+	// here so layout uses the same metrics the viewer will.
+	if family == "" {
+		family = font.Helvetica
+	}
 	variantID := buildFontVariantID(family, bold, italic)
 
 	// Try variant-specific font first, then fall back to base family.
@@ -34,7 +40,22 @@ func (r *builtinFontResolver) Resolve(family string, weight document.FontWeight,
 	}
 
 	if !ok {
-		// Return approximate metrics for standard fonts.
+		// If the requested font is one of the Adobe 14 standard fonts, use
+		// its AFM-derived metrics so that layout matches what PDF viewers
+		// render from non-embedded Type1 entries.
+		if m, std := font.Standard14Metrics(variantID); std {
+			scale := 1.0 / float64(m.UnitsPerEm)
+			return layout.ResolvedFont{
+				ID: variantID,
+				Metrics: layout.FontMetrics{
+					Ascender:   float64(m.Ascender) * scale,
+					Descender:  float64(m.Descender) * scale,
+					LineHeight: float64(m.Ascender-m.Descender+m.LineGap) * scale,
+					CapHeight:  float64(m.CapHeight) * scale,
+				},
+			}
+		}
+		// Return approximate metrics for non-standard unregistered fonts.
 		return layout.ResolvedFont{
 			ID: variantID,
 			Metrics: layout.FontMetrics{
@@ -75,21 +96,26 @@ func buildFontVariantID(family string, bold, italic bool) string {
 
 // MeasureString measures the width of text at the given font size.
 func (r *builtinFontResolver) MeasureString(f layout.ResolvedFont, text string, size float64) float64 {
-	ttf, ok := r.fonts[f.ID]
-	if !ok {
-		// Fallback to approximate: average char width ≈ 0.5 * fontSize.
-		return float64(len([]rune(text))) * size * 0.5
+	if ttf, ok := r.fonts[f.ID]; ok {
+		return font.MeasureString(ttf, text, size)
 	}
-	return font.MeasureString(ttf, text, size)
+	// Non-embedded Adobe 14 fonts: use AFM widths so layout matches viewer.
+	if std, ok := font.NewStandard14Font(f.ID); ok {
+		return font.MeasureString(std, text, size)
+	}
+	// Fallback to approximate: average char width ≈ 0.5 * fontSize.
+	return float64(len([]rune(text))) * size * 0.5
 }
 
 // LineBreak splits text into lines fitting within maxWidth.
 func (r *builtinFontResolver) LineBreak(f layout.ResolvedFont, text string, size float64, maxWidth float64) []string {
-	ttf, ok := r.fonts[f.ID]
-	if !ok {
-		return approximateBreak(text, size, maxWidth)
+	if ttf, ok := r.fonts[f.ID]; ok {
+		return font.LineBreak(ttf, text, size, maxWidth)
 	}
-	return font.LineBreak(ttf, text, size, maxWidth)
+	if std, ok := font.NewStandard14Font(f.ID); ok {
+		return font.LineBreak(std, text, size, maxWidth)
+	}
+	return approximateBreak(text, size, maxWidth)
 }
 
 // approximateBreak performs rough line breaking without font metrics.

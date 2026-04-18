@@ -2,6 +2,7 @@ package template
 
 import (
 	"bytes"
+	"math"
 	"strings"
 	"testing"
 
@@ -1523,19 +1524,23 @@ func TestApproximateBreakEmptyString(t *testing.T) {
 func TestBuiltinFontResolverResolveDifferentWeightsAndStyles(t *testing.T) {
 	r := newBuiltinFontResolver(nil)
 
-	// All these should fall back since no fonts are registered.
-	// The returned ID should reflect the weight/style variant.
+	// All these families are Adobe Standard 14 — the resolver returns
+	// AFM-derived metrics so that layout matches how PDF viewers render
+	// non-embedded Type1 text. The ID carries the generic variant name
+	// emitted by buildFontVariantID (aliased to the canonical Adobe name
+	// inside the Standard14 table).
 	tests := []struct {
-		family string
-		weight document.FontWeight
-		italic bool
-		wantID string
+		family       string
+		weight       document.FontWeight
+		italic       bool
+		wantID       string
+		wantAscender float64
 	}{
-		{"Helvetica", document.WeightNormal, false, "Helvetica"},
-		{"Helvetica", document.WeightBold, false, "Helvetica-Bold"},
-		{"Helvetica", document.WeightNormal, true, "Helvetica-Italic"},
-		{"Helvetica", document.WeightBold, true, "Helvetica-BoldItalic"},
-		{"Times", document.WeightNormal, false, "Times"},
+		{"Helvetica", document.WeightNormal, false, "Helvetica", 0.718},
+		{"Helvetica", document.WeightBold, false, "Helvetica-Bold", 0.718},
+		{"Helvetica", document.WeightNormal, true, "Helvetica-Italic", 0.718},
+		{"Helvetica", document.WeightBold, true, "Helvetica-BoldItalic", 0.718},
+		{"Times", document.WeightNormal, false, "Times", 0.683},
 	}
 
 	for _, tt := range tests {
@@ -1544,8 +1549,9 @@ func TestBuiltinFontResolverResolveDifferentWeightsAndStyles(t *testing.T) {
 			t.Errorf("Resolve(%q, %v, %v) ID: got %q, want %q",
 				tt.family, tt.weight, tt.italic, f.ID, tt.wantID)
 		}
-		if f.Metrics.Ascender != 0.8 {
-			t.Errorf("Resolve(%q) ascender: got %v, want 0.8", tt.family, f.Metrics.Ascender)
+		if math.Abs(f.Metrics.Ascender-tt.wantAscender) > 0.001 {
+			t.Errorf("Resolve(%q) ascender: got %v, want %v",
+				tt.family, f.Metrics.Ascender, tt.wantAscender)
 		}
 	}
 }

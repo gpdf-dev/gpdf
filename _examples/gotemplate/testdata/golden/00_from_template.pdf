@@ -6,7 +6,7 @@ endobj
 << /BaseFont /Helvetica /Subtype /Type1 /Type /Font >>
 endobj
 5 0 obj
-<< /Length 1576 >>
+<< /Length 1541 >>
 stream
 0 g
 BT
@@ -24,13 +24,13 @@ ET
 BT
 /F2 12 Tf
 56.693 702.5198 Td
-(This quarter showed strong growth across all product lines. Revenue increased) Tj
+(This quarter showed strong growth across all product lines. Revenue increased 25%) Tj
 ET
 0 g
 BT
 /F2 12 Tf
 56.693 688.1197999999999 Td
-(25% year-over-year, driven primarily by our new enterprise offerings.) Tj
+(year-over-year, driven primarily by our new enterprise offerings.) Tj
 ET
 0.10196078431372549 0.13725490196078433 0.49411764705882355 rg
 BT
@@ -42,13 +42,13 @@ ET
 BT
 /F2 12 Tf
 56.693 623.33865 Td
-(The gpdf library reached v0.8 with Go template integration and JSON schema) Tj
+(The gpdf library reached v0.8 with Go template integration and JSON schema support.) Tj
 ET
 0 g
 BT
 /F2 12 Tf
 56.693 608.93865 Td
-(support. Community adoption continues to accelerate with over 500 GitHub stars.) Tj
+(Community adoption continues to accelerate with over 500 GitHub stars.) Tj
 ET
 0.10196078431372549 0.13725490196078433 0.49411764705882355 rg
 BT
@@ -60,37 +60,31 @@ ET
 BT
 /F2 12 Tf
 56.693 544.1575 Td
-(The PDF generation market continues to grow, with increasing demand for) Tj
+(The PDF generation market continues to grow, with increasing demand for programmatic) Tj
 ET
 0 g
 BT
 /F2 12 Tf
 56.693 529.7574999999999 Td
-(programmatic document creation. Our zero-dependency approach resonates well with) Tj
-ET
-0 g
-BT
-/F2 12 Tf
-56.693 515.3575 Td
-(Go developers.) Tj
+(document creation. Our zero-dependency approach resonates well with Go developers.) Tj
 ET
 0.10196078431372549 0.13725490196078433 0.49411764705882355 rg
 BT
 /F1 16 Tf
-56.693 474.2803 Td
+56.693 488.6803 Td
 (Next Steps) Tj
 ET
 0 g
 BT
 /F2 12 Tf
-56.693 450.57635 Td
-(Focus areas for Q2 include reusable components \(invoice, report, letter) Tj
+56.693 464.97634999999997 Td
+(Focus areas for Q2 include reusable components \(invoice, report, letter templates\), fuzz) Tj
 ET
 0 g
 BT
 /F2 12 Tf
-56.693 436.17635 Td
-(templates\), fuzz testing, and preparation for the v1.0 release.) Tj
+56.693 450.57635 Td
+(testing, and preparation for the v1.0 release.) Tj
 ET
 
 endstream
@@ -110,15 +104,15 @@ endobj
 xref
 0 8
 0000000000 65535 f
-0000002055 00000 n
-0000001924 00000 n
+0000002020 00000 n
+0000001889 00000 n
 0000000009 00000 n
 0000000084 00000 n
 0000000154 00000 n
-0000001782 00000 n
-0000001981 00000 n
+0000001747 00000 n
+0000001946 00000 n
 trailer
 << /Info 7 0 R /Root 1 0 R /Size 8 >>
 startxref
-2104
+2069
 %%EOF

@@ -6,7 +6,7 @@ endobj
 << /BaseFont /Helvetica /Subtype /Type1 /Type /Font >>
 endobj
 5 0 obj
-<< /Length 794 >>
+<< /Length 740 >>
 stream
 0 g
 BT
@@ -24,13 +24,13 @@ ET
 BT
 /F2 12 Tf
 113.386 751.3702499999999 Td
-(left/right. The wide side margins create a narrower text) Tj
+(left/right. The wide side margins create a narrower text area, similar) Tj
 ET
 0 g
 BT
 /F2 12 Tf
 113.386 736.97025 Td
-(area, similar to a book layout.) Tj
+(to a book layout.) Tj
 ET
 q
 0.8 g
@@ -41,25 +41,19 @@ Q
 BT
 /F2 12 Tf
 113.386 693.22375 Td
-(Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed) Tj
+(Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do) Tj
 ET
 0 g
 BT
 /F2 12 Tf
 113.386 678.82375 Td
-(do eiusmod tempor incididunt ut labore et dolore magna) Tj
+(eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim) Tj
 ET
 0 g
 BT
 /F2 12 Tf
 113.386 664.4237499999999 Td
-(aliqua. Ut enim ad minim veniam, quis nostrud exercitation) Tj
-ET
-0 g
-BT
-/F2 12 Tf
-113.386 650.0237500000001 Td
-(ullamco laboris.) Tj
+(ad minim veniam, quis nostrud exercitation ullamco laboris.) Tj
 ET
 
 endstream
@@ -79,15 +73,15 @@ endobj
 xref
 0 8
 0000000000 65535 f
-0000001236 00000 n
-0000001141 00000 n
+0000001182 00000 n
+0000001087 00000 n
 0000000009 00000 n
 0000000084 00000 n
 0000000154 00000 n
-0000000999 00000 n
-0000001198 00000 n
+0000000945 00000 n
+0000001144 00000 n
 trailer
 << /Info 7 0 R /Root 1 0 R /Size 8 >>
 startxref
-1285
+1231
 %%EOF
