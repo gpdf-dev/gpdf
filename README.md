@@ -857,6 +857,7 @@ doc.Render(f)
 | Option | Description |
 |---|---|
 | `template.QRSize(value)` | Set QR code size |
+| `template.QRMinSize(value)` | Minimum display size — overflow to next page instead of shrinking below |
 | `template.QRErrorCorrection(level)` | Set error correction (L/M/Q/H) |
 | `template.QRScale(n)` | Set module scale factor |
 
