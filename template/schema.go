@@ -127,11 +127,13 @@ type SchemaStyle struct {
 
 // SchemaImage defines an image element.
 type SchemaImage struct {
-	Src    string `json:"src"`              // base64, data URI, or file path
-	Width  string `json:"width,omitempty"`  // dimension
-	Height string `json:"height,omitempty"` // dimension
-	Fit    string `json:"fit,omitempty"`    // "contain"|"cover"|"stretch"|"original"
-	Align  string `json:"align,omitempty"`  // "left"|"center"|"right"
+	Src       string `json:"src"`                 // base64, data URI, or file path
+	Width     string `json:"width,omitempty"`     // dimension
+	Height    string `json:"height,omitempty"`    // dimension
+	MinWidth  string `json:"minWidth,omitempty"`  // minimum display width; overflow to next page when violated
+	MinHeight string `json:"minHeight,omitempty"` // minimum display height; overflow to next page when violated
+	Fit       string `json:"fit,omitempty"`       // "contain"|"cover"|"stretch"|"original"
+	Align     string `json:"align,omitempty"`     // "left"|"center"|"right"
 }
 
 // SchemaTable defines a table element.
@@ -625,6 +627,16 @@ func buildSchemaImage(c *ColBuilder, img *SchemaImage) {
 	if img.Height != "" {
 		if v, err := parseValue(img.Height); err == nil {
 			opts = append(opts, FitHeight(v))
+		}
+	}
+	if img.MinWidth != "" {
+		if v, err := parseValue(img.MinWidth); err == nil {
+			opts = append(opts, MinDisplayWidth(v))
+		}
+	}
+	if img.MinHeight != "" {
+		if v, err := parseValue(img.MinHeight); err == nil {
+			opts = append(opts, MinDisplayHeight(v))
 		}
 	}
 	if img.Fit != "" {

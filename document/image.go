@@ -37,6 +37,15 @@ type Image struct {
 	DisplayWidth Value
 	// DisplayHeight is the explicit display height set by template options.
 	DisplayHeight Value
+	// MinDisplayWidth prevents the layout engine from shrinking the image
+	// below this width to fit the remaining space. When the clamped width
+	// would fall below this value the image is moved to the next page
+	// instead. UnitAuto (the zero value) preserves the original behavior.
+	MinDisplayWidth Value
+	// MinDisplayHeight is the vertical counterpart to MinDisplayWidth.
+	// When the clamped height would fall below this value the image is
+	// moved to the next page. UnitAuto preserves the original behavior.
+	MinDisplayHeight Value
 }
 
 // ImageFitMode controls how an image is scaled within its layout bounds.
