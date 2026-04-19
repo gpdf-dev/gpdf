@@ -236,6 +236,7 @@ type QRCodeOption func(*qrCodeConfig)
 
 type qrCodeConfig struct {
 	size    document.Value
+	minSize document.Value
 	ecLevel qrcode.ErrorCorrectionLevel
 	scale   int
 }
@@ -244,6 +245,15 @@ type qrCodeConfig struct {
 func QRSize(v document.Value) QRCodeOption {
 	return func(cfg *qrCodeConfig) {
 		cfg.size = v
+	}
+}
+
+// QRMinSize sets a minimum display size (width = height) for the QR code.
+// When the layout would shrink the QR code below this value it is moved to
+// the next page instead, preserving scannability.
+func QRMinSize(v document.Value) QRCodeOption {
+	return func(cfg *qrCodeConfig) {
+		cfg.minSize = v
 	}
 }
 

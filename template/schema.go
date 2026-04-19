@@ -162,6 +162,7 @@ type SchemaLine struct {
 type SchemaQRCode struct {
 	Data            string `json:"data"`
 	Size            string `json:"size,omitempty"`
+	MinSize         string `json:"minSize,omitempty"`         // minimum display size; overflow to next page when violated
 	ErrorCorrection string `json:"errorCorrection,omitempty"` // "L", "M", "Q", "H"
 }
 
@@ -759,6 +760,11 @@ func buildSchemaQRCode(c *ColBuilder, qr *SchemaQRCode) {
 	if qr.Size != "" {
 		if v, err := parseValue(qr.Size); err == nil {
 			opts = append(opts, QRSize(v))
+		}
+	}
+	if qr.MinSize != "" {
+		if v, err := parseValue(qr.MinSize); err == nil {
+			opts = append(opts, QRMinSize(v))
 		}
 	}
 	if qr.ErrorCorrection != "" {

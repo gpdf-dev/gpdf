@@ -416,6 +416,11 @@ func (c *ColBuilder) QRCode(data string, opts ...QRCodeOption) {
 		imgNode.DisplayHeight = cfg.size
 	}
 
+	if cfg.minSize.Amount > 0 {
+		imgNode.MinDisplayWidth = cfg.minSize
+		imgNode.MinDisplayHeight = cfg.minSize
+	}
+
 	c.nodes = append(c.nodes, imgNode)
 }
 
