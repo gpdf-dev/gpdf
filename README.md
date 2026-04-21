@@ -2,7 +2,7 @@
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/gpdf-dev/gpdf.svg)](https://pkg.go.dev/github.com/gpdf-dev/gpdf)
 [![CI](https://github.com/gpdf-dev/gpdf/actions/workflows/check-code.yml/badge.svg)](https://github.com/gpdf-dev/gpdf/actions/workflows/check-code.yml)
-![coverage](https://img.shields.io/badge/coverage-86.1%25-green)
+![coverage](https://img.shields.io/badge/coverage-85.8%25-green)
 [![Go Report Card](https://goreportcard.com/badge/github.com/gpdf-dev/gpdf)](https://goreportcard.com/report/github.com/gpdf-dev/gpdf)
 [![Go Version](https://img.shields.io/badge/Go-%3E%3D1.22-blue)](https://go.dev/)
 [![Website](https://img.shields.io/badge/Website-gpdf.dev-blue)](https://gpdf.dev/)
@@ -857,6 +857,7 @@ doc.Render(f)
 | Option | Description |
 |---|---|
 | `template.QRSize(value)` | Set QR code size |
+| `template.QRMinSize(value)` | Minimum display size — overflow to next page instead of shrinking below |
 | `template.QRErrorCorrection(level)` | Set error correction (L/M/Q/H) |
 | `template.QRScale(n)` | Set module scale factor |
 

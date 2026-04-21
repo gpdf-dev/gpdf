@@ -339,6 +339,7 @@ c.QRCode("HELLO",
     "qrcode": {
         "data": "https://gpdf.dev",
         "size": "30mm",
+        "minSize": "20mm",
         "errorCorrection": "M"
     }
 }
@@ -349,6 +350,7 @@ c.QRCode("HELLO",
 | Option | Description |
 |---|---|
 | `QRSize(v)` | Display size (width = height) |
+| `QRMinSize(v)` | Minimum display size. When the layout would shrink the QR below this value it overflows to the next page instead of rendering at an unscannable size |
 | `QRErrorCorrection(level)` | Error correction: `LevelL`, `LevelM` (default), `LevelQ`, `LevelH` |
 | `QRScale(s)` | Pixels per QR module (affects image resolution) |
 

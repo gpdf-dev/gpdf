@@ -796,6 +796,7 @@ doc.Render(f)
 | 选项 | 说明 |
 |---|---|
 | `template.QRSize(value)` | 设置二维码大小 |
+| `template.QRMinSize(value)` | 最小显示尺寸 — 低于此值时溢出到下一页 |
 | `template.QRErrorCorrection(level)` | 设置纠错等级（L/M/Q/H） |
 | `template.QRScale(n)` | 设置模块缩放因子 |
 

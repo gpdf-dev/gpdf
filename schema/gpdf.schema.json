@@ -406,6 +406,10 @@
           "$ref": "#/$defs/dimension",
           "description": "QR code size (width and height)."
         },
+        "minSize": {
+          "$ref": "#/$defs/dimension",
+          "description": "Minimum display size. If the layout would shrink the QR code below this value it overflows to the next page instead."
+        },
         "errorCorrection": {
           "type": "string",
           "description": "Error correction level. L=~7%, M=~15% (default), Q=~25%, H=~30%.",

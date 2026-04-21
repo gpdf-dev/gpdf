@@ -127,11 +127,13 @@ type SchemaStyle struct {
 
 // SchemaImage defines an image element.
 type SchemaImage struct {
-	Src    string `json:"src"`              // base64, data URI, or file path
-	Width  string `json:"width,omitempty"`  // dimension
-	Height string `json:"height,omitempty"` // dimension
-	Fit    string `json:"fit,omitempty"`    // "contain"|"cover"|"stretch"|"original"
-	Align  string `json:"align,omitempty"`  // "left"|"center"|"right"
+	Src       string `json:"src"`                 // base64, data URI, or file path
+	Width     string `json:"width,omitempty"`     // dimension
+	Height    string `json:"height,omitempty"`    // dimension
+	MinWidth  string `json:"minWidth,omitempty"`  // minimum display width; overflow to next page when violated
+	MinHeight string `json:"minHeight,omitempty"` // minimum display height; overflow to next page when violated
+	Fit       string `json:"fit,omitempty"`       // "contain"|"cover"|"stretch"|"original"
+	Align     string `json:"align,omitempty"`     // "left"|"center"|"right"
 }
 
 // SchemaTable defines a table element.
@@ -160,6 +162,7 @@ type SchemaLine struct {
 type SchemaQRCode struct {
 	Data            string `json:"data"`
 	Size            string `json:"size,omitempty"`
+	MinSize         string `json:"minSize,omitempty"`         // minimum display size; overflow to next page when violated
 	ErrorCorrection string `json:"errorCorrection,omitempty"` // "L", "M", "Q", "H"
 }
 
@@ -627,6 +630,16 @@ func buildSchemaImage(c *ColBuilder, img *SchemaImage) {
 			opts = append(opts, FitHeight(v))
 		}
 	}
+	if img.MinWidth != "" {
+		if v, err := parseValue(img.MinWidth); err == nil {
+			opts = append(opts, MinDisplayWidth(v))
+		}
+	}
+	if img.MinHeight != "" {
+		if v, err := parseValue(img.MinHeight); err == nil {
+			opts = append(opts, MinDisplayHeight(v))
+		}
+	}
 	if img.Fit != "" {
 		if mode, ok := parseFitMode(img.Fit); ok {
 			opts = append(opts, WithFitMode(mode))
@@ -747,6 +760,11 @@ func buildSchemaQRCode(c *ColBuilder, qr *SchemaQRCode) {
 	if qr.Size != "" {
 		if v, err := parseValue(qr.Size); err == nil {
 			opts = append(opts, QRSize(v))
+		}
+	}
+	if qr.MinSize != "" {
+		if v, err := parseValue(qr.MinSize); err == nil {
+			opts = append(opts, QRMinSize(v))
 		}
 	}
 	if qr.ErrorCorrection != "" {

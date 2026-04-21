@@ -83,10 +83,12 @@ func Strikethrough() TextOption {
 type ImageOption func(*imageConfig)
 
 type imageConfig struct {
-	width   document.Value
-	height  document.Value
-	fitMode document.ImageFitMode
-	align   document.TextAlign
+	width     document.Value
+	height    document.Value
+	minWidth  document.Value
+	minHeight document.Value
+	fitMode   document.ImageFitMode
+	align     document.TextAlign
 }
 
 // FitWidth sets the image to fit within the specified width.
@@ -116,6 +118,24 @@ func WithFitMode(mode document.ImageFitMode) ImageOption {
 func WithAlign(align document.TextAlign) ImageOption {
 	return func(cfg *imageConfig) {
 		cfg.align = align
+	}
+}
+
+// MinDisplayWidth sets a minimum display width for the image. If the layout
+// engine would need to shrink the image below this width to fit the remaining
+// space, the image is moved to the next page instead.
+func MinDisplayWidth(width document.Value) ImageOption {
+	return func(cfg *imageConfig) {
+		cfg.minWidth = width
+	}
+}
+
+// MinDisplayHeight sets a minimum display height for the image. If the layout
+// engine would need to shrink the image below this height to fit the remaining
+// space, the image is moved to the next page instead.
+func MinDisplayHeight(height document.Value) ImageOption {
+	return func(cfg *imageConfig) {
+		cfg.minHeight = height
 	}
 }
 
@@ -216,6 +236,7 @@ type QRCodeOption func(*qrCodeConfig)
 
 type qrCodeConfig struct {
 	size    document.Value
+	minSize document.Value
 	ecLevel qrcode.ErrorCorrectionLevel
 	scale   int
 }
@@ -224,6 +245,15 @@ type qrCodeConfig struct {
 func QRSize(v document.Value) QRCodeOption {
 	return func(cfg *qrCodeConfig) {
 		cfg.size = v
+	}
+}
+
+// QRMinSize sets a minimum display size (width = height) for the QR code.
+// When the layout would shrink the QR code below this value it is moved to
+// the next page instead, preserving scannability.
+func QRMinSize(v document.Value) QRCodeOption {
+	return func(cfg *qrCodeConfig) {
+		cfg.minSize = v
 	}
 }
 

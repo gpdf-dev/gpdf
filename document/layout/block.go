@@ -186,6 +186,13 @@ func (bl *BlockLayout) layoutVerticalChild(bc *blockContext, child document.Docu
 		return bc.overflowResult(placed, cursorY, children[i:]), true
 	}
 
+	// When a child overflows without producing any bounds (e.g. an image
+	// whose clamped size would violate MinDisplay* constraints), defer the
+	// entire child to the next page instead of emitting a zero-size placeholder.
+	if childResult.Overflow != nil && childResult.Bounds.Width == 0 && childResult.Bounds.Height == 0 {
+		return bc.overflowResult(placed, cursorY, children[i:]), true
+	}
+
 	return childResult, false
 }
 
@@ -546,7 +553,12 @@ func (bl *BlockLayout) layoutImage(child document.DocumentNode, constraints Cons
 		}
 	}
 
-	displayW, displayH = clampImageSize(img.FitMode, displayW, displayH, aspectRatio, constraints)
+	clampedW, clampedH := clampImageSize(img.FitMode, displayW, displayH, aspectRatio, constraints)
+	if shouldOverflowImageForMinimum(displayW, clampedW, img.MinDisplayWidth, constraints.AvailableWidth) ||
+		shouldOverflowImageForMinimum(displayH, clampedH, img.MinDisplayHeight, constraints.AvailableHeight) {
+		return Result{Overflow: img}
+	}
+	displayW, displayH = clampedW, clampedH
 
 	return Result{
 		Bounds: document.Rectangle{
@@ -619,6 +631,41 @@ func clampImageSize(fitMode document.ImageFitMode, w, h, aspectRatio float64, co
 		}
 	}
 	return w, h
+}
+
+// shouldOverflowImageForMinimum reports whether shrinking an image to fit
+// the available space would violate a configured minimum display dimension.
+// When true, the caller should move the image to the next page instead of
+// rendering it at a shrunken size.
+func shouldOverflowImageForMinimum(original, clamped float64, minimum document.Value, available float64) bool {
+	resolvedMinimum, ok := resolveImageMinimum(minimum, available)
+	if !ok {
+		return false
+	}
+	if !wasImageShrunk(original, clamped) {
+		return false
+	}
+	// Only overflow when the original size would have honored the minimum.
+	// This prevents an infinite loop when the minimum itself exceeds the
+	// full page's available space.
+	return original >= resolvedMinimum && clamped < resolvedMinimum
+}
+
+// resolveImageMinimum converts a configured minimum image dimension into
+// points and reports whether a usable minimum was provided.
+func resolveImageMinimum(minimum document.Value, available float64) (float64, bool) {
+	const defaultFontSize = 12.0
+	if minimum.Unit == document.UnitAuto || minimum.Amount <= 0 {
+		return 0, false
+	}
+	return minimum.Resolve(available, defaultFontSize), true
+}
+
+// wasImageShrunk reports whether clamping reduced a dimension by more than
+// a small floating-point tolerance.
+func wasImageShrunk(original, clamped float64) bool {
+	const shrinkEpsilon = 1e-6
+	return clamped < original-shrinkEpsilon
 }
 
 // resolveBorderWidths extracts the four border widths as resolved edges.

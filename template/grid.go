@@ -209,6 +209,12 @@ func (c *ColBuilder) Image(src []byte, opts ...ImageOption) {
 	if imgCfg.height.Amount > 0 {
 		imgNode.DisplayHeight = imgCfg.height
 	}
+	if imgCfg.minWidth.Amount > 0 {
+		imgNode.MinDisplayWidth = imgCfg.minWidth
+	}
+	if imgCfg.minHeight.Amount > 0 {
+		imgNode.MinDisplayHeight = imgCfg.minHeight
+	}
 
 	c.nodes = append(c.nodes, imgNode)
 }
@@ -408,6 +414,11 @@ func (c *ColBuilder) QRCode(data string, opts ...QRCodeOption) {
 	if cfg.size.Amount > 0 {
 		imgNode.DisplayWidth = cfg.size
 		imgNode.DisplayHeight = cfg.size
+	}
+
+	if cfg.minSize.Amount > 0 {
+		imgNode.MinDisplayWidth = cfg.minSize
+		imgNode.MinDisplayHeight = cfg.minSize
 	}
 
 	c.nodes = append(c.nodes, imgNode)

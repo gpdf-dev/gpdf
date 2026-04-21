@@ -796,6 +796,7 @@ doc.Render(f)
 | 옵션 | 설명 |
 |---|---|
 | `template.QRSize(value)` | QR 코드 크기 설정 |
+| `template.QRMinSize(value)` | 최소 표시 크기 — 이 값 미만이 되면 다음 페이지로 이동 |
 | `template.QRErrorCorrection(level)` | 오류 정정 레벨 설정 (L/M/Q/H) |
 | `template.QRScale(n)` | 모듈 스케일 팩터 설정 |
 

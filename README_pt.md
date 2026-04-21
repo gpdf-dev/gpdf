@@ -796,6 +796,7 @@ merged, _ := gpdf.Merge(
 | Opção | Descrição |
 |---|---|
 | `template.QRSize(value)` | Tamanho do QR code |
+| `template.QRMinSize(value)` | Tamanho mínimo — transborda para a próxima página em vez de encolher abaixo |
 | `template.QRErrorCorrection(level)` | Nível de correção de erros (L/M/Q/H) |
 | `template.QRScale(n)` | Fator de escala do módulo |
 
