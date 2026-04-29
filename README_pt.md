@@ -17,7 +17,8 @@ Biblioteca de geração de PDF em Go puro, sem dependências externas, com arqui
 - **Sistema de grade de 12 colunas** — layout responsivo estilo Bootstrap
 - **Suporte a fontes TrueType** — incorporação de fontes personalizadas com subconjuntos
 - **Pronto para CJK** — suporte completo a texto chinês, japonês e coreano desde o primeiro dia
-- **Tabelas** — cabeçalhos, larguras de coluna, linhas alternadas, alinhamento vertical
+- **Tabelas** — cabeçalhos, larguras de coluna, linhas alternadas, alinhamento vertical, bordas externas + por célula
+- **Bordas e fundos** — aplicáveis a tabelas, imagens e contêineres Box (solid / dashed / dotted)
 - **Cabeçalhos e rodapés** — com números de página, consistentes em todas as páginas
 - **Listas** — listas com marcadores e numeradas
 - **QR codes** — geração de QR code em Go puro (níveis de correção de erros)
@@ -279,6 +280,40 @@ c.Table(
 )
 ```
 
+Bordas de tabela — moldura externa, grade por célula, ou ambos:
+
+```go
+outer := template.Border(
+	template.BorderWidth(document.Pt(1)),
+	template.BorderColor(pdf.RGBHex(0x1A237E)),
+)
+grid := template.Border(
+	template.BorderWidth(document.Pt(0.5)),
+	template.BorderColor(pdf.Gray(0.5)),
+)
+
+// Apenas moldura externa
+c.Table(header, rows, template.WithTableBorder(outer))
+
+// Apenas grade (linhas estilo Excel)
+c.Table(header, rows, template.WithTableCellBorder(grid))
+
+// Moldura + grade + fundo
+c.Table(header, rows,
+	template.WithTableBorder(outer),
+	template.WithTableCellBorder(grid),
+	template.WithTableBackground(pdf.RGBHex(0xFAFAFA)),
+)
+
+// Grade com linhas tracejadas
+dashed := template.Border(
+	template.BorderWidth(document.Pt(0.75)),
+	template.BorderColor(pdf.RGBHex(0x0D47A1)),
+	template.BorderLine(document.BorderDashed),
+)
+c.Table(header, rows, template.WithTableCellBorder(dashed))
+```
+
 ### Imagens
 
 Incorporar imagens JPEG e PNG com opções de ajuste:
@@ -287,6 +322,37 @@ Incorporar imagens JPEG e PNG com opções de ajuste:
 c.Image(imgData)                                      // Tamanho padrão
 c.Image(imgData, template.FitWidth(document.Mm(80)))   // Ajustar à largura
 c.Image(imgData, template.FitHeight(document.Mm(30)))  // Ajustar à altura
+```
+
+Imagem com borda e fundo sólido (útil para PNGs transparentes):
+
+```go
+c.Image(pngData,
+	template.FitWidth(document.Mm(60)),
+	template.WithImageBorder(template.Border(
+		template.BorderWidth(document.Pt(2)),
+		template.BorderColor(pdf.RGBHex(0xE53935)),
+	)),
+	template.WithImageBackground(pdf.RGBHex(0xFFF8E1)),
+)
+```
+
+### Caixas (Box)
+
+Envolva conteúdo arbitrário de coluna em um contêiner retangular com borda, preenchimento e padding:
+
+```go
+c.Box(func(c *template.ColBuilder) {
+	c.Text("Dentro de uma caixa")
+	c.Text("com duas linhas de texto")
+},
+	template.WithBoxBorder(template.Border(
+		template.BorderWidth(document.Pt(1)),
+		template.BorderColor(pdf.RGBHex(0x1A237E)),
+	)),
+	template.WithBoxBackground(pdf.RGBHex(0xE8EAF6)),
+	template.WithBoxPadding(document.UniformEdges(document.Mm(4))),
+)
 ```
 
 ### Linhas e espaçadores
@@ -562,6 +628,27 @@ doc, err := template.FromJSON(schema, nil)
 data, _ := doc.Generate()
 ```
 
+Tabelas e imagens aceitam as mesmas chaves `border` / `background` da API do builder:
+
+```jsonc
+{"span": 12, "table": {
+  "header": ["Nome", "Qtd.", "Preço"],
+  "rows": [["A","1","R$100"], ["B","2","R$200"]],
+  "border":     {"width": "1pt",   "color": "#1A237E"},                      // moldura externa
+  "cellBorder": {"width": "0.5pt", "color": "gray(0.5)", "style": "dashed"}, // linhas de grade
+  "background": "#FAFAFA"
+}}
+
+{"span": 12, "image": {
+  "src": "...",
+  "width": "60mm",
+  "border":     {"widths": ["2pt","2pt","2pt","2pt"], "color": "#E53935"},
+  "background": "#FFF8E1"
+}}
+```
+
+`style` aceita `solid` (padrão), `dashed`, `dotted` ou `none`. Use `widths` para larguras por borda em ordem CSS `[top, right, bottom, left]`, ou `width` para um valor uniforme.
+
 ### Integração com Go Templates
 
 Use templates Go com esquemas JSON para conteúdo dinâmico:
@@ -727,6 +814,7 @@ merged, _ := gpdf.Merge(
 | `c.TotalPages(opts...)` | Adicionar total de páginas |
 | `c.Line(opts...)` | Adicionar uma linha horizontal |
 | `c.Spacer(height)` | Adicionar espaço vertical |
+| `c.Box(fn, opts...)` | Envolver conteúdo em um Box estilizado (borda / preenchimento / padding) |
 
 ### Conteúdo em nível de página
 
@@ -783,6 +871,10 @@ merged, _ := gpdf.Merge(
 | `template.TableHeaderStyle(opts...)` | Estilo da linha de cabeçalho |
 | `template.TableStripe(color)` | Cor de linhas alternadas |
 | `template.TableCellVAlign(align)` | Alinhamento vertical da célula (Top/Middle/Bottom) |
+| `template.WithTableBorder(spec)` | Desenhar uma borda externa ao redor da tabela |
+| `template.WithTableCellBorder(spec)` | Desenhar a mesma borda em cada célula de cabeçalho e corpo (linhas de grade) |
+| `template.WithTableBorderCollapse(b)` | Marcar bordas de células adjacentes para colapso |
+| `template.WithTableBackground(color)` | Preencher a caixa externa da tabela |
 
 ### Opções de imagem
 
@@ -790,6 +882,42 @@ merged, _ := gpdf.Merge(
 |---|---|
 | `template.FitWidth(value)` | Escalar à largura (mantém proporção) |
 | `template.FitHeight(value)` | Escalar à altura (mantém proporção) |
+| `template.MinDisplayWidth(v)` | Transbordar para a próxima página se reduzido abaixo desta largura |
+| `template.MinDisplayHeight(v)` | Transbordar para a próxima página se reduzido abaixo desta altura |
+| `template.WithImageBorder(spec)` | Desenhar uma borda ao redor da imagem |
+| `template.WithImageBackground(color)` | Preencher a caixa da imagem (útil para PNGs transparentes) |
+
+### Opções de Box
+
+| Opção | Descrição |
+|---|---|
+| `template.WithBoxBorder(spec)` | Desenhar uma borda ao redor do Box |
+| `template.WithBoxBackground(color)` | Preencher o Box |
+| `template.WithBoxPadding(edges)` | Espaçamento interno |
+| `template.WithBoxMargin(edges)` | Espaçamento externo |
+| `template.WithBoxWidth(value)` | Largura explícita |
+| `template.WithBoxHeight(value)` | Altura explícita |
+
+### Helpers de borda
+
+Construa um `BorderSpec` uma vez e aplique-o com `WithTableBorder`,
+`WithTableCellBorder`, `WithImageBorder`, `WithBoxBorder` ou `WithTextBorder`:
+
+```go
+spec := template.Border(
+	template.BorderWidth(document.Pt(1)),       // bordas uniformes
+	template.BorderColor(pdf.RGBHex(0x1A237E)),
+	template.BorderLine(document.BorderSolid),  // BorderSolid | BorderDashed | BorderDotted
+)
+```
+
+| Opção | Descrição |
+|---|---|
+| `template.Border(opts...)` | Constrói um `BorderSpec` (padrão 1pt preto sólido) |
+| `template.BorderWidth(v)` | Largura uniforme nas quatro bordas |
+| `template.BorderWidths(t, r, b, l)` | Larguras por borda em ordem CSS |
+| `template.BorderColor(c)` | Cor da borda |
+| `template.BorderLine(style)` | Estilo de linha: `BorderSolid` / `BorderDashed` / `BorderDotted` / `BorderNone` |
 
 ### Opções de QR code
 

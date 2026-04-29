@@ -215,8 +215,55 @@ func (c *ColBuilder) Image(src []byte, opts ...ImageOption) {
 	if imgCfg.minHeight.Amount > 0 {
 		imgNode.MinDisplayHeight = imgCfg.minHeight
 	}
+	if imgCfg.border != nil {
+		imgNode.ImgStyle.Border = imgCfg.border.toEdges()
+	}
+	if imgCfg.background != nil {
+		imgNode.ImgStyle.Background = imgCfg.background
+	}
 
 	c.nodes = append(c.nodes, imgNode)
+}
+
+// Box adds a styled rectangular container that wraps the content built
+// inside fn. Use [BoxOption] values such as [WithBoxBorder],
+// [WithBoxBackground], or [WithBoxPadding] to style the container.
+//
+//	c.Box(func(c *template.ColBuilder) {
+//	    c.Text("Inside a bordered box")
+//	}, template.WithBoxBorder(template.Border(
+//	    template.BorderWidth(document.Pt(1)),
+//	    template.BorderColor(pdf.RGBHex(0x1A237E)),
+//	)), template.WithBoxPadding(document.UniformEdges(document.Mm(4))))
+func (c *ColBuilder) Box(fn func(c *ColBuilder), opts ...BoxOption) {
+	cfg := boxConfig{}
+	for _, opt := range opts {
+		opt(&cfg)
+	}
+	inner := &ColBuilder{doc: c.doc}
+	if fn != nil {
+		fn(inner)
+	}
+	box := &document.Box{
+		Content: inner.buildNodes(),
+		BoxStyle: document.BoxStyle{
+			Width:  cfg.width,
+			Height: cfg.height,
+		},
+	}
+	if cfg.border != nil {
+		box.BoxStyle.Border = cfg.border.toEdges()
+	}
+	if cfg.background != nil {
+		box.BoxStyle.Background = cfg.background
+	}
+	if cfg.hasPadding {
+		box.BoxStyle.Padding = cfg.padding
+	}
+	if cfg.hasMargin {
+		box.BoxStyle.Margin = cfg.margin
+	}
+	c.nodes = append(c.nodes, box)
 }
 
 // Table adds a table with header and body rows.
@@ -227,6 +274,8 @@ func (c *ColBuilder) Table(header []string, rows [][]string, opts ...TableOption
 	for _, opt := range opts {
 		opt(&tblCfg)
 	}
+
+	cellOuter := tableCellOuterStyle(&tblCfg)
 
 	// Build header row.
 	if len(header) > 0 {
@@ -244,8 +293,9 @@ func (c *ColBuilder) Table(header []string, rows [][]string, opts ...TableOption
 				Content: []document.DocumentNode{
 					&document.Text{Content: h, TextStyle: cellStyle},
 				},
-				ColSpan: 1,
-				RowSpan: 1,
+				ColSpan:   1,
+				RowSpan:   1,
+				CellStyle: cellOuter,
 			})
 		}
 		tbl.Header = []document.TableRow{headerRow}
@@ -266,8 +316,9 @@ func (c *ColBuilder) Table(header []string, rows [][]string, opts ...TableOption
 				Content: []document.DocumentNode{
 					&document.Text{Content: cell, TextStyle: cellStyle},
 				},
-				ColSpan: 1,
-				RowSpan: 1,
+				ColSpan:   1,
+				RowSpan:   1,
+				CellStyle: cellOuter,
 			})
 		}
 		tbl.Body = append(tbl.Body, bodyRow)
@@ -282,7 +333,34 @@ func (c *ColBuilder) Table(header []string, rows [][]string, opts ...TableOption
 		}
 	}
 
+	applyTableDecoration(tbl, &tblCfg)
+
 	c.nodes = append(c.nodes, tbl)
+}
+
+// applyTableDecoration copies border, background, and border-collapse
+// settings from a tableConfig onto the constructed Table node.
+func applyTableDecoration(tbl *document.Table, cfg *tableConfig) {
+	if cfg.border != nil {
+		tbl.TableStyle.Border = cfg.border.toEdges()
+	}
+	if cfg.background != nil {
+		tbl.TableStyle.Background = cfg.background
+	}
+	if cfg.hasCollapse {
+		tbl.TableStyle.BorderCollapse = cfg.borderCollapse
+	}
+}
+
+// tableCellOuterStyle builds the outer per-cell Style (border, background,
+// padding) shared by every header and body cell. Returns the zero Style when
+// no cell-level decoration is configured.
+func tableCellOuterStyle(cfg *tableConfig) document.Style {
+	var s document.Style
+	if cfg.cellBorder != nil {
+		s.Border = cfg.cellBorder.toEdges()
+	}
+	return s
 }
 
 // Line adds a horizontal line (rule) to the column.

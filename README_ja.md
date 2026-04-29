@@ -17,7 +17,8 @@
 - **12カラムグリッドシステム** — Bootstrap風のレスポンシブレイアウト
 - **TrueTypeフォント対応** — カスタムフォントの埋め込みとサブセット化
 - **CJK対応** — 日中韓テキストを初日からフルサポート
-- **テーブル** — ヘッダー、カラム幅指定、ストライプ行、垂直揃え
+- **テーブル** — ヘッダー、カラム幅指定、ストライプ行、垂直揃え、外周罫線とセル罫線
+- **罫線と背景** — テーブル / 画像 / Box コンテナに適用可能（solid / dashed / dotted）
 - **ヘッダー＆フッター** — ページ番号付きで全ページに一貫表示
 - **リスト** — 箇条書きリストと番号付きリスト
 - **QRコード** — 純GoのQRコード生成（誤り訂正レベル対応）
@@ -279,6 +280,40 @@ c.Table(
 )
 ```
 
+テーブル罫線 — 外周フレーム、セルグリッド、または両方:
+
+```go
+outer := template.Border(
+	template.BorderWidth(document.Pt(1)),
+	template.BorderColor(pdf.RGBHex(0x1A237E)),
+)
+grid := template.Border(
+	template.BorderWidth(document.Pt(0.5)),
+	template.BorderColor(pdf.Gray(0.5)),
+)
+
+// 外周フレームのみ
+c.Table(header, rows, template.WithTableBorder(outer))
+
+// セルグリッドのみ（Excel 風グリッド線）
+c.Table(header, rows, template.WithTableCellBorder(grid))
+
+// 外周フレーム + セルグリッド + 背景
+c.Table(header, rows,
+	template.WithTableBorder(outer),
+	template.WithTableCellBorder(grid),
+	template.WithTableBackground(pdf.RGBHex(0xFAFAFA)),
+)
+
+// 破線セルグリッド
+dashed := template.Border(
+	template.BorderWidth(document.Pt(0.75)),
+	template.BorderColor(pdf.RGBHex(0x0D47A1)),
+	template.BorderLine(document.BorderDashed),
+)
+c.Table(header, rows, template.WithTableCellBorder(dashed))
+```
+
 ### 画像
 
 JPEGとPNG画像の埋め込み（フィットオプション対応）:
@@ -287,6 +322,37 @@ JPEGとPNG画像の埋め込み（フィットオプション対応）:
 c.Image(imgData)                                      // デフォルトサイズ
 c.Image(imgData, template.FitWidth(document.Mm(80)))   // 幅に合わせる
 c.Image(imgData, template.FitHeight(document.Mm(30)))  // 高さに合わせる
+```
+
+罫線と背景色を指定（透過 PNG に背景を敷く用途に便利）:
+
+```go
+c.Image(pngData,
+	template.FitWidth(document.Mm(60)),
+	template.WithImageBorder(template.Border(
+		template.BorderWidth(document.Pt(2)),
+		template.BorderColor(pdf.RGBHex(0xE53935)),
+	)),
+	template.WithImageBackground(pdf.RGBHex(0xFFF8E1)),
+)
+```
+
+### Box コンテナ
+
+カラム内の任意の内容を、罫線・塗りつぶし・パディング付きの矩形コンテナでラップ:
+
+```go
+c.Box(func(c *template.ColBuilder) {
+	c.Text("Box の中")
+	c.Text("本文 2 行")
+},
+	template.WithBoxBorder(template.Border(
+		template.BorderWidth(document.Pt(1)),
+		template.BorderColor(pdf.RGBHex(0x1A237E)),
+	)),
+	template.WithBoxBackground(pdf.RGBHex(0xE8EAF6)),
+	template.WithBoxPadding(document.UniformEdges(document.Mm(4))),
+)
 ```
 
 ### 罫線とスペーサー
@@ -489,6 +555,27 @@ schema := []byte(`{
 doc, err := template.FromJSON(schema, nil)
 data, _ := doc.Generate()
 ```
+
+テーブルと画像はビルダー API と同じ border / background キーを受け付けます:
+
+```jsonc
+{"span": 12, "table": {
+  "header": ["商品", "数量", "単価"],
+  "rows": [["A","1","¥100"], ["B","2","¥200"]],
+  "border":     {"width": "1pt",   "color": "#1A237E"},                      // 外周フレーム
+  "cellBorder": {"width": "0.5pt", "color": "gray(0.5)", "style": "dashed"}, // グリッド線
+  "background": "#FAFAFA"
+}}
+
+{"span": 12, "image": {
+  "src": "...",
+  "width": "60mm",
+  "border":     {"widths": ["2pt","2pt","2pt","2pt"], "color": "#E53935"},
+  "background": "#FFF8E1"
+}}
+```
+
+`style` には `solid`（デフォルト） / `dashed` / `dotted` / `none` を指定可能。CSS 順で `[top, right, bottom, left]` を別指定する場合は `widths`、一律の場合は `width` を使用。
 
 ### Goテンプレート統合
 
@@ -720,6 +807,7 @@ doc.Render(f)
 | `c.TotalPages(opts...)` | 総ページ数を追加 |
 | `c.Line(opts...)` | 水平線を追加 |
 | `c.Spacer(height)` | 垂直スペースを追加 |
+| `c.Box(fn, opts...)` | スタイル付き Box にコンテンツをラップ（罫線 / 塗り / パディング） |
 
 ### ページレベルコンテンツ
 
@@ -776,6 +864,10 @@ doc.Render(f)
 | `template.TableHeaderStyle(opts...)` | ヘッダー行のスタイル設定 |
 | `template.TableStripe(color)` | 交互行の色を設定 |
 | `template.TableCellVAlign(align)` | セルの垂直揃え (Top/Middle/Bottom) |
+| `template.WithTableBorder(spec)` | テーブル外周に罫線を描画 |
+| `template.WithTableCellBorder(spec)` | 全ヘッダー・ボディセルに同じ罫線を描画（グリッド線） |
+| `template.WithTableBorderCollapse(b)` | 隣接セル境界の collapse を有効化 |
+| `template.WithTableBackground(color)` | テーブルの外側 Box を塗りつぶし |
 
 ### 画像オプション
 
@@ -783,6 +875,42 @@ doc.Render(f)
 |---|---|
 | `template.FitWidth(value)` | 幅に合わせてスケール（アスペクト比維持） |
 | `template.FitHeight(value)` | 高さに合わせてスケール（アスペクト比維持） |
+| `template.MinDisplayWidth(v)` | この幅を下回る場合は次ページへ送る |
+| `template.MinDisplayHeight(v)` | この高さを下回る場合は次ページへ送る |
+| `template.WithImageBorder(spec)` | 画像の周囲に罫線を描画 |
+| `template.WithImageBackground(color)` | 画像の Box を塗りつぶし（透過 PNG に便利） |
+
+### Box オプション
+
+| オプション | 説明 |
+|---|---|
+| `template.WithBoxBorder(spec)` | Box の周囲に罫線を描画 |
+| `template.WithBoxBackground(color)` | Box を塗りつぶし |
+| `template.WithBoxPadding(edges)` | 内側のパディング |
+| `template.WithBoxMargin(edges)` | 外側のマージン |
+| `template.WithBoxWidth(value)` | 明示的な幅 |
+| `template.WithBoxHeight(value)` | 明示的な高さ |
+
+### 罫線ヘルパー
+
+`BorderSpec` を一度組み立てて、`WithTableBorder` / `WithTableCellBorder` /
+`WithImageBorder` / `WithBoxBorder` / `WithTextBorder` で適用します:
+
+```go
+spec := template.Border(
+	template.BorderWidth(document.Pt(1)),       // 全 4 辺一律
+	template.BorderColor(pdf.RGBHex(0x1A237E)),
+	template.BorderLine(document.BorderSolid),  // BorderSolid | BorderDashed | BorderDotted
+)
+```
+
+| オプション | 説明 |
+|---|---|
+| `template.Border(opts...)` | `BorderSpec` を構築（デフォルト: 1pt black solid） |
+| `template.BorderWidth(v)` | 全 4 辺に同じ幅 |
+| `template.BorderWidths(t, r, b, l)` | CSS 順で各辺別の幅 |
+| `template.BorderColor(c)` | 辺の色 |
+| `template.BorderLine(style)` | 線スタイル: `BorderSolid` / `BorderDashed` / `BorderDotted` / `BorderNone` |
 
 ### QRコードオプション
 

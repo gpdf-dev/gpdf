@@ -17,7 +17,8 @@
 - **12컬럼 그리드 시스템** — Bootstrap 스타일의 반응형 레이아웃
 - **TrueType 폰트 지원** — 커스텀 폰트 임베딩 및 서브셋팅
 - **CJK 지원** — 첫날부터 한중일 텍스트 완벽 지원
-- **테이블** — 헤더, 컬럼 너비, 줄무늬 행, 수직 정렬
+- **테이블** — 헤더, 컬럼 너비, 줄무늬 행, 수직 정렬, 외곽 + 셀별 테두리
+- **테두리 및 배경** — 테이블, 이미지, Box 컨테이너에 적용 (solid / dashed / dotted)
 - **머리글 및 바닥글** — 페이지 번호 포함, 모든 페이지에서 일관된 표시
 - **리스트** — 글머리 기호 목록 및 번호 목록
 - **QR 코드** — 순수 Go QR 코드 생성 (오류 정정 레벨 지원)
@@ -279,6 +280,40 @@ c.Table(
 )
 ```
 
+테이블 테두리 — 외곽 프레임, 셀 그리드, 또는 둘 다:
+
+```go
+outer := template.Border(
+	template.BorderWidth(document.Pt(1)),
+	template.BorderColor(pdf.RGBHex(0x1A237E)),
+)
+grid := template.Border(
+	template.BorderWidth(document.Pt(0.5)),
+	template.BorderColor(pdf.Gray(0.5)),
+)
+
+// 외곽만
+c.Table(header, rows, template.WithTableBorder(outer))
+
+// 셀 그리드만 (Excel 스타일 그리드 라인)
+c.Table(header, rows, template.WithTableCellBorder(grid))
+
+// 외곽 + 셀 그리드 + 배경
+c.Table(header, rows,
+	template.WithTableBorder(outer),
+	template.WithTableCellBorder(grid),
+	template.WithTableBackground(pdf.RGBHex(0xFAFAFA)),
+)
+
+// 점선 셀 그리드
+dashed := template.Border(
+	template.BorderWidth(document.Pt(0.75)),
+	template.BorderColor(pdf.RGBHex(0x0D47A1)),
+	template.BorderLine(document.BorderDashed),
+)
+c.Table(header, rows, template.WithTableCellBorder(dashed))
+```
+
 ### 이미지
 
 JPEG 및 PNG 이미지 임베딩 (맞춤 옵션 지원):
@@ -287,6 +322,37 @@ JPEG 및 PNG 이미지 임베딩 (맞춤 옵션 지원):
 c.Image(imgData)                                      // 기본 크기
 c.Image(imgData, template.FitWidth(document.Mm(80)))   // 너비에 맞춤
 c.Image(imgData, template.FitHeight(document.Mm(30)))  // 높이에 맞춤
+```
+
+테두리와 단색 배경이 있는 이미지 (투명 PNG에 유용):
+
+```go
+c.Image(pngData,
+	template.FitWidth(document.Mm(60)),
+	template.WithImageBorder(template.Border(
+		template.BorderWidth(document.Pt(2)),
+		template.BorderColor(pdf.RGBHex(0xE53935)),
+	)),
+	template.WithImageBackground(pdf.RGBHex(0xFFF8E1)),
+)
+```
+
+### Box 컨테이너
+
+임의의 컬럼 콘텐츠를 테두리, 채우기, 안쪽 여백이 있는 사각형 컨테이너로 감싸기:
+
+```go
+c.Box(func(c *template.ColBuilder) {
+	c.Text("박스 안")
+	c.Text("두 줄의 본문")
+},
+	template.WithBoxBorder(template.Border(
+		template.BorderWidth(document.Pt(1)),
+		template.BorderColor(pdf.RGBHex(0x1A237E)),
+	)),
+	template.WithBoxBackground(pdf.RGBHex(0xE8EAF6)),
+	template.WithBoxPadding(document.UniformEdges(document.Mm(4))),
+)
 ```
 
 ### 선 및 간격
@@ -589,6 +655,27 @@ doc, err := template.FromJSON(schema, nil)
 data, _ := doc.Generate()
 ```
 
+테이블과 이미지는 빌더 API와 동일한 border / background 키를 받습니다:
+
+```jsonc
+{"span": 12, "table": {
+  "header": ["이름", "수량", "단가"],
+  "rows": [["A","1","₩100"], ["B","2","₩200"]],
+  "border":     {"width": "1pt",   "color": "#1A237E"},                      // 외곽 프레임
+  "cellBorder": {"width": "0.5pt", "color": "gray(0.5)", "style": "dashed"}, // 그리드 라인
+  "background": "#FAFAFA"
+}}
+
+{"span": 12, "image": {
+  "src": "...",
+  "width": "60mm",
+  "border":     {"widths": ["2pt","2pt","2pt","2pt"], "color": "#E53935"},
+  "background": "#FFF8E1"
+}}
+```
+
+`style`은 `solid`(기본) / `dashed` / `dotted` / `none`을 받습니다. 변별적으로 지정할 때는 CSS 순서 `[top, right, bottom, left]`로 `widths`를, 균일한 폭은 `width`를 사용하세요.
+
 ### Go 템플릿 통합
 
 Go 템플릿과 JSON 스키마로 동적 콘텐츠 생성:
@@ -727,6 +814,7 @@ doc.Render(f)
 | `c.TotalPages(opts...)` | 전체 페이지 수 추가 |
 | `c.Line(opts...)` | 수평선 추가 |
 | `c.Spacer(height)` | 수직 공간 추가 |
+| `c.Box(fn, opts...)` | 스타일이 적용된 Box로 콘텐츠 감싸기 (테두리 / 채우기 / 안쪽 여백) |
 
 ### 페이지 레벨 콘텐츠
 
@@ -783,6 +871,10 @@ doc.Render(f)
 | `template.TableHeaderStyle(opts...)` | 헤더 행 스타일 설정 |
 | `template.TableStripe(color)` | 교차 행 색상 설정 |
 | `template.TableCellVAlign(align)` | 셀 수직 정렬 (Top/Middle/Bottom) |
+| `template.WithTableBorder(spec)` | 테이블 외곽에 테두리 그리기 |
+| `template.WithTableCellBorder(spec)` | 모든 헤더 및 본문 셀에 동일한 테두리 그리기 (그리드 라인) |
+| `template.WithTableBorderCollapse(b)` | 인접 셀 테두리 병합 활성화 |
+| `template.WithTableBackground(color)` | 테이블의 외곽 Box 채우기 |
 
 ### 이미지 옵션
 
@@ -790,6 +882,42 @@ doc.Render(f)
 |---|---|
 | `template.FitWidth(value)` | 너비에 맞춰 스케일 (비율 유지) |
 | `template.FitHeight(value)` | 높이에 맞춰 스케일 (비율 유지) |
+| `template.MinDisplayWidth(v)` | 이 너비 미만으로 축소되면 다음 페이지로 이동 |
+| `template.MinDisplayHeight(v)` | 이 높이 미만으로 축소되면 다음 페이지로 이동 |
+| `template.WithImageBorder(spec)` | 이미지 주위에 테두리 그리기 |
+| `template.WithImageBackground(color)` | 이미지의 Box 채우기 (투명 PNG에 유용) |
+
+### Box 옵션
+
+| 옵션 | 설명 |
+|---|---|
+| `template.WithBoxBorder(spec)` | Box 주위에 테두리 그리기 |
+| `template.WithBoxBackground(color)` | Box 채우기 |
+| `template.WithBoxPadding(edges)` | 안쪽 여백 |
+| `template.WithBoxMargin(edges)` | 바깥쪽 여백 |
+| `template.WithBoxWidth(value)` | 명시적 너비 |
+| `template.WithBoxHeight(value)` | 명시적 높이 |
+
+### 테두리 헬퍼
+
+`BorderSpec`을 한 번 만들고 `WithTableBorder` / `WithTableCellBorder` /
+`WithImageBorder` / `WithBoxBorder` / `WithTextBorder`로 적용:
+
+```go
+spec := template.Border(
+	template.BorderWidth(document.Pt(1)),       // 4면 균일
+	template.BorderColor(pdf.RGBHex(0x1A237E)),
+	template.BorderLine(document.BorderSolid),  // BorderSolid | BorderDashed | BorderDotted
+)
+```
+
+| 옵션 | 설명 |
+|---|---|
+| `template.Border(opts...)` | `BorderSpec` 빌드 (기본 1pt 검정 실선) |
+| `template.BorderWidth(v)` | 4면 균일 폭 |
+| `template.BorderWidths(t, r, b, l)` | CSS 순서로 변별 폭 |
+| `template.BorderColor(c)` | 모서리 색상 |
+| `template.BorderLine(style)` | 선 스타일: `BorderSolid` / `BorderDashed` / `BorderDotted` / `BorderNone` |
 
 ### QR 코드 옵션
 

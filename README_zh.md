@@ -17,7 +17,8 @@
 - **12 列网格系统** — Bootstrap 风格的响应式布局
 - **TrueType 字体支持** — 自定义字体嵌入与子集化
 - **CJK 就绪** — 从第一天起完整支持中日韩文本
-- **表格** — 表头、列宽、条纹行、垂直对齐
+- **表格** — 表头、列宽、条纹行、垂直对齐、外边框和单元格边框
+- **边框和背景** — 适用于表格、图片和 Box 容器（solid / dashed / dotted）
 - **页眉和页脚** — 带页码，所有页面统一显示
 - **列表** — 无序列表和有序列表
 - **二维码** — 纯 Go 二维码生成（支持纠错等级）
@@ -279,6 +280,40 @@ c.Table(
 )
 ```
 
+表格边框 — 外框、单元格网格、或两者：
+
+```go
+outer := template.Border(
+	template.BorderWidth(document.Pt(1)),
+	template.BorderColor(pdf.RGBHex(0x1A237E)),
+)
+grid := template.Border(
+	template.BorderWidth(document.Pt(0.5)),
+	template.BorderColor(pdf.Gray(0.5)),
+)
+
+// 仅外框
+c.Table(header, rows, template.WithTableBorder(outer))
+
+// 仅单元格网格（Excel 风格网格线）
+c.Table(header, rows, template.WithTableCellBorder(grid))
+
+// 外框 + 单元格网格 + 背景
+c.Table(header, rows,
+	template.WithTableBorder(outer),
+	template.WithTableCellBorder(grid),
+	template.WithTableBackground(pdf.RGBHex(0xFAFAFA)),
+)
+
+// 虚线单元格网格
+dashed := template.Border(
+	template.BorderWidth(document.Pt(0.75)),
+	template.BorderColor(pdf.RGBHex(0x0D47A1)),
+	template.BorderLine(document.BorderDashed),
+)
+c.Table(header, rows, template.WithTableCellBorder(dashed))
+```
+
 ### 图片
 
 嵌入 JPEG 和 PNG 图片（支持缩放选项）：
@@ -287,6 +322,37 @@ c.Table(
 c.Image(imgData)                                      // 默认尺寸
 c.Image(imgData, template.FitWidth(document.Mm(80)))   // 按宽度缩放
 c.Image(imgData, template.FitHeight(document.Mm(30)))  // 按高度缩放
+```
+
+带边框和实色背景的图片（适用于透明 PNG）：
+
+```go
+c.Image(pngData,
+	template.FitWidth(document.Mm(60)),
+	template.WithImageBorder(template.Border(
+		template.BorderWidth(document.Pt(2)),
+		template.BorderColor(pdf.RGBHex(0xE53935)),
+	)),
+	template.WithImageBackground(pdf.RGBHex(0xFFF8E1)),
+)
+```
+
+### Box 容器
+
+将任意列内容包装在带边框、填充和内边距的样式化矩形容器中：
+
+```go
+c.Box(func(c *template.ColBuilder) {
+	c.Text("盒子里")
+	c.Text("两行正文")
+},
+	template.WithBoxBorder(template.Border(
+		template.BorderWidth(document.Pt(1)),
+		template.BorderColor(pdf.RGBHex(0x1A237E)),
+	)),
+	template.WithBoxBackground(pdf.RGBHex(0xE8EAF6)),
+	template.WithBoxPadding(document.UniformEdges(document.Mm(4))),
+)
 ```
 
 ### 线条和间距
@@ -621,6 +687,27 @@ doc, err := template.FromJSON(schema, nil)
 data, _ := doc.Generate()
 ```
 
+表格和图片接受与构建器 API 相同的 border / background 键：
+
+```jsonc
+{"span": 12, "table": {
+  "header": ["名称", "数量", "单价"],
+  "rows": [["A","1","¥100"], ["B","2","¥200"]],
+  "border":     {"width": "1pt",   "color": "#1A237E"},                      // 外框
+  "cellBorder": {"width": "0.5pt", "color": "gray(0.5)", "style": "dashed"}, // 网格线
+  "background": "#FAFAFA"
+}}
+
+{"span": 12, "image": {
+  "src": "...",
+  "width": "60mm",
+  "border":     {"widths": ["2pt","2pt","2pt","2pt"], "color": "#E53935"},
+  "background": "#FFF8E1"
+}}
+```
+
+`style` 接受 `solid`（默认）/ `dashed` / `dotted` / `none`。使用 `widths` 按 CSS 顺序 `[top, right, bottom, left]` 指定各边宽度；使用 `width` 设置统一宽度。
+
 ### Go 模板集成
 
 使用 Go 模板和 JSON 模式生成动态内容：
@@ -727,6 +814,7 @@ doc.Render(f)
 | `c.TotalPages(opts...)` | 添加总页数 |
 | `c.Line(opts...)` | 添加水平线 |
 | `c.Spacer(height)` | 添加垂直间距 |
+| `c.Box(fn, opts...)` | 在带样式的 Box 中包装内容（边框 / 填充 / 内边距） |
 
 ### 页面级内容
 
@@ -783,6 +871,10 @@ doc.Render(f)
 | `template.TableHeaderStyle(opts...)` | 设置表头行样式 |
 | `template.TableStripe(color)` | 设置交替行颜色 |
 | `template.TableCellVAlign(align)` | 设置单元格垂直对齐（Top/Middle/Bottom） |
+| `template.WithTableBorder(spec)` | 在表格周围绘制外边框 |
+| `template.WithTableCellBorder(spec)` | 在每个表头和正文单元格周围绘制相同的边框（网格线） |
+| `template.WithTableBorderCollapse(b)` | 启用相邻单元格边框合并 |
+| `template.WithTableBackground(color)` | 填充表格的外部 Box |
 
 ### 图片选项
 
@@ -790,6 +882,42 @@ doc.Render(f)
 |---|---|
 | `template.FitWidth(value)` | 按宽度缩放（保持宽高比） |
 | `template.FitHeight(value)` | 按高度缩放（保持宽高比） |
+| `template.MinDisplayWidth(v)` | 低于此宽度时溢出到下一页 |
+| `template.MinDisplayHeight(v)` | 低于此高度时溢出到下一页 |
+| `template.WithImageBorder(spec)` | 在图片周围绘制边框 |
+| `template.WithImageBackground(color)` | 填充图片的 Box（适用于透明 PNG） |
+
+### Box 选项
+
+| 选项 | 说明 |
+|---|---|
+| `template.WithBoxBorder(spec)` | 在 Box 周围绘制边框 |
+| `template.WithBoxBackground(color)` | 填充 Box |
+| `template.WithBoxPadding(edges)` | 内边距 |
+| `template.WithBoxMargin(edges)` | 外边距 |
+| `template.WithBoxWidth(value)` | 显式宽度 |
+| `template.WithBoxHeight(value)` | 显式高度 |
+
+### 边框辅助函数
+
+构建一次 `BorderSpec` 并通过 `WithTableBorder` / `WithTableCellBorder` /
+`WithImageBorder` / `WithBoxBorder` / `WithTextBorder` 应用：
+
+```go
+spec := template.Border(
+	template.BorderWidth(document.Pt(1)),       // 四边统一
+	template.BorderColor(pdf.RGBHex(0x1A237E)),
+	template.BorderLine(document.BorderSolid),  // BorderSolid | BorderDashed | BorderDotted
+)
+```
+
+| 选项 | 说明 |
+|---|---|
+| `template.Border(opts...)` | 构建 `BorderSpec`（默认 1pt 黑色实线） |
+| `template.BorderWidth(v)` | 四边统一宽度 |
+| `template.BorderWidths(t, r, b, l)` | 按 CSS 顺序设置各边宽度 |
+| `template.BorderColor(c)` | 边线颜色 |
+| `template.BorderLine(style)` | 线型：`BorderSolid` / `BorderDashed` / `BorderDotted` / `BorderNone` |
 
 ### 二维码选项
 

@@ -1,0 +1,83 @@
+%PDF-1.7
+3 0 obj
+<< /BaseFont /Helvetica-Bold /Subtype /Type1 /Type /Font >>
+endobj
+4 0 obj
+<< /BaseFont /Helvetica /Subtype /Type1 /Type /Font >>
+endobj
+5 0 obj
+<< /Length 757 >>
+stream
+0 g
+BT
+/F1 18 Tf
+56.693 767.197 Td
+(Box container) Tj
+ET
+q
+0.9098039215686274 0.9176470588235294 0.9647058823529412 rg
+56.693 698.34655 481.894 51.0772 re
+f
+Q
+q
+0.10196078431372549 0.13725490196078433 0.49411764705882355 rg
+56.693 748.4237499999999 481.894 1 re
+f
+Q
+q
+0.10196078431372549 0.13725490196078433 0.49411764705882355 rg
+56.693 698.34655 481.894 1 re
+f
+Q
+q
+0.10196078431372549 0.13725490196078433 0.49411764705882355 rg
+56.693 698.34655 1 51.0772 re
+f
+Q
+q
+0.10196078431372549 0.13725490196078433 0.49411764705882355 rg
+537.587 698.34655 1 51.0772 re
+f
+Q
+0 g
+BT
+/F2 11 Tf
+69.0316 726.08515 Td
+(This paragraph lives inside a Box with a 1pt border, a) Tj
+ET
+0 g
+BT
+/F2 11 Tf
+69.0316 712.88515 Td
+(light fill, and 4mm of padding on every side.) Tj
+ET
+
+endstream
+endobj
+6 0 obj
+<< /Contents 5 0 R /MediaBox [0 0 595.28 841.89] /Parent 2 0 R /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Type /Page >>
+endobj
+2 0 obj
+<< /Count 1 /Kids [6 0 R] /Type /Pages >>
+endobj
+7 0 obj
+<< /Producer (gpdf) >>
+endobj
+1 0 obj
+<< /Pages 2 0 R /Type /Catalog >>
+endobj
+xref
+0 8
+0000000000 65535 f
+0000001199 00000 n
+0000001104 00000 n
+0000000009 00000 n
+0000000084 00000 n
+0000000154 00000 n
+0000000962 00000 n
+0000001161 00000 n
+trailer
+<< /Info 7 0 R /Root 1 0 R /Size 8 >>
+startxref
+1248
+%%EOF

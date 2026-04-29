@@ -93,6 +93,8 @@ func (p *Paginator) Paginate(doc *document.Document) []PageLayout {
 			constraints := Constraints{
 				AvailableWidth:  contentWidth,
 				AvailableHeight: bodyHeight,
+				PageWidth:       pageSize.Width,
+				PageHeight:      pageSize.Height,
 				FontResolver:    p.fontResolver,
 			}
 

@@ -233,17 +233,35 @@ func (bl *BlockLayout) layoutAbsolute(box *document.Box, bc *blockContext) Place
 	const defaultFontSize = 12.0
 
 	pos := box.BoxStyle.Position
-	x := pos.X.Resolve(bc.contentWidth, defaultFontSize)
-	y := pos.Y.Resolve(bc.contentHeight, defaultFontSize)
+
+	// For OriginPage, the user-supplied (x,y) is relative to the page corner,
+	// so the remaining space extends to the page edge (not the content area
+	// edge). Without this, page-origin coordinates near the bottom/right
+	// margin resolve to availW/availH<=0 and the child is silently dropped.
+	// Page dimensions come from the Paginator (Constraints.PageWidth/Height);
+	// outside the paginator we fall back to the content area.
+	refW := bc.contentWidth
+	refH := bc.contentHeight
+	if pos.Origin == document.OriginPage {
+		if bc.constraints.PageWidth > 0 {
+			refW = bc.constraints.PageWidth
+		}
+		if bc.constraints.PageHeight > 0 {
+			refH = bc.constraints.PageHeight
+		}
+	}
+
+	x := pos.X.Resolve(refW, defaultFontSize)
+	y := pos.Y.Resolve(refH, defaultFontSize)
 
 	// Determine available space for child layout.
-	availW := bc.contentWidth - x
+	availW := refW - x
 	if box.BoxStyle.Width.Unit != document.UnitAuto && box.BoxStyle.Width.Amount > 0 {
-		availW = box.BoxStyle.Width.Resolve(bc.contentWidth, defaultFontSize)
+		availW = box.BoxStyle.Width.Resolve(refW, defaultFontSize)
 	}
-	availH := bc.contentHeight - y
+	availH := refH - y
 	if box.BoxStyle.Height.Unit != document.UnitAuto && box.BoxStyle.Height.Amount > 0 {
-		availH = box.BoxStyle.Height.Resolve(bc.contentHeight, defaultFontSize)
+		availH = box.BoxStyle.Height.Resolve(refH, defaultFontSize)
 	}
 	if availW < 0 {
 		availW = 0

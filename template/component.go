@@ -83,12 +83,14 @@ func Strikethrough() TextOption {
 type ImageOption func(*imageConfig)
 
 type imageConfig struct {
-	width     document.Value
-	height    document.Value
-	minWidth  document.Value
-	minHeight document.Value
-	fitMode   document.ImageFitMode
-	align     document.TextAlign
+	width      document.Value
+	height     document.Value
+	minWidth   document.Value
+	minHeight  document.Value
+	fitMode    document.ImageFitMode
+	align      document.TextAlign
+	border     *BorderSpec
+	background *pdf.Color
 }
 
 // FitWidth sets the image to fit within the specified width.
@@ -139,6 +141,22 @@ func MinDisplayHeight(height document.Value) ImageOption {
 	}
 }
 
+// WithImageBorder draws a border around the image using the given [BorderSpec].
+// Build a spec with [Border] and [BorderWidth], [BorderColor], etc.
+func WithImageBorder(spec BorderSpec) ImageOption {
+	return func(cfg *imageConfig) {
+		cfg.border = &spec
+	}
+}
+
+// WithImageBackground fills the image's box with the given color before the
+// image is drawn. Useful for transparent PNGs that need a solid backdrop.
+func WithImageBackground(c pdf.Color) ImageOption {
+	return func(cfg *imageConfig) {
+		cfg.background = &c
+	}
+}
+
 // --- Table Options ---
 
 // TableOption configures a Table element.
@@ -151,6 +169,11 @@ type tableConfig struct {
 	columnWidths    []float64
 	cellVAlign      document.VerticalAlign
 	hasCellVAlign   bool
+	border          *BorderSpec
+	cellBorder      *BorderSpec
+	background      *pdf.Color
+	borderCollapse  bool
+	hasCollapse     bool
 }
 
 // TableHeaderStyle sets the header background and text color.
@@ -186,6 +209,104 @@ func TableCellVAlign(align document.VerticalAlign) TableOption {
 	return func(cfg *tableConfig) {
 		cfg.cellVAlign = align
 		cfg.hasCellVAlign = true
+	}
+}
+
+// WithTableBorder draws a border around the table using the given [BorderSpec].
+func WithTableBorder(spec BorderSpec) TableOption {
+	return func(cfg *tableConfig) {
+		cfg.border = &spec
+	}
+}
+
+// WithTableBorderCollapse merges adjacent cell borders into a single line,
+// like CSS border-collapse: collapse. The default is separated borders.
+func WithTableBorderCollapse(collapse bool) TableOption {
+	return func(cfg *tableConfig) {
+		cfg.borderCollapse = collapse
+		cfg.hasCollapse = true
+	}
+}
+
+// WithTableBackground fills the table's outer box with the given color.
+func WithTableBackground(c pdf.Color) TableOption {
+	return func(cfg *tableConfig) {
+		cfg.background = &c
+	}
+}
+
+// WithTableCellBorder draws the same border around every header and body
+// cell, producing a uniform grid. Combine with [WithTableBorder] for an
+// outer frame, or use alone for cell-only grid lines.
+func WithTableCellBorder(spec BorderSpec) TableOption {
+	return func(cfg *tableConfig) {
+		cfg.cellBorder = &spec
+	}
+}
+
+// --- Box Options ---
+
+// BoxOption configures a styled Box container created with [ColBuilder.Box].
+type BoxOption func(*boxConfig)
+
+type boxConfig struct {
+	border     *BorderSpec
+	background *pdf.Color
+	padding    document.Edges
+	hasPadding bool
+	margin     document.Edges
+	hasMargin  bool
+	width      document.Value
+	height     document.Value
+}
+
+// WithBoxBorder draws a border around the box using the given [BorderSpec].
+func WithBoxBorder(spec BorderSpec) BoxOption {
+	return func(cfg *boxConfig) {
+		cfg.border = &spec
+	}
+}
+
+// WithBoxBackground fills the box with the given color.
+func WithBoxBackground(c pdf.Color) BoxOption {
+	return func(cfg *boxConfig) {
+		cfg.background = &c
+	}
+}
+
+// WithBoxPadding sets uniform or per-edge padding inside the box.
+func WithBoxPadding(e document.Edges) BoxOption {
+	return func(cfg *boxConfig) {
+		cfg.padding = e
+		cfg.hasPadding = true
+	}
+}
+
+// WithBoxMargin sets uniform or per-edge margin around the box.
+func WithBoxMargin(e document.Edges) BoxOption {
+	return func(cfg *boxConfig) {
+		cfg.margin = e
+		cfg.hasMargin = true
+	}
+}
+
+// WithBoxWidth sets an explicit width for the box.
+func WithBoxWidth(v document.Value) BoxOption {
+	return func(cfg *boxConfig) { cfg.width = v }
+}
+
+// WithBoxHeight sets an explicit height for the box.
+func WithBoxHeight(v document.Value) BoxOption {
+	return func(cfg *boxConfig) { cfg.height = v }
+}
+
+// --- Text border ---
+
+// WithTextBorder draws a border around a text paragraph. Background color is
+// available via the existing [BgColor] option.
+func WithTextBorder(spec BorderSpec) TextOption {
+	return func(s *document.Style) {
+		s.Border = spec.toEdges()
 	}
 }
 
