@@ -127,23 +127,41 @@ type SchemaStyle struct {
 
 // SchemaImage defines an image element.
 type SchemaImage struct {
-	Src       string `json:"src"`                 // base64, data URI, or file path
-	Width     string `json:"width,omitempty"`     // dimension
-	Height    string `json:"height,omitempty"`    // dimension
-	MinWidth  string `json:"minWidth,omitempty"`  // minimum display width; overflow to next page when violated
-	MinHeight string `json:"minHeight,omitempty"` // minimum display height; overflow to next page when violated
-	Fit       string `json:"fit,omitempty"`       // "contain"|"cover"|"stretch"|"original"
-	Align     string `json:"align,omitempty"`     // "left"|"center"|"right"
+	Src        string        `json:"src"`                  // base64, data URI, or file path
+	Width      string        `json:"width,omitempty"`      // dimension
+	Height     string        `json:"height,omitempty"`     // dimension
+	MinWidth   string        `json:"minWidth,omitempty"`   // minimum display width; overflow to next page when violated
+	MinHeight  string        `json:"minHeight,omitempty"`  // minimum display height; overflow to next page when violated
+	Fit        string        `json:"fit,omitempty"`        // "contain"|"cover"|"stretch"|"original"
+	Align      string        `json:"align,omitempty"`      // "left"|"center"|"right"
+	Border     *SchemaBorder `json:"border,omitempty"`     // optional border around the image
+	Background string        `json:"background,omitempty"` // "#RRGGBB" or named, drawn behind the image
 }
 
 // SchemaTable defines a table element.
 type SchemaTable struct {
-	Header       []string     `json:"header"`
-	Rows         [][]string   `json:"rows"`
-	ColumnWidths []float64    `json:"columnWidths,omitempty"`
-	HeaderStyle  *SchemaStyle `json:"headerStyle,omitempty"`
-	StripeColor  string       `json:"stripeColor,omitempty"`
-	CellVAlign   string       `json:"cellVAlign,omitempty"` // "top", "middle", "bottom"
+	Header         []string      `json:"header"`
+	Rows           [][]string    `json:"rows"`
+	ColumnWidths   []float64     `json:"columnWidths,omitempty"`
+	HeaderStyle    *SchemaStyle  `json:"headerStyle,omitempty"`
+	StripeColor    string        `json:"stripeColor,omitempty"`
+	CellVAlign     string        `json:"cellVAlign,omitempty"` // "top", "middle", "bottom"
+	Border         *SchemaBorder `json:"border,omitempty"`
+	CellBorder     *SchemaBorder `json:"cellBorder,omitempty"` // applies to every header + body cell
+	BorderCollapse *bool         `json:"borderCollapse,omitempty"`
+	Background     string        `json:"background,omitempty"` // "#RRGGBB" or named
+}
+
+// SchemaBorder defines border styling for table/image/box elements.
+//
+// Width is the uniform edge width (e.g. "1pt", "2mm"). Use Widths for per-edge
+// values in CSS order [top, right, bottom, left]. If both are set, Widths wins.
+// Style accepts "solid" (default), "dashed", "dotted", or "none".
+type SchemaBorder struct {
+	Width  string   `json:"width,omitempty"`
+	Widths []string `json:"widths,omitempty"`
+	Color  string   `json:"color,omitempty"`
+	Style  string   `json:"style,omitempty"`
 }
 
 // SchemaList defines a list element.
@@ -383,6 +401,61 @@ func appendColorOpt(opts []TextOption, s string, fn func(pdf.Color) TextOption) 
 	return opts
 }
 
+// parseBorderLineStyle converts a string into a [document.BorderStyle].
+// Empty string returns BorderSolid (matches the [Border] default).
+func parseBorderLineStyle(s string) (document.BorderStyle, bool) {
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "", "solid":
+		return document.BorderSolid, true
+	case "dashed":
+		return document.BorderDashed, true
+	case "dotted":
+		return document.BorderDotted, true
+	case "none":
+		return document.BorderNone, true
+	default:
+		return document.BorderSolid, false
+	}
+}
+
+// parseSchemaBorder turns a SchemaBorder into a [BorderSpec]. Returns ok=false
+// when the schema is nil or the width/widths cannot be parsed.
+func parseSchemaBorder(b *SchemaBorder) (BorderSpec, bool) {
+	if b == nil {
+		return BorderSpec{}, false
+	}
+	var bopts []BorderOption
+	switch {
+	case len(b.Widths) == 4:
+		var edges [4]document.Value
+		for i, w := range b.Widths {
+			v, err := parseValue(w)
+			if err != nil {
+				return BorderSpec{}, false
+			}
+			edges[i] = v
+		}
+		bopts = append(bopts, BorderWidths(edges[0], edges[1], edges[2], edges[3]))
+	case b.Width != "":
+		v, err := parseValue(b.Width)
+		if err != nil {
+			return BorderSpec{}, false
+		}
+		bopts = append(bopts, BorderWidth(v))
+	}
+	if b.Color != "" {
+		if c, err := parseColor(b.Color); err == nil {
+			bopts = append(bopts, BorderColor(c))
+		}
+	}
+	if b.Style != "" {
+		if st, ok := parseBorderLineStyle(b.Style); ok {
+			bopts = append(bopts, BorderLine(st))
+		}
+	}
+	return Border(bopts...), true
+}
+
 // decodeBase64Image decodes a base64-encoded image string.
 // Supports both raw base64 and data URI format (data:image/...;base64,...).
 func decodeBase64Image(s string) ([]byte, error) {
@@ -619,27 +692,7 @@ func buildSchemaImage(c *ColBuilder, img *SchemaImage) {
 	if err != nil {
 		return // silently skip, consistent with builder API pattern
 	}
-	var opts []ImageOption
-	if img.Width != "" {
-		if v, err := parseValue(img.Width); err == nil {
-			opts = append(opts, FitWidth(v))
-		}
-	}
-	if img.Height != "" {
-		if v, err := parseValue(img.Height); err == nil {
-			opts = append(opts, FitHeight(v))
-		}
-	}
-	if img.MinWidth != "" {
-		if v, err := parseValue(img.MinWidth); err == nil {
-			opts = append(opts, MinDisplayWidth(v))
-		}
-	}
-	if img.MinHeight != "" {
-		if v, err := parseValue(img.MinHeight); err == nil {
-			opts = append(opts, MinDisplayHeight(v))
-		}
-	}
+	opts := schemaImageDimensionOpts(img)
 	if img.Fit != "" {
 		if mode, ok := parseFitMode(img.Fit); ok {
 			opts = append(opts, WithFitMode(mode))
@@ -650,7 +703,41 @@ func buildSchemaImage(c *ColBuilder, img *SchemaImage) {
 			opts = append(opts, WithAlign(align))
 		}
 	}
+	if spec, ok := parseSchemaBorder(img.Border); ok {
+		opts = append(opts, WithImageBorder(spec))
+	}
+	if img.Background != "" {
+		if c2, err := parseColor(img.Background); err == nil {
+			opts = append(opts, WithImageBackground(c2))
+		}
+	}
 	c.Image(data, opts...)
+}
+
+// schemaImageDimensionOpts converts the dimension fields of a SchemaImage
+// (width, height, minWidth, minHeight) into the matching ImageOption slice.
+func schemaImageDimensionOpts(img *SchemaImage) []ImageOption {
+	dims := []struct {
+		raw string
+		fn  func(document.Value) ImageOption
+	}{
+		{img.Width, FitWidth},
+		{img.Height, FitHeight},
+		{img.MinWidth, MinDisplayWidth},
+		{img.MinHeight, MinDisplayHeight},
+	}
+	var opts []ImageOption
+	for _, d := range dims {
+		if d.raw == "" {
+			continue
+		}
+		v, err := parseValue(d.raw)
+		if err != nil {
+			continue
+		}
+		opts = append(opts, d.fn(v))
+	}
+	return opts
 }
 
 // parseFitMode converts a fit mode string to an ImageFitMode constant.
@@ -717,6 +804,20 @@ func buildSchemaTable(c *ColBuilder, tbl *SchemaTable) {
 	if tbl.CellVAlign != "" {
 		if align, ok := parseVerticalAlign(tbl.CellVAlign); ok {
 			opts = append(opts, TableCellVAlign(align))
+		}
+	}
+	if spec, ok := parseSchemaBorder(tbl.Border); ok {
+		opts = append(opts, WithTableBorder(spec))
+	}
+	if spec, ok := parseSchemaBorder(tbl.CellBorder); ok {
+		opts = append(opts, WithTableCellBorder(spec))
+	}
+	if tbl.BorderCollapse != nil {
+		opts = append(opts, WithTableBorderCollapse(*tbl.BorderCollapse))
+	}
+	if tbl.Background != "" {
+		if c2, err := parseColor(tbl.Background); err == nil {
+			opts = append(opts, WithTableBackground(c2))
 		}
 	}
 	c.Table(tbl.Header, tbl.Rows, opts...)

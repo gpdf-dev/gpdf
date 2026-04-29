@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.0.6] - 2026-04-20
+
+### Added
+- Minimum display size constraints for images and QR codes — raise layout overflow to the next page when the target box would render below `minWidth` / `minHeight` (#19)
+  - Builder: `MinDisplayWidth(v)` / `MinDisplayHeight(v)` options on Image and QR
+  - JSON / GoTemplate schema: `image.minWidth` / `image.minHeight` / `qr.minWidth` / `qr.minHeight`
+  - Layout engine propagates overflow when the constraint is violated (`document/layout/block.go`)
+- Example tests: `_examples/{builder,json,gotemplate}/34_image_min_size_test.go` with shared golden
+
 ## [1.0.5] - 2026-04-19
 
 ### Fixed
@@ -132,7 +141,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Reed-Solomon coefficient order in QR code encoder
 - binary.Write return value handling for errcheck lint
 
-[Unreleased]: https://github.com/gpdf-dev/gpdf/compare/v1.0.5...HEAD
+[Unreleased]: https://github.com/gpdf-dev/gpdf/compare/v1.0.6...HEAD
+[1.0.6]: https://github.com/gpdf-dev/gpdf/compare/v1.0.5...v1.0.6
 [1.0.5]: https://github.com/gpdf-dev/gpdf/compare/v1.0.4...v1.0.5
 [1.0.4]: https://github.com/gpdf-dev/gpdf/compare/v1.0.3...v1.0.4
 [1.0.3]: https://github.com/gpdf-dev/gpdf/compare/v1.0.2...v1.0.3

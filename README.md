@@ -18,7 +18,8 @@ A pure Go, zero-dependency PDF generation library with a layered architecture an
 - **12-column grid system** — Bootstrap-style responsive layout
 - **TrueType font support** — embed custom fonts with subsetting
 - **CJK ready** — full CJK text support from day one
-- **Tables** — headers, column widths, striped rows, vertical alignment
+- **Tables** — headers, column widths, striped rows, vertical alignment, outer + per-cell borders
+- **Borders & backgrounds** — apply to tables, images, and box containers (solid / dashed / dotted)
 - **Headers & Footers** — consistent across all pages with page numbers
 - **Lists** — bulleted and numbered lists
 - **QR codes** — pure Go QR code generation with error correction levels
@@ -297,6 +298,40 @@ c.Table(
 )
 ```
 
+Table borders — outer frame, per-cell grid, or both:
+
+```go
+outer := template.Border(
+	template.BorderWidth(document.Pt(1)),
+	template.BorderColor(pdf.RGBHex(0x1A237E)),
+)
+grid := template.Border(
+	template.BorderWidth(document.Pt(0.5)),
+	template.BorderColor(pdf.Gray(0.5)),
+)
+
+// Outer frame only
+c.Table(header, rows, template.WithTableBorder(outer))
+
+// Cell grid only (Excel-style grid lines)
+c.Table(header, rows, template.WithTableCellBorder(grid))
+
+// Outer frame + cell grid + background
+c.Table(header, rows,
+	template.WithTableBorder(outer),
+	template.WithTableCellBorder(grid),
+	template.WithTableBackground(pdf.RGBHex(0xFAFAFA)),
+)
+
+// Dashed cell grid
+dashed := template.Border(
+	template.BorderWidth(document.Pt(0.75)),
+	template.BorderColor(pdf.RGBHex(0x0D47A1)),
+	template.BorderLine(document.BorderDashed),
+)
+c.Table(header, rows, template.WithTableCellBorder(dashed))
+```
+
 ### Images
 
 Embed JPEG and PNG images with optional fit options:
@@ -325,6 +360,38 @@ page.AutoRow(func(r *template.RowBuilder) {
 		c.Image(jpegData)
 	})
 })
+```
+
+Image with a border and a solid backdrop (handy for transparent PNGs):
+
+```go
+c.Image(pngData,
+	template.FitWidth(document.Mm(60)),
+	template.WithImageBorder(template.Border(
+		template.BorderWidth(document.Pt(2)),
+		template.BorderColor(pdf.RGBHex(0xE53935)),
+	)),
+	template.WithImageBackground(pdf.RGBHex(0xFFF8E1)),
+)
+```
+
+### Boxes
+
+Wrap arbitrary column content in a styled rectangular container with a
+border, fill, and padding:
+
+```go
+c.Box(func(c *template.ColBuilder) {
+	c.Text("Inside a box")
+	c.Text("with two lines of body copy")
+},
+	template.WithBoxBorder(template.Border(
+		template.BorderWidth(document.Pt(1)),
+		template.BorderColor(pdf.RGBHex(0x1A237E)),
+	)),
+	template.WithBoxBackground(pdf.RGBHex(0xE8EAF6)),
+	template.WithBoxPadding(document.UniformEdges(document.Mm(4))),
+)
 ```
 
 ### Lines & Spacers
@@ -558,6 +625,27 @@ doc, err := template.FromJSON(schema, nil)
 data, _ := doc.Generate()
 ```
 
+Tables and images accept the same border / background keys as the builder API:
+
+```jsonc
+{"span": 12, "table": {
+  "header": ["Name", "Age", "City"],
+  "rows": [["Alice","30","Tokyo"], ["Bob","25","NYC"]],
+  "border":     {"width": "1pt",   "color": "#1A237E"},                      // outer frame
+  "cellBorder": {"width": "0.5pt", "color": "gray(0.5)", "style": "dashed"}, // grid lines
+  "background": "#FAFAFA"
+}}
+
+{"span": 12, "image": {
+  "src": "...",
+  "width": "60mm",
+  "border":     {"widths": ["2pt","2pt","2pt","2pt"], "color": "#E53935"},
+  "background": "#FFF8E1"
+}}
+```
+
+`style` accepts `solid` (default), `dashed`, `dotted`, or `none`. Use `widths` for per-edge `[top, right, bottom, left]` or `width` for a uniform value.
+
 ### Go Template Integration
 
 Use Go templates with JSON schema for dynamic content:
@@ -788,6 +876,7 @@ doc.Render(f)
 | `c.TotalPages(opts...)` | Add total page count |
 | `c.Line(opts...)` | Add a horizontal line |
 | `c.Spacer(height)` | Add vertical space |
+| `c.Box(fn, opts...)` | Wrap content in a styled box (border / fill / padding) |
 
 ### Page-Level Content
 
@@ -844,6 +933,10 @@ doc.Render(f)
 | `template.TableHeaderStyle(opts...)` | Style the header row |
 | `template.TableStripe(color)` | Set alternating row color |
 | `template.TableCellVAlign(align)` | Set cell vertical alignment (Top/Middle/Bottom) |
+| `template.WithTableBorder(spec)` | Draw an outer border around the table |
+| `template.WithTableCellBorder(spec)` | Draw the same border around every header + body cell (grid lines) |
+| `template.WithTableBorderCollapse(b)` | Mark adjacent cell borders for collapsing |
+| `template.WithTableBackground(color)` | Fill the table's outer box |
 
 ### Image Options
 
@@ -851,6 +944,43 @@ doc.Render(f)
 |---|---|
 | `template.FitWidth(value)` | Scale to fit width (keeps aspect ratio) |
 | `template.FitHeight(value)` | Scale to fit height (keeps aspect ratio) |
+| `template.MinDisplayWidth(v)` | Overflow to next page if shrunk below this width |
+| `template.MinDisplayHeight(v)` | Overflow to next page if shrunk below this height |
+| `template.WithImageBorder(spec)` | Draw a border around the image |
+| `template.WithImageBackground(color)` | Fill the image's box (useful for transparent PNGs) |
+
+### Box Options
+
+| Option | Description |
+|---|---|
+| `template.WithBoxBorder(spec)` | Draw a border around the box |
+| `template.WithBoxBackground(color)` | Fill the box |
+| `template.WithBoxPadding(edges)` | Inner spacing |
+| `template.WithBoxMargin(edges)` | Outer spacing |
+| `template.WithBoxWidth(value)` | Explicit width |
+| `template.WithBoxHeight(value)` | Explicit height |
+
+### Border Helpers
+
+Build a `BorderSpec` once and apply it with `WithTableBorder`,
+`WithTableCellBorder`, `WithImageBorder`, `WithBoxBorder`, or
+`WithTextBorder`:
+
+```go
+spec := template.Border(
+	template.BorderWidth(document.Pt(1)),       // uniform edges
+	template.BorderColor(pdf.RGBHex(0x1A237E)),
+	template.BorderLine(document.BorderSolid),  // BorderSolid | BorderDashed | BorderDotted
+)
+```
+
+| Option | Description |
+|---|---|
+| `template.Border(opts...)` | Build a `BorderSpec` (default 1pt black solid) |
+| `template.BorderWidth(v)` | Uniform width on all four edges |
+| `template.BorderWidths(t, r, b, l)` | Per-edge widths in CSS order |
+| `template.BorderColor(c)` | Edge color |
+| `template.BorderLine(style)` | Line style: `BorderSolid`, `BorderDashed`, `BorderDotted`, `BorderNone` |
 
 ### QR Code Options
 

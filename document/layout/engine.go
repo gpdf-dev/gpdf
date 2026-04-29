@@ -22,6 +22,14 @@ type Constraints struct {
 	AvailableWidth float64
 	// AvailableHeight is the maximum vertical space in points.
 	AvailableHeight float64
+	// PageWidth is the physical page width in points, used to resolve
+	// absolute positions with OriginPage. Zero means fall back to
+	// AvailableWidth (single-box layout outside a paginator).
+	PageWidth float64
+	// PageHeight is the physical page height in points, used to resolve
+	// absolute positions with OriginPage. Zero means fall back to
+	// AvailableHeight.
+	PageHeight float64
 	// FontResolver provides font metrics and text measurement.
 	FontResolver FontResolver
 }

@@ -17,7 +17,8 @@ Biblioteca de generación de PDF en Go puro, sin dependencias externas, con arqu
 - **Sistema de cuadrícula de 12 columnas** — diseño responsivo estilo Bootstrap
 - **Soporte de fuentes TrueType** — incrustación de fuentes personalizadas con subconjuntos
 - **Listo para CJK** — soporte completo de texto chino, japonés y coreano desde el primer día
-- **Tablas** — encabezados, anchos de columna, filas alternadas, alineación vertical
+- **Tablas** — encabezados, anchos de columna, filas alternadas, alineación vertical, bordes externos + por celda
+- **Bordes y fondos** — aplicables a tablas, imágenes y contenedores Box (solid / dashed / dotted)
 - **Encabezados y pies de página** — con números de página, consistentes en todas las páginas
 - **Listas** — listas con viñetas y numeradas
 - **Códigos QR** — generación de QR en Go puro (niveles de corrección de errores)
@@ -279,6 +280,40 @@ c.Table(
 )
 ```
 
+Bordes de tabla — marco externo, cuadrícula por celda, o ambos:
+
+```go
+outer := template.Border(
+	template.BorderWidth(document.Pt(1)),
+	template.BorderColor(pdf.RGBHex(0x1A237E)),
+)
+grid := template.Border(
+	template.BorderWidth(document.Pt(0.5)),
+	template.BorderColor(pdf.Gray(0.5)),
+)
+
+// Solo marco externo
+c.Table(header, rows, template.WithTableBorder(outer))
+
+// Solo cuadrícula (líneas estilo Excel)
+c.Table(header, rows, template.WithTableCellBorder(grid))
+
+// Marco + cuadrícula + fondo
+c.Table(header, rows,
+	template.WithTableBorder(outer),
+	template.WithTableCellBorder(grid),
+	template.WithTableBackground(pdf.RGBHex(0xFAFAFA)),
+)
+
+// Cuadrícula con líneas discontinuas
+dashed := template.Border(
+	template.BorderWidth(document.Pt(0.75)),
+	template.BorderColor(pdf.RGBHex(0x0D47A1)),
+	template.BorderLine(document.BorderDashed),
+)
+c.Table(header, rows, template.WithTableCellBorder(dashed))
+```
+
 ### Imágenes
 
 Incrustar imágenes JPEG y PNG con opciones de ajuste:
@@ -287,6 +322,37 @@ Incrustar imágenes JPEG y PNG con opciones de ajuste:
 c.Image(imgData)                                      // Tamaño por defecto
 c.Image(imgData, template.FitWidth(document.Mm(80)))   // Ajustar al ancho
 c.Image(imgData, template.FitHeight(document.Mm(30)))  // Ajustar a la altura
+```
+
+Imagen con borde y fondo sólido (útil para PNG transparentes):
+
+```go
+c.Image(pngData,
+	template.FitWidth(document.Mm(60)),
+	template.WithImageBorder(template.Border(
+		template.BorderWidth(document.Pt(2)),
+		template.BorderColor(pdf.RGBHex(0xE53935)),
+	)),
+	template.WithImageBackground(pdf.RGBHex(0xFFF8E1)),
+)
+```
+
+### Cajas (Box)
+
+Envuelve contenido arbitrario de columna en un contenedor rectangular con borde, relleno y padding:
+
+```go
+c.Box(func(c *template.ColBuilder) {
+	c.Text("Dentro de una caja")
+	c.Text("con dos líneas de texto")
+},
+	template.WithBoxBorder(template.Border(
+		template.BorderWidth(document.Pt(1)),
+		template.BorderColor(pdf.RGBHex(0x1A237E)),
+	)),
+	template.WithBoxBackground(pdf.RGBHex(0xE8EAF6)),
+	template.WithBoxPadding(document.UniformEdges(document.Mm(4))),
+)
 ```
 
 ### Líneas y espaciadores
@@ -621,6 +687,27 @@ doc, err := template.FromJSON(schema, nil)
 data, _ := doc.Generate()
 ```
 
+Las tablas y las imágenes aceptan las mismas claves `border` / `background` que la API del builder:
+
+```jsonc
+{"span": 12, "table": {
+  "header": ["Nombre", "Cant.", "Precio"],
+  "rows": [["A","1","$100"], ["B","2","$200"]],
+  "border":     {"width": "1pt",   "color": "#1A237E"},                      // marco externo
+  "cellBorder": {"width": "0.5pt", "color": "gray(0.5)", "style": "dashed"}, // líneas de cuadrícula
+  "background": "#FAFAFA"
+}}
+
+{"span": 12, "image": {
+  "src": "...",
+  "width": "60mm",
+  "border":     {"widths": ["2pt","2pt","2pt","2pt"], "color": "#E53935"},
+  "background": "#FFF8E1"
+}}
+```
+
+`style` acepta `solid` (por defecto), `dashed`, `dotted` o `none`. Usa `widths` para anchuras por borde en orden CSS `[top, right, bottom, left]`, o `width` para un valor uniforme.
+
 ### Integración con Go Templates
 
 Use plantillas Go con esquemas JSON para contenido dinámico:
@@ -727,6 +814,7 @@ doc.Render(f)
 | `c.TotalPages(opts...)` | Agregar total de páginas |
 | `c.Line(opts...)` | Agregar una línea horizontal |
 | `c.Spacer(height)` | Agregar espacio vertical |
+| `c.Box(fn, opts...)` | Envolver contenido en un Box estilizado (borde / relleno / padding) |
 
 ### Contenido a nivel de página
 
@@ -783,6 +871,10 @@ doc.Render(f)
 | `template.TableHeaderStyle(opts...)` | Estilo de la fila de encabezado |
 | `template.TableStripe(color)` | Color de filas alternadas |
 | `template.TableCellVAlign(align)` | Alineación vertical de celda (Top/Middle/Bottom) |
+| `template.WithTableBorder(spec)` | Dibujar un borde exterior alrededor de la tabla |
+| `template.WithTableCellBorder(spec)` | Dibujar el mismo borde en cada celda de encabezado y cuerpo (líneas de cuadrícula) |
+| `template.WithTableBorderCollapse(b)` | Marcar bordes de celdas adyacentes para fusionarse |
+| `template.WithTableBackground(color)` | Rellenar la caja externa de la tabla |
 
 ### Opciones de imagen
 
@@ -790,6 +882,42 @@ doc.Render(f)
 |---|---|
 | `template.FitWidth(value)` | Escalar al ancho (mantiene proporción) |
 | `template.FitHeight(value)` | Escalar a la altura (mantiene proporción) |
+| `template.MinDisplayWidth(v)` | Pasar a la siguiente página si se reduce por debajo de este ancho |
+| `template.MinDisplayHeight(v)` | Pasar a la siguiente página si se reduce por debajo de esta altura |
+| `template.WithImageBorder(spec)` | Dibujar un borde alrededor de la imagen |
+| `template.WithImageBackground(color)` | Rellenar la caja de la imagen (útil para PNG transparentes) |
+
+### Opciones de Box
+
+| Opción | Descripción |
+|---|---|
+| `template.WithBoxBorder(spec)` | Dibujar un borde alrededor del Box |
+| `template.WithBoxBackground(color)` | Rellenar el Box |
+| `template.WithBoxPadding(edges)` | Espaciado interior |
+| `template.WithBoxMargin(edges)` | Espaciado exterior |
+| `template.WithBoxWidth(value)` | Ancho explícito |
+| `template.WithBoxHeight(value)` | Altura explícita |
+
+### Helpers de borde
+
+Construye un `BorderSpec` una vez y aplícalo con `WithTableBorder`,
+`WithTableCellBorder`, `WithImageBorder`, `WithBoxBorder` o `WithTextBorder`:
+
+```go
+spec := template.Border(
+	template.BorderWidth(document.Pt(1)),       // bordes uniformes
+	template.BorderColor(pdf.RGBHex(0x1A237E)),
+	template.BorderLine(document.BorderSolid),  // BorderSolid | BorderDashed | BorderDotted
+)
+```
+
+| Opción | Descripción |
+|---|---|
+| `template.Border(opts...)` | Construye un `BorderSpec` (por defecto 1pt sólido negro) |
+| `template.BorderWidth(v)` | Ancho uniforme en los cuatro bordes |
+| `template.BorderWidths(t, r, b, l)` | Anchos por borde en orden CSS |
+| `template.BorderColor(c)` | Color del borde |
+| `template.BorderLine(style)` | Estilo de línea: `BorderSolid` / `BorderDashed` / `BorderDotted` / `BorderNone` |
 
 ### Opciones de código QR
 
