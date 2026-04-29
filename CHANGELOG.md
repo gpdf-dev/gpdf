@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.0.7] - 2026-04-29
+
+### Added
+- Borders and backgrounds for tables, images, and boxes
+  - Builder: `Border(opts...)` with `BorderWidth`, `BorderWidths`, `BorderColor`, `BorderLine`; applied via `WithTableBorder`, `WithImageBorder`, `WithBoxBorder`, `WithTextBorder`, plus `WithImageBackground` / table & box background options
+  - JSON / GoTemplate schema: `SchemaBorder { width, widths, color, style }`; `image.border` / `image.background`; `table.border` / `table.cellBorder` / `table.borderCollapse` / `table.background`
+  - Layout engine support: borders participate in box-model sizing and pagination (`document/layout/{block,engine,paging}.go`)
+- Example tests: `_examples/{builder,json,gotemplate}/35_border_test.go` with shared golden
+
 ## [1.0.6] - 2026-04-20
 
 ### Added
@@ -141,7 +150,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Reed-Solomon coefficient order in QR code encoder
 - binary.Write return value handling for errcheck lint
 
-[Unreleased]: https://github.com/gpdf-dev/gpdf/compare/v1.0.6...HEAD
+[Unreleased]: https://github.com/gpdf-dev/gpdf/compare/v1.0.7...HEAD
+[1.0.7]: https://github.com/gpdf-dev/gpdf/compare/v1.0.6...v1.0.7
 [1.0.6]: https://github.com/gpdf-dev/gpdf/compare/v1.0.5...v1.0.6
 [1.0.5]: https://github.com/gpdf-dev/gpdf/compare/v1.0.4...v1.0.5
 [1.0.4]: https://github.com/gpdf-dev/gpdf/compare/v1.0.3...v1.0.4
