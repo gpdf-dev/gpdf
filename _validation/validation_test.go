@@ -20,6 +20,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/gpdf-dev/gpdf"
 	"github.com/gpdf-dev/gpdf/document"
 	"github.com/gpdf-dev/gpdf/pdf"
 	"github.com/gpdf-dev/gpdf/template"
@@ -380,4 +381,70 @@ func TestPoppler_PdfToText(t *testing.T) {
 			}
 		})
 	}
+}
+
+// ---------------------------------------------------------------------------
+// Object stream (/ObjStm) round-trip — see gpdf#35
+// ---------------------------------------------------------------------------
+
+// TestQPDF_ObjectStreamRoundTrip converts a generated PDF into the compressed
+// object stream layout that most real-world producers emit, then reads it back
+// through gpdf's merge and overlay paths and validates the result with pdfcpu.
+func TestQPDF_ObjectStreamRoundTrip(t *testing.T) {
+	if _, err := exec.LookPath("qpdf"); err != nil {
+		t.Skip("qpdf not found; install qpdf to enable this test")
+	}
+
+	plain, err := genHelloWorld()
+	if err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+
+	tmpDir := t.TempDir()
+	plainPath := filepath.Join(tmpDir, "plain.pdf")
+	objStmPath := filepath.Join(tmpDir, "objstm.pdf")
+	if err := os.WriteFile(plainPath, plain, 0644); err != nil {
+		t.Fatalf("write file: %v", err)
+	}
+	if out, err := exec.Command("qpdf", "--object-streams=generate", plainPath, objStmPath).CombinedOutput(); err != nil {
+		t.Fatalf("qpdf --object-streams=generate: %v\n%s", err, out)
+	}
+	objStm, err := os.ReadFile(objStmPath)
+	if err != nil {
+		t.Fatalf("read objstm.pdf: %v", err)
+	}
+
+	t.Run("merge", func(t *testing.T) {
+		merged, err := gpdf.Merge([]gpdf.Source{{Data: objStm}, {Data: objStm}})
+		if err != nil {
+			t.Fatalf("merge object stream PDF: %v", err)
+		}
+		if err := pdfcpuapi.Validate(bytes.NewReader(merged), nil); err != nil {
+			t.Errorf("pdfcpu validate merged: %v", err)
+		}
+	})
+
+	t.Run("overlay", func(t *testing.T) {
+		doc, err := gpdf.Open(objStm)
+		if err != nil {
+			t.Fatalf("open object stream PDF: %v", err)
+		}
+		err = doc.Overlay(0, func(p *template.PageBuilder) {
+			p.AutoRow(func(r *template.RowBuilder) {
+				r.Col(12, func(c *template.ColBuilder) {
+					c.Text("overlay")
+				})
+			})
+		})
+		if err != nil {
+			t.Fatalf("overlay: %v", err)
+		}
+		out, err := doc.Save()
+		if err != nil {
+			t.Fatalf("save: %v", err)
+		}
+		if err := pdfcpuapi.Validate(bytes.NewReader(out), nil); err != nil {
+			t.Errorf("pdfcpu validate overlay: %v", err)
+		}
+	})
 }
