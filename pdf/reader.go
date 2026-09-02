@@ -11,12 +11,15 @@ import (
 // It provides random access to objects via the cross-reference table
 // and can traverse the page tree to enumerate pages.
 type Reader struct {
-	data    []byte
-	xref    map[int]int64  // object number -> byte offset
-	trailer Dict           // the trailer dictionary
-	root    ObjectRef      // catalog reference
-	pages   []PageInfo     // flattened page list (populated lazily)
-	cache   map[int]Object // parsed object cache
+	data       []byte
+	xref       map[int]int64            // object number -> byte offset (type-1 entries)
+	compressed map[int]compressedObjRef // object number -> location in an /ObjStm (type-2 entries)
+	objStms    map[int]*objectStream    // decoded /ObjStm cache, keyed by stream object number
+	loadingStm map[int]bool             // guards against self-referential /ObjStm chains
+	trailer    Dict                     // the trailer dictionary
+	root       ObjectRef                // catalog reference
+	pages      []PageInfo               // flattened page list (populated lazily)
+	cache      map[int]Object           // parsed object cache
 }
 
 // PageInfo describes a page in the existing PDF.
@@ -30,9 +33,12 @@ type PageInfo struct {
 // It parses the xref table and trailer to enable object lookups.
 func NewReader(data []byte) (*Reader, error) {
 	r := &Reader{
-		data:  data,
-		xref:  make(map[int]int64),
-		cache: make(map[int]Object),
+		data:       data,
+		xref:       make(map[int]int64),
+		compressed: make(map[int]compressedObjRef),
+		objStms:    make(map[int]*objectStream),
+		loadingStm: make(map[int]bool),
+		cache:      make(map[int]Object),
 	}
 
 	if err := r.parseXRefAndTrailer(); err != nil {
@@ -73,23 +79,32 @@ func (r *Reader) Page(i int) (PageInfo, error) {
 }
 
 // GetObject reads and parses the indirect object with the given number.
-// Results are cached for repeated lookups.
+// The object may be stored directly in the file or inside a compressed
+// object stream (/ObjStm). Results are cached for repeated lookups.
 func (r *Reader) GetObject(objNum int) (Object, error) {
 	if obj, ok := r.cache[objNum]; ok {
 		return obj, nil
 	}
 
-	offset, ok := r.xref[objNum]
-	if !ok {
-		return nil, fmt.Errorf("pdf: object %d not found in xref", objNum)
+	if offset, ok := r.xref[objNum]; ok {
+		obj, err := r.parseIndirectObjectAt(offset)
+		if err != nil {
+			return nil, err
+		}
+		r.cache[objNum] = obj
+		return obj, nil
 	}
 
-	obj, err := r.parseIndirectObjectAt(offset)
-	if err != nil {
-		return nil, err
+	if loc, ok := r.compressed[objNum]; ok {
+		obj, err := r.getCompressedObject(objNum, loc)
+		if err != nil {
+			return nil, err
+		}
+		r.cache[objNum] = obj
+		return obj, nil
 	}
-	r.cache[objNum] = obj
-	return obj, nil
+
+	return nil, fmt.Errorf("pdf: object %d not found in xref", objNum)
 }
 
 // Resolve dereferences an Object: if it is an ObjectRef, fetch the actual object.
@@ -133,10 +148,16 @@ func (r *Reader) Data() []byte {
 	return r.data
 }
 
-// MaxObjectNumber returns the highest object number found in the xref table.
+// MaxObjectNumber returns the highest object number found in the xref table,
+// including objects stored inside compressed object streams.
 func (r *Reader) MaxObjectNumber() int {
 	max := 0
 	for n := range r.xref {
+		if n > max {
+			max = n
+		}
+	}
+	for n := range r.compressed {
 		if n > max {
 			max = n
 		}
@@ -408,6 +429,9 @@ func parseXRefIndices(d Dict) []int {
 }
 
 // parseXRefEntries reads xref entries from stream content and populates the xref table.
+// Type-1 entries record a byte offset; type-2 entries record a location inside a
+// compressed object stream. Entries seen in a newer section always win, so an
+// object already recorded is never overwritten by an older /Prev section.
 func (r *Reader) parseXRefEntries(content []byte, indices []int, w [3]int, entrySize int) {
 	pos := 0
 	for i := 0; i < len(indices)-1; i += 2 {
@@ -421,9 +445,23 @@ func (r *Reader) parseXRefEntries(content []byte, indices []int, w [3]int, entry
 			pos += entrySize
 
 			objNum := startObj + j
-			if fields[0] == 1 {
-				if _, exists := r.xref[objNum]; !exists {
-					r.xref[objNum] = fields[1]
+			if _, exists := r.xref[objNum]; exists {
+				continue
+			}
+			if _, exists := r.compressed[objNum]; exists {
+				continue
+			}
+
+			switch fields[0] {
+			case 1:
+				r.xref[objNum] = fields[1]
+			case 2:
+				if r.compressed == nil {
+					r.compressed = make(map[int]compressedObjRef)
+				}
+				r.compressed[objNum] = compressedObjRef{
+					streamNum: int(fields[1]),
+					index:     int(fields[2]),
 				}
 			}
 		}
@@ -496,27 +534,25 @@ func (r *Reader) parseIndirectObjectAt(offset int64) (Object, error) {
 	return obj, nil
 }
 
-// decodeStreamContent decompresses a stream's content based on /Filter.
+// decodeStreamContent decompresses a stream's content based on /Filter,
+// applying any predictor given by the matching /DecodeParms entry.
 func (r *Reader) decodeStreamContent(s Stream) ([]byte, error) {
 	filterObj, hasFilter := s.Dict[Name("Filter")]
 	if !hasFilter {
 		return s.Content, nil
 	}
 
-	filters := []string{}
-	switch f := filterObj.(type) {
-	case Name:
-		filters = []string{string(f)}
-	case Array:
-		for _, item := range f {
-			if n, ok := item.(Name); ok {
-				filters = append(filters, string(n))
-			}
-		}
+	filters, err := r.filterNames(filterObj)
+	if err != nil {
+		return nil, err
+	}
+	parms, err := r.decodeParmsList(s.Dict, len(filters))
+	if err != nil {
+		return nil, err
 	}
 
 	data := s.Content
-	for _, filter := range filters {
+	for i, filter := range filters {
 		switch filter {
 		case "FlateDecode":
 			decoded, err := decompressFlate(data)
@@ -527,8 +563,79 @@ func (r *Reader) decodeStreamContent(s Stream) ([]byte, error) {
 		default:
 			return nil, fmt.Errorf("pdf: unsupported filter %q", filter)
 		}
+
+		params, err := r.readPredictorParams(parms[i])
+		if err != nil {
+			return nil, err
+		}
+		data, err = applyPredictor(data, params)
+		if err != nil {
+			return nil, err
+		}
 	}
 	return data, nil
+}
+
+// filterNames normalises /Filter, which may be a single name or an array.
+func (r *Reader) filterNames(obj Object) ([]string, error) {
+	resolved, err := r.Resolve(obj)
+	if err != nil {
+		return nil, err
+	}
+
+	switch f := resolved.(type) {
+	case Name:
+		return []string{string(f)}, nil
+	case Array:
+		names := make([]string, 0, len(f))
+		for _, item := range f {
+			if n, ok := item.(Name); ok {
+				names = append(names, string(n))
+			}
+		}
+		return names, nil
+	default:
+		return nil, nil
+	}
+}
+
+// decodeParmsList returns one /DecodeParms dict per filter. Entries are nil
+// where the stream supplies no parameters. /DecodeParms may be a single dict
+// (when there is one filter) or an array parallel to /Filter, with null for
+// filters that take no parameters.
+func (r *Reader) decodeParmsList(d Dict, numFilters int) ([]Dict, error) {
+	parms := make([]Dict, numFilters)
+
+	obj, ok := d[Name("DecodeParms")]
+	if !ok {
+		obj, ok = d[Name("DP")]
+	}
+	if !ok {
+		return parms, nil
+	}
+
+	resolved, err := r.Resolve(obj)
+	if err != nil {
+		return nil, err
+	}
+
+	switch v := resolved.(type) {
+	case Dict:
+		if numFilters > 0 {
+			parms[0] = v
+		}
+	case Array:
+		for i := 0; i < len(v) && i < numFilters; i++ {
+			item, err := r.Resolve(v[i])
+			if err != nil {
+				return nil, err
+			}
+			if pd, ok := item.(Dict); ok {
+				parms[i] = pd
+			}
+		}
+	}
+	return parms, nil
 }
 
 // ---------------------------------------------------------------------------
@@ -654,7 +761,7 @@ func (r *Reader) parseRectangle(obj Object) (Rectangle, error) {
 // String returns a summary of the reader state.
 func (r *Reader) String() string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "Reader: %d bytes, %d objects in xref", len(r.data), len(r.xref))
+	fmt.Fprintf(&b, "Reader: %d bytes, %d objects in xref", len(r.data), len(r.xref)+len(r.compressed))
 	if r.pages != nil {
 		fmt.Fprintf(&b, ", %d pages", len(r.pages))
 	}

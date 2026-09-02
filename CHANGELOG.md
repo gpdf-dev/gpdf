@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- Reader now supports compressed object streams (`/ObjStm`) and predictor-encoded streams, so PDFs written with a cross-reference stream — the default for most modern producers — can be opened, overlaid and merged instead of failing with `pdf: object N not found in xref` (#35)
+  - `pdf/objstm.go`: new `/ObjStm` reader — decodes the stream body, parses the `N` object-number/offset header pairs up to `/First`, and resolves objects from it. Decoded streams are cached so sibling objects do not re-inflate the same body, and each object is parsed from its own bounded slice of the body.
+  - `pdf/reader.go`: `parseXRefEntries` now records type-2 cross-reference entries, `GetObject` resolves them through the object stream, and `MaxObjectNumber` counts them — so `gpdf.Open`, `gpdf.Merge` and `Overlay` all work on these files. Entries from a newer xref section keep winning over an older `/Prev` section.
+  - `pdf/predictor.go`: `/DecodeParms` predictor support (PNG predictors 10–15 and the TIFF predictor 2). Real cross-reference streams are almost always written with `/Predictor 12`, so without this the decoded xref entries were garbage.
+  - `pdf/objstm_test.go`, `pdf/predictor_test.go`: coverage for object-stream reads, merging an object-stream PDF, stale xref indices, newest-section-wins precedence, and each predictor filter type
+- Incremental update xref entries are now exactly 20 bytes, so the output of `Open` → `Overlay` → `Save` is no longer reported as damaged by strict readers
+  - `pdf/modifier.go`: `writeIncrementalXRef` wrote `"%010d %05d n \r\n"` — 21 bytes. Readers index the table by fixed-width offset, so the extra byte shifted every following entry and forced a cross-reference reconstruction (`qpdf --check`: `invalid xref entry`). The non-incremental writer in `pdf/xref.go` was already correct; its doc comment showed the wrong width and has been corrected.
+  - `pdf/modifier_extra_test.go`: regression test asserting every appended xref entry line is 20 bytes
+
+### Changed
+- `_validation` now resolves again: `github.com/hhrutter/lzw` was pinned to `v1.0.4`, a version that no longer exists upstream, and the `go.sum` entry for `github.com/hhrutter/tiff v1.0.4` no longer matched the module. The indirect requirements are realigned with what `pdfcpu v0.9.1` declares (`lzw v1.0.0`, `tiff v1.0.1`); the recorded checksums are verified against `sum.golang.org`.
+  - `_validation/validation_test.go`: `TestQPDF_ObjectStreamRoundTrip` converts a generated PDF with `qpdf --object-streams=generate`, then merges and overlays it and validates the result with pdfcpu (skipped when `qpdf` is not installed)
+
 ## [1.0.11] - 2026-05-18
 
 ### Fixed
