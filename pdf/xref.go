@@ -52,8 +52,8 @@ func (t *XRefTable) Size() int {
 //
 //	xref
 //	0 N
-//	0000000000 65535 f \r\n
-//	0000000009 00000 n \r\n
+//	0000000000 65535 f\r\n
+//	0000000009 00000 n\r\n
 //	...
 //
 // Each entry line is exactly 20 bytes (including the trailing \r\n).

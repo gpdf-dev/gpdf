@@ -249,7 +249,11 @@ func (m *Modifier) writeIncrementalXRef(w io.Writer, xref *XRefTable) error {
 			return err
 		}
 		for k := i; k < j; k++ {
-			line := fmt.Sprintf("%010d %05d n \r\n", entries[k].offset, 0)
+			// Each line is exactly 20 bytes: 10-digit offset + space + 5-digit
+			// gen + space + marker + EOL(2), per ISO 32000-2 §7.5.4. An extra
+			// byte here shifts every following entry and makes readers treat
+			// the incremental update as damaged.
+			line := fmt.Sprintf("%010d %05d n\r\n", entries[k].offset, 0)
 			if _, err := io.WriteString(w, line); err != nil {
 				return err
 			}
