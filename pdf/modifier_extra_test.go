@@ -1,6 +1,7 @@
 package pdf
 
 import (
+	"bytes"
 	"testing"
 )
 
@@ -162,4 +163,69 @@ func TestModifierOverlayOutOfRange(t *testing.T) {
 	if err == nil {
 		t.Error("expected error for out-of-range page overlay")
 	}
+}
+
+// TestModifierIncrementalXRefEntryWidth guards the fixed-width xref entry format
+// of the incremental update. Every entry line must be exactly 20 bytes: readers
+// index into the table by offset, so a single extra byte shifts every following
+// entry and makes the update look damaged (ISO 32000-2 §7.5.4).
+func TestModifierIncrementalXRefEntryWidth(t *testing.T) {
+	data := buildTestPDF(t, 2)
+	r, err := NewReader(data)
+	if err != nil {
+		t.Fatalf("NewReader: %v", err)
+	}
+
+	m := NewModifier(r)
+	if err := m.OverlayPage(0, []byte("BT /F1 24 Tf 100 400 Td (OVERLAY) Tj ET"), nil); err != nil {
+		t.Fatalf("OverlayPage: %v", err)
+	}
+	result, err := m.Bytes()
+	if err != nil {
+		t.Fatalf("Bytes: %v", err)
+	}
+
+	// Take the appended xref section: "\nxref\n<subsections>trailer".
+	// Match on the leading newline so this does not hit "startxref".
+	xrefStart := bytes.LastIndex(result, []byte("\nxref\n"))
+	trailerStart := bytes.LastIndex(result, []byte("trailer"))
+	if xrefStart < 0 || trailerStart < xrefStart {
+		t.Fatalf("no incremental xref section found")
+	}
+	section := result[xrefStart+len("\nxref\n") : trailerStart]
+
+	entries := 0
+	for _, line := range bytes.SplitAfter(section, []byte("\n")) {
+		if len(line) == 0 {
+			continue
+		}
+		// Subsection headers are "start count\n"; entry lines begin with a
+		// zero-padded 10-digit offset. Match on the offset rather than the
+		// terminator so a wrong terminator is reported as a width error.
+		if !isXRefEntryLine(line) {
+			continue
+		}
+		entries++
+		if len(line) != 20 {
+			t.Errorf("xref entry %q is %d bytes, want exactly 20", line, len(line))
+		}
+	}
+	if entries == 0 {
+		t.Fatal("no xref entry lines found in the incremental section")
+	}
+}
+
+// isXRefEntryLine reports whether a line from an xref section is an entry
+// (a 10-digit zero-padded offset followed by a space) rather than a
+// "start count" subsection header.
+func isXRefEntryLine(line []byte) bool {
+	if len(line) < 11 || line[10] != ' ' {
+		return false
+	}
+	for _, c := range line[:10] {
+		if c < '0' || c > '9' {
+			return false
+		}
+	}
+	return true
 }
