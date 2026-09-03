@@ -11,6 +11,7 @@ import (
 	"github.com/gpdf-dev/gpdf/document"
 	"github.com/gpdf-dev/gpdf/document/layout"
 	"github.com/gpdf-dev/gpdf/pdf"
+	"github.com/gpdf-dev/gpdf/pdf/font"
 )
 
 // ---------------------------------------------------------------------------
@@ -835,14 +836,16 @@ func TestWriteOverlayToModifier_StandardFont(t *testing.T) {
 }
 
 func TestWriteOverlayToModifier_TrueTypeFont(t *testing.T) {
+	ttf, rawData := buildArabicTestFont(t)
 	m := newTestModifier(t)
 	result := &OverlayResult{
-		Content: []byte("BT /OvF1 12 Tf <0048> Tj ET"),
+		Content: []byte("BT /OvF1 12 Tf <0001> Tj ET"),
 		FontObjects: map[string]fontObject{
 			"NotoSansJP": {
 				ResName: "OvF1",
 				Family:  "NotoSansJP",
-				Data:    []byte{0x00, 0x01, 0x02, 0x03}, // dummy font data
+				Data:    rawData,
+				TTF:     ttf,
 			},
 		},
 		ImageObjects: map[string]imageObject{},
@@ -971,5 +974,187 @@ func TestWriteOverlayToModifier_FontsAndImages(t *testing.T) {
 	}
 	if _, ok := (*res)[pdf.Name("XObject")]; !ok {
 		t.Error("should have XObject in resources")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Embedded TrueType fonts in overlays (issue #37)
+// ---------------------------------------------------------------------------
+
+// buildArabicTestFont builds an in-memory TrueType font covering a few
+// non-ASCII runes, so overlay encoding can be tested without a font file.
+func buildArabicTestFont(t *testing.T) (*font.TrueTypeFont, []byte) {
+	t.Helper()
+	runeMap := map[rune]uint16{
+		'ا': 1,
+		'ب': 2,
+		'ت': 3,
+		' ': 4,
+	}
+	widths := []uint16{0, 300, 500, 500, 250}
+	data := buildTestTTFData(5, widths, runeMap)
+
+	ttf, err := font.ParseTrueType(data)
+	if err != nil {
+		t.Fatalf("ParseTrueType: %v", err)
+	}
+	return ttf, data
+}
+
+func overlayTextNodes(text string, family string) []layout.PlacedNode {
+	style := document.DefaultStyle()
+	style.FontSize = 12
+	style.FontFamily = family
+	return []layout.PlacedNode{
+		{
+			Node:     &document.Text{Content: text, TextStyle: style},
+			Position: document.Point{X: 72, Y: 100},
+			Size:     document.Size{Width: 200, Height: 14.4},
+		},
+	}
+}
+
+// Overlay text in a registered TrueType font must be written as Identity-H
+// glyph IDs. Emitting raw UTF-8 bytes made every non-ASCII character render
+// as "?" (issue #37).
+func TestOverlayRenderText_EmbeddedTTFEncodesGlyphIDs(t *testing.T) {
+	ttf, rawData := buildArabicTestFont(t)
+	r := NewOverlayRenderer(595, 842,
+		map[string]*font.TrueTypeFont{"NotoNaskhArabic": ttf},
+		map[string][]byte{"NotoNaskhArabic": rawData},
+	)
+
+	result, err := r.RenderOverlay(overlayTextNodes("اب", "NotoNaskhArabic"))
+	if err != nil {
+		t.Fatalf("RenderOverlay: %v", err)
+	}
+
+	content := string(result.Content)
+	if !strings.Contains(content, "<00010002> Tj") {
+		t.Errorf("expected Identity-H glyph IDs, got:\n%s", content)
+	}
+	if strings.Contains(content, "(") {
+		t.Errorf("embedded TTF text must not be emitted as a literal string:\n%s", content)
+	}
+
+	fo, ok := result.FontObjects["NotoNaskhArabic"]
+	if !ok {
+		t.Fatal("font object should be recorded for the registered family")
+	}
+	if fo.TTF != ttf {
+		t.Error("font object should carry the parsed TrueType font")
+	}
+}
+
+// A bold/italic variant with no dedicated face registered must still use the
+// base family's embedded font rather than falling back to Helvetica.
+func TestOverlayRenderText_VariantFallsBackToBaseFamily(t *testing.T) {
+	ttf, rawData := buildArabicTestFont(t)
+	r := NewOverlayRenderer(595, 842,
+		map[string]*font.TrueTypeFont{"NotoNaskhArabic": ttf},
+		map[string][]byte{"NotoNaskhArabic": rawData},
+	)
+
+	nodes := overlayTextNodes("اب", "NotoNaskhArabic")
+	textNode := nodes[0].Node.(*document.Text)
+	textNode.TextStyle.FontWeight = document.WeightBold
+
+	result, err := r.RenderOverlay(nodes)
+	if err != nil {
+		t.Fatalf("RenderOverlay: %v", err)
+	}
+	if !strings.Contains(string(result.Content), "<00010002> Tj") {
+		t.Errorf("bold variant should reuse the base family font:\n%s", result.Content)
+	}
+	if _, ok := result.FontObjects["NotoNaskhArabic"]; !ok {
+		t.Error("font object should be keyed by the base family")
+	}
+}
+
+func TestWriteOverlayToModifier_EmbedsType0Font(t *testing.T) {
+	ttf, rawData := buildArabicTestFont(t)
+	r := NewOverlayRenderer(595, 842,
+		map[string]*font.TrueTypeFont{"NotoNaskhArabic": ttf},
+		map[string][]byte{"NotoNaskhArabic": rawData},
+	)
+	result, err := r.RenderOverlay(overlayTextNodes("اب", "NotoNaskhArabic"))
+	if err != nil {
+		t.Fatalf("RenderOverlay: %v", err)
+	}
+
+	m := newTestModifier(t)
+	if _, _, err := WriteOverlayToModifier(result, m); err != nil {
+		t.Fatalf("WriteOverlayToModifier: %v", err)
+	}
+
+	out, err := m.Bytes()
+	if err != nil {
+		t.Fatalf("Bytes: %v", err)
+	}
+	for _, want := range []string{"/Type0", "/Identity-H", "/CIDFontType2", "/FontFile2", "/ToUnicode"} {
+		if !bytes.Contains(out, []byte(want)) {
+			t.Errorf("output PDF should contain %s", want)
+		}
+	}
+}
+
+// A font used by several pages must be allocated and embedded exactly once.
+func TestOverlayFontRegistry_SharesFontAcrossPages(t *testing.T) {
+	ttf, rawData := buildArabicTestFont(t)
+	fonts := map[string]*font.TrueTypeFont{"NotoNaskhArabic": ttf}
+	fontData := map[string][]byte{"NotoNaskhArabic": rawData}
+
+	m := newTestModifier(t)
+	reg := NewOverlayFontRegistry()
+
+	var refs []pdf.ObjectRef
+	for _, text := range []string{"اب", "تا"} {
+		r := NewOverlayRenderer(595, 842, fonts, fontData)
+		result, err := r.RenderOverlay(overlayTextNodes(text, "NotoNaskhArabic"))
+		if err != nil {
+			t.Fatalf("RenderOverlay: %v", err)
+		}
+		_, res, err := WriteOverlayToModifierWithFonts(result, m, reg)
+		if err != nil {
+			t.Fatalf("WriteOverlayToModifierWithFonts: %v", err)
+		}
+		fontDict, ok := (*res)[pdf.Name("Font")].(pdf.Dict)
+		if !ok {
+			t.Fatal("resources should contain a Font dict")
+		}
+		for _, v := range fontDict {
+			ref, ok := v.(pdf.ObjectRef)
+			if !ok {
+				t.Fatalf("font resource should be an object ref, got %T", v)
+			}
+			refs = append(refs, ref)
+		}
+	}
+
+	if len(refs) != 2 || refs[0] != refs[1] {
+		t.Errorf("both pages should reference the same font object, got %v", refs)
+	}
+
+	if err := reg.Flush(m); err != nil {
+		t.Fatalf("Flush: %v", err)
+	}
+	out, err := m.Bytes()
+	if err != nil {
+		t.Fatalf("Bytes: %v", err)
+	}
+	if n := bytes.Count(out, []byte("/FontFile2")); n != 1 {
+		t.Errorf("font should be embedded once, found %d FontFile2 entries", n)
+	}
+
+	// Flush is idempotent: a second call must not re-embed the font.
+	if err := reg.Flush(m); err != nil {
+		t.Fatalf("second Flush: %v", err)
+	}
+	out2, err := m.Bytes()
+	if err != nil {
+		t.Fatalf("Bytes: %v", err)
+	}
+	if n := bytes.Count(out2, []byte("/FontFile2")); n != 1 {
+		t.Errorf("second Flush should not re-embed the font, found %d entries", n)
 	}
 }

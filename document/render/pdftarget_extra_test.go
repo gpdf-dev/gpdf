@@ -532,7 +532,7 @@ func TestSubsetFontData(t *testing.T) {
 	// Encode a few characters to populate usedRunes.
 	ttf.Encode("ABC")
 
-	subsetData := r.subsetFontData(ttf, rawData)
+	subsetData := subsetFontData(ttf, rawData)
 	if len(subsetData) == 0 {
 		t.Error("subset data should not be empty")
 	}
@@ -556,9 +556,8 @@ func TestSubsetFontData_NoUsedRunes(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	r, _ := newTestRenderer(t)
 	// No characters encoded, usedRunes is empty.
-	subsetData := r.subsetFontData(ttf, rawData)
+	subsetData := subsetFontData(ttf, rawData)
 	if subsetData == nil {
 		t.Error("subset data should not be nil")
 	}
@@ -584,11 +583,10 @@ func TestWriteFontDescriptor(t *testing.T) {
 
 	var buf bytes.Buffer
 	w := pdf.NewWriter(&buf)
-	r := NewPDFRenderer(w)
 	metrics := ttf.Metrics()
 
 	fontFileRef := w.AllocObject()
-	descRef, err := r.writeFontDescriptor(w, "TestFont", metrics, fontFileRef)
+	descRef, err := writeFontDescriptor(w, "TestFont", metrics, fontFileRef)
 	if err != nil {
 		t.Fatalf("writeFontDescriptor error: %v", err)
 	}
@@ -604,12 +602,11 @@ func TestWriteFontDescriptor(t *testing.T) {
 func TestWriteCIDFont(t *testing.T) {
 	var buf bytes.Buffer
 	w := pdf.NewWriter(&buf)
-	r := NewPDFRenderer(w)
 
 	descRef := w.AllocObject()
 	wArray := pdf.Array{pdf.Integer(1), pdf.Array{pdf.Integer(500)}}
 
-	cidRef, err := r.writeCIDFont(w, "TestFont", descRef, 1000, wArray)
+	cidRef, err := writeCIDFont(w, "TestFont", descRef, 1000, wArray)
 	if err != nil {
 		t.Fatalf("writeCIDFont error: %v", err)
 	}
@@ -621,11 +618,10 @@ func TestWriteCIDFont(t *testing.T) {
 func TestWriteCIDFont_EmptyWidths(t *testing.T) {
 	var buf bytes.Buffer
 	w := pdf.NewWriter(&buf)
-	r := NewPDFRenderer(w)
 
 	descRef := w.AllocObject()
 
-	cidRef, err := r.writeCIDFont(w, "TestFont", descRef, 1000, nil)
+	cidRef, err := writeCIDFont(w, "TestFont", descRef, 1000, nil)
 	if err != nil {
 		t.Fatalf("writeCIDFont error: %v", err)
 	}

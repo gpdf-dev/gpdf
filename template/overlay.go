@@ -16,6 +16,7 @@ type ExistingDocument struct {
 	modifier    *pdf.Modifier
 	fonts       map[string]*font.TrueTypeFont
 	fontDataMap map[string][]byte
+	fontReg     *render.OverlayFontRegistry
 	config      Config
 }
 
@@ -41,6 +42,7 @@ func OpenExisting(data []byte, opts ...Option) (*ExistingDocument, error) {
 		modifier:    pdf.NewModifier(reader),
 		fonts:       make(map[string]*font.TrueTypeFont),
 		fontDataMap: make(map[string][]byte),
+		fontReg:     render.NewOverlayFontRegistry(),
 		config:      cfg,
 	}
 
@@ -108,7 +110,7 @@ func (d *ExistingDocument) Overlay(pageIndex int, fn func(p *PageBuilder)) error
 	}
 
 	// Write overlay resources to modifier and get content + resource dict.
-	content, resources, err := render.WriteOverlayToModifier(result, d.modifier)
+	content, resources, err := render.WriteOverlayToModifierWithFonts(result, d.modifier, d.fontReg)
 	if err != nil {
 		return fmt.Errorf("gpdf: write overlay: %w", err)
 	}
@@ -141,7 +143,12 @@ func (d *ExistingDocument) FlattenForms() error {
 	return d.modifier.FlattenForms()
 }
 
-// Save generates the modified PDF as a byte slice.
+// Save generates the modified PDF as a byte slice. Fonts used by overlays are
+// embedded here rather than per page, so a font referenced from many pages is
+// subsetted once over every glyph the document actually uses.
 func (d *ExistingDocument) Save() ([]byte, error) {
+	if err := d.fontReg.Flush(d.modifier); err != nil {
+		return nil, fmt.Errorf("gpdf: embed overlay fonts: %w", err)
+	}
 	return d.modifier.Bytes()
 }

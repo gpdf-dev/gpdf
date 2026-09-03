@@ -384,6 +384,54 @@ func TestPoppler_PdfToText(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// Overlay with an embedded font — see gpdf#37
+// ---------------------------------------------------------------------------
+
+// TestOverlayEmbeddedFont checks that overlay text drawn in a font registered
+// via WithFont produces a valid PDF. The font is embedded as a Type0 composite
+// font through an incremental update; before the fix the overlay wrote raw
+// UTF-8 bytes against a bare /TrueType dict and every non-ASCII character
+// rendered as "?".
+func TestOverlayEmbeddedFont(t *testing.T) {
+	fontPath := filepath.Join("..", "..", "NotoSansJP-Regular.ttf")
+	fontData, err := os.ReadFile(fontPath)
+	if err != nil {
+		t.Skipf("font fixture not found: %s", fontPath)
+	}
+
+	plain, err := genHelloWorld()
+	if err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+
+	doc, err := gpdf.Open(plain, template.WithFont("NotoSansJP", fontData))
+	if err != nil {
+		t.Fatalf("open PDF: %v", err)
+	}
+	err = doc.Overlay(0, func(p *template.PageBuilder) {
+		p.AutoRow(func(r *template.RowBuilder) {
+			r.Col(12, func(c *template.ColBuilder) {
+				c.Text("日本語オーバーレイ", template.FontFamily("NotoSansJP"))
+			})
+		})
+	})
+	if err != nil {
+		t.Fatalf("overlay: %v", err)
+	}
+	out, err := doc.Save()
+	if err != nil {
+		t.Fatalf("save: %v", err)
+	}
+
+	if err := pdfcpuapi.Validate(bytes.NewReader(out), nil); err != nil {
+		t.Errorf("pdfcpu validate overlay with embedded font: %v", err)
+	}
+	if !bytes.Contains(out, []byte("/Identity-H")) {
+		t.Error("overlay font should be embedded as a Type0/Identity-H font")
+	}
+}
+
+// ---------------------------------------------------------------------------
 // Object stream (/ObjStm) round-trip — see gpdf#35
 // ---------------------------------------------------------------------------
 

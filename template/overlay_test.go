@@ -2,6 +2,8 @@ package template
 
 import (
 	"bytes"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/gpdf-dev/gpdf/document"
@@ -274,5 +276,50 @@ func TestSave_NoModifications(t *testing.T) {
 	// No modifications should produce identical output.
 	if !bytes.Equal(result, data) {
 		t.Error("no-modification save should produce identical output")
+	}
+}
+
+// Overlay text drawn in a font registered via WithFont must be embedded as a
+// Type0/Identity-H composite font. Before the fix the overlay renderer emitted
+// raw UTF-8 bytes against a bare /TrueType dict, so viewers showed "?" for
+// every non-ASCII character (issue #37).
+func TestOverlay_EmbeddedFontRendersNonASCII(t *testing.T) {
+	// Same Noto fixture as the CJK example tests; skip where it is absent.
+	path := filepath.Join("..", "..", "NotoSansJP-Regular.ttf")
+	fontData, err := os.ReadFile(path)
+	if err != nil {
+		t.Skipf("font fixture not found: %s", path)
+	}
+
+	doc, err := OpenExisting(generateTestPDF(t, 2), WithFont("NotoSansJP", fontData))
+	if err != nil {
+		t.Fatalf("OpenExisting: %v", err)
+	}
+
+	for _, text := range []string{"日本語のテキスト", "ページ二枚目"} {
+		if err := doc.Overlay(0, func(p *PageBuilder) {
+			p.AutoRow(func(r *RowBuilder) {
+				r.Col(12, func(c *ColBuilder) {
+					c.Text(text, FontFamily("NotoSansJP"), FontSize(18))
+				})
+			})
+		}); err != nil {
+			t.Fatalf("Overlay: %v", err)
+		}
+	}
+
+	out, err := doc.Save()
+	if err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+
+	for _, want := range []string{"/Type0", "/Identity-H", "/FontFile2"} {
+		if !bytes.Contains(out, []byte(want)) {
+			t.Errorf("output PDF should contain %s", want)
+		}
+	}
+	// The font is shared by both overlays, so it must be embedded only once.
+	if n := bytes.Count(out, []byte("/FontFile2")); n != 1 {
+		t.Errorf("font should be embedded once, found %d FontFile2 entries", n)
 	}
 }
