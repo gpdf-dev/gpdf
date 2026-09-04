@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.0.13] - 2026-09-04
+
 ### Fixed
 - Overlay text drawn in a font registered via `WithFont` is now embedded as a Type0/Identity-H composite font, so non-Latin scripts (Arabic, CJK, Cyrillic, …) render correctly instead of as `?` (#37)
   - `document/render/overlay.go`: `renderText` emitted the raw UTF-8 bytes as a literal string (`(…) Tj`) while `WriteOverlayToModifier` registered the font as a bare `/Subtype /TrueType` dict with no `/Encoding`, `/Widths` or `/FirstChar`. Viewers read those bytes as single-byte codes and substituted a glyph for each one. Overlay text in a registered TrueType font is now encoded as big-endian glyph IDs (`<…> Tj`), matching what the normal render path has always done.
@@ -207,7 +209,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Reed-Solomon coefficient order in QR code encoder
 - binary.Write return value handling for errcheck lint
 
-[Unreleased]: https://github.com/gpdf-dev/gpdf/compare/v1.0.12...HEAD
+[Unreleased]: https://github.com/gpdf-dev/gpdf/compare/v1.0.13...HEAD
+[1.0.13]: https://github.com/gpdf-dev/gpdf/compare/v1.0.12...v1.0.13
 [1.0.12]: https://github.com/gpdf-dev/gpdf/compare/v1.0.11...v1.0.12
 [1.0.11]: https://github.com/gpdf-dev/gpdf/compare/v1.0.10...v1.0.11
 [1.0.10]: https://github.com/gpdf-dev/gpdf/compare/v1.0.9...v1.0.10
