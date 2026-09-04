@@ -12,7 +12,6 @@ import (
 	"fmt"
 	"regexp"
 	"strconv"
-	"strings"
 )
 
 // SignatureInfo holds parsed signature information from a signed PDF.
@@ -348,11 +347,68 @@ func extractContentsHex(s string) ([]byte, error) {
 	if m == nil {
 		return nil, fmt.Errorf("contents hex string not found")
 	}
-	hexStr := strings.TrimRight(m[1], "0") // remove trailing zero padding
+	hexStr := m[1]
 	if len(hexStr)%2 != 0 {
 		hexStr += "0"
 	}
-	return hex.DecodeString(hexStr)
+	raw, err := hex.DecodeString(hexStr)
+	if err != nil {
+		return nil, err
+	}
+	// The /Contents placeholder is fixed-width and zero-padded on the right.
+	// Trimming those zeros textually would also eat the CMS blob's own trailing
+	// zero bytes — a DER structure ending in 0x00 came back one byte short and
+	// failed to parse as "data truncated". Read the outer DER length instead so
+	// exactly the signature is returned, whatever it ends with.
+	return trimDERPadding(raw)
+}
+
+// derSequenceTag is the ASN.1 universal tag for a constructed SEQUENCE.
+const derSequenceTag = 0x30
+
+// trimDERPadding returns the leading DER object in data, discarding whatever
+// follows it. It reads the tag-length header of the outer structure rather
+// than looking at the content, so trailing zero padding is dropped without
+// depending on the payload's own bytes.
+func trimDERPadding(data []byte) ([]byte, error) {
+	if len(data) < 2 {
+		return nil, fmt.Errorf("contents too short for a DER object: %d bytes", len(data))
+	}
+	// CMS ContentInfo is always a SEQUENCE. Checking the tag also rejects an
+	// untouched all-zero placeholder with a clear message instead of handing
+	// two zero bytes to the ASN.1 parser.
+	if data[0] != derSequenceTag {
+		return nil, fmt.Errorf("contents do not start with a DER SEQUENCE (tag 0x%02X)", data[0])
+	}
+
+	lengthByte := data[1]
+	if lengthByte < 0x80 {
+		// Short form: the length byte is the content length.
+		return sliceDER(data, 2, int(lengthByte))
+	}
+
+	numLenBytes := int(lengthByte & 0x7F)
+	if numLenBytes == 0 {
+		// Indefinite length is forbidden in DER.
+		return nil, fmt.Errorf("contents use indefinite DER length")
+	}
+	if numLenBytes > 4 || len(data) < 2+numLenBytes {
+		return nil, fmt.Errorf("invalid DER length header in contents")
+	}
+
+	contentLen := 0
+	for _, b := range data[2 : 2+numLenBytes] {
+		contentLen = contentLen<<8 | int(b)
+	}
+	return sliceDER(data, 2+numLenBytes, contentLen)
+}
+
+func sliceDER(data []byte, headerLen, contentLen int) ([]byte, error) {
+	total := headerLen + contentLen
+	if contentLen < 0 || total > len(data) {
+		return nil, fmt.Errorf("DER object of %d bytes exceeds contents of %d bytes", total, len(data))
+	}
+	return data[:total], nil
 }
 
 func constantTimeEqual(a, b []byte) bool {

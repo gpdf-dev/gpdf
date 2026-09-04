@@ -17,6 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   - `document/render/pdftarget.go`: the Type0/CIDFont writer (`writeType0Font`, `writeFontDescriptor`, `writeCIDFont`, `writeToUnicodeCMap`, `writeCompressedStream`, `subsetFontData`) is now written against an `objectSink` interface so it serves both `pdf.Writer` (new documents) and `pdf.Modifier` (incremental updates) instead of being duplicated.
   - `document/render/overlay_test.go`, `template/overlay_test.go`: regression coverage for glyph-ID encoding, the variant fallback, the emitted `/Type0` + `/Identity-H` + `/FontFile2` structure, and single embedding across pages
   - `_validation/validation_test.go`: `TestOverlayEmbeddedFont` validates an overlay-with-embedded-font PDF through pdfcpu
+- `ParseSignatureInfo` no longer truncates a CMS blob whose DER ends in a zero byte, which made ECDSA signature verification fail intermittently
+  - `signature/verify.go`: `extractContentsHex` stripped the fixed-width `/Contents` placeholder padding with `strings.TrimRight(hex, "0")`, so a signature whose own final byte was `0x00` came back one byte short and failed to parse as `asn1: syntax error: data truncated`. The outer DER tag-length header is now read to slice off exactly the signature, whatever it ends with. An all-zero placeholder is also rejected with a clear message instead of reaching the ASN.1 parser.
+  - This affected ECDSA in practice — its DER length and trailing byte vary per signature, so roughly 1 in 256 signatures hit it, which showed up as a flaky `TestSign_WithTimestamp_ECDSA` in CI. RSA was unaffected because its signature length is fixed.
+  - `signature/sign_test.go`: deterministic coverage for a payload ending in `0x00`, long-form DER lengths, and malformed contents
 
 ## [1.0.12] - 2026-09-03
 

@@ -2,6 +2,7 @@ package signature
 
 import (
 	"bytes"
+	"encoding/hex"
 	"strings"
 	"testing"
 	"time"
@@ -229,5 +230,61 @@ func TestGenerateTestECCertificate(t *testing.T) {
 	}
 	if signer.PrivateKey == nil {
 		t.Error("private key is nil")
+	}
+}
+
+// The /Contents placeholder is fixed-width and zero-padded, but the padding
+// cannot be stripped textually: a CMS blob whose own DER ends in 0x00 loses
+// that byte and fails to parse as "data truncated". ECDSA hits this roughly
+// once every 256 signatures because its DER length and final byte vary per
+// signature, which made TestSign_WithTimestamp_ECDSA flaky in CI.
+func TestExtractContentsHex_PayloadEndingInZeroByte(t *testing.T) {
+	// A DER SEQUENCE holding one OCTET STRING that ends in 0x00.
+	der := []byte{0x30, 0x06, 0x04, 0x04, 0xDE, 0xAD, 0xBE, 0x00}
+
+	hexStr := strings.ToUpper(hex.EncodeToString(der))
+	padded := hexStr + strings.Repeat("0", 40) // placeholder zero padding
+	pdfLike := "/Contents <" + padded + ">"
+
+	got, err := extractContentsHex(pdfLike)
+	if err != nil {
+		t.Fatalf("extractContentsHex: %v", err)
+	}
+	if !bytes.Equal(got, der) {
+		t.Errorf("got % X, want % X", got, der)
+	}
+}
+
+func TestExtractContentsHex_LongFormLength(t *testing.T) {
+	// Long-form length: SEQUENCE with a 200-byte OCTET STRING payload of zeros.
+	payload := make([]byte, 200)
+	der := append([]byte{0x30, 0x81, 0xCA, 0x04, 0x81, 0xC7}, payload[:199]...)
+
+	padded := strings.ToUpper(hex.EncodeToString(der)) + strings.Repeat("0", 64)
+	got, err := extractContentsHex("/Contents <" + padded + ">")
+	if err != nil {
+		t.Fatalf("extractContentsHex: %v", err)
+	}
+	if len(got) != len(der) {
+		t.Errorf("got %d bytes, want %d", len(got), len(der))
+	}
+}
+
+func TestExtractContentsHex_Malformed(t *testing.T) {
+	tests := []struct {
+		name     string
+		contents string
+	}{
+		{"all padding", strings.Repeat("0", 32)},
+		{"too short", "30"},
+		{"length exceeds contents", "3082FFFF" + strings.Repeat("0", 16)},
+		{"indefinite length", "3080" + strings.Repeat("0", 16)},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if _, err := extractContentsHex("/Contents <" + tt.contents + ">"); err == nil {
+				t.Error("expected an error")
+			}
+		})
 	}
 }
