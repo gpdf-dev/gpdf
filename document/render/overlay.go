@@ -2,6 +2,7 @@ package render
 
 import (
 	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"strings"
 
@@ -26,7 +27,8 @@ type OverlayResult struct {
 type fontObject struct {
 	ResName string
 	Family  string
-	Data    []byte // nil for standard fonts
+	Data    []byte             // nil for standard (non-embedded) fonts
+	TTF     *font.TrueTypeFont // nil for standard fonts
 }
 
 type imageObject struct {
@@ -155,7 +157,7 @@ func (r *OverlayRenderer) renderText(text string, pos document.Point, style docu
 		fontSize = 12
 	}
 
-	fontName := resolvePDFFontName(style.FontFamily, style.FontWeight, style.FontStyle)
+	fontName, ttf := r.resolveTextFont(style)
 	resName := r.ensureFont(fontName)
 
 	pdfY := r.pageHeight - pos.Y - fontSize
@@ -172,7 +174,15 @@ func (r *OverlayRenderer) renderText(text string, pos document.Point, style docu
 		fmt.Fprintf(&buf, "%g Tc\n", style.LetterSpacing)
 	}
 	fmt.Fprintf(&buf, "%g %g Td\n", pos.X, pdfY)
-	fmt.Fprintf(&buf, "(%s) Tj\n", escapeStringPDF(text))
+	if ttf != nil {
+		// Embedded TrueType fonts are written as Type0/Identity-H composite
+		// fonts, so text is encoded as big-endian glyph IDs. Emitting the raw
+		// UTF-8 bytes here instead makes viewers render every non-ASCII
+		// character as "?" (issue #37).
+		fmt.Fprintf(&buf, "<%s> Tj\n", hex.EncodeToString(ttf.Encode(text)))
+	} else {
+		fmt.Fprintf(&buf, "(%s) Tj\n", escapeStringPDF(text))
+	}
 	if style.LetterSpacing != 0 {
 		buf.WriteString("0 Tc\n")
 	}
@@ -237,6 +247,22 @@ func (r *OverlayRenderer) renderImage(src document.ImageSource, pos document.Poi
 	r.content = append(r.content, buf.String()...)
 }
 
+// resolveTextFont picks the PDF font name for a style and returns the
+// registered TrueType font behind it, if any. Like the main renderer it falls
+// back from the variant name (e.g. "MyFont-Bold") to the base family so that
+// a single registered face still gets used — and embedded — for bold/italic
+// text instead of silently degrading to Helvetica.
+func (r *OverlayRenderer) resolveTextFont(style document.Style) (string, *font.TrueTypeFont) {
+	fontName := resolvePDFFontName(style.FontFamily, style.FontWeight, style.FontStyle)
+	if ttf, ok := r.fonts[fontName]; ok {
+		return fontName, ttf
+	}
+	if ttf, ok := r.fonts[style.FontFamily]; ok {
+		return style.FontFamily, ttf
+	}
+	return fontName, nil
+}
+
 func (r *OverlayRenderer) ensureFont(family string) string {
 	if family == "" {
 		family = "Helvetica"
@@ -249,15 +275,21 @@ func (r *OverlayRenderer) ensureFont(family string) string {
 	resName := fmt.Sprintf("OvF%d", r.fontCount)
 	r.fontMap[family] = resName
 
+	ttf := r.fonts[family]
+
 	var data []byte
 	if r.fontDataMap != nil {
 		data = r.fontDataMap[family]
+	}
+	if len(data) == 0 && ttf != nil {
+		data = ttf.Data()
 	}
 
 	r.fontObjects[family] = fontObject{
 		ResName: resName,
 		Family:  family,
 		Data:    data,
+		TTF:     ttf,
 	}
 
 	return resName
@@ -356,9 +388,89 @@ func RenderOverlayContent(
 	return renderer.RenderOverlay(layouts[0].Children)
 }
 
+// modifierSink adapts a [pdf.Modifier] to the objectSink interface used by
+// the shared composite-font writer in pdftarget.go.
+type modifierSink struct{ m *pdf.Modifier }
+
+func (s modifierSink) AllocObject() pdf.ObjectRef { return s.m.AllocObject() }
+
+func (s modifierSink) WriteObject(ref pdf.ObjectRef, obj pdf.Object) error {
+	s.m.SetObject(ref, obj)
+	return nil
+}
+
+// OverlayFontRegistry assigns one PDF font object per font family across all
+// overlay operations on a document. Object references are handed out eagerly
+// so pages can reference them, while the font objects themselves are written
+// by Flush — after every page has been rendered, so the embedded subset covers
+// all glyphs used anywhere in the document and is embedded exactly once.
+type OverlayFontRegistry struct {
+	refs  map[string]pdf.ObjectRef
+	fonts map[string]fontObject
+}
+
+// NewOverlayFontRegistry creates an empty registry.
+func NewOverlayFontRegistry() *OverlayFontRegistry {
+	return &OverlayFontRegistry{
+		refs:  make(map[string]pdf.ObjectRef),
+		fonts: make(map[string]fontObject),
+	}
+}
+
+// ref returns the object reference for a font, allocating it on first use.
+func (reg *OverlayFontRegistry) ref(m *pdf.Modifier, fo fontObject) pdf.ObjectRef {
+	if ref, ok := reg.refs[fo.Family]; ok {
+		return ref
+	}
+	ref := m.AllocObject()
+	reg.refs[fo.Family] = ref
+	reg.fonts[fo.Family] = fo
+	return ref
+}
+
+// Flush writes the font objects for every family registered so far.
+func (reg *OverlayFontRegistry) Flush(m *pdf.Modifier) error {
+	sink := modifierSink{m: m}
+	for family, fo := range reg.fonts {
+		ref := reg.refs[family]
+		if fo.TTF != nil {
+			if err := writeType0Font(sink, family, ref, fo.TTF, fo.Data); err != nil {
+				return fmt.Errorf("write overlay font %q: %w", family, err)
+			}
+			continue
+		}
+		// Standard Type1 font — no embedded data.
+		m.SetObject(ref, pdf.Dict{
+			pdf.Name("Type"):     pdf.Name("Font"),
+			pdf.Name("Subtype"):  pdf.Name("Type1"),
+			pdf.Name("BaseFont"): pdf.Name(family),
+		})
+	}
+	clear(reg.fonts)
+	return nil
+}
+
 // WriteOverlayToModifier registers overlay fonts and images with the modifier,
 // and returns the content bytes and a resource dict with the correct ObjectRefs.
+// Fonts are embedded immediately; use [WriteOverlayToModifierWithFonts] with a
+// shared [OverlayFontRegistry] when overlaying several pages of one document so
+// that each font is embedded only once.
 func WriteOverlayToModifier(result *OverlayResult, m *pdf.Modifier) ([]byte, *pdf.Dict, error) {
+	reg := NewOverlayFontRegistry()
+	content, resources, err := WriteOverlayToModifierWithFonts(result, m, reg)
+	if err != nil {
+		return nil, nil, err
+	}
+	if err := reg.Flush(m); err != nil {
+		return nil, nil, err
+	}
+	return content, resources, nil
+}
+
+// WriteOverlayToModifierWithFonts is [WriteOverlayToModifier] with an explicit
+// font registry. The caller is responsible for calling reg.Flush before the
+// modified PDF is written out.
+func WriteOverlayToModifierWithFonts(result *OverlayResult, m *pdf.Modifier, reg *OverlayFontRegistry) ([]byte, *pdf.Dict, error) {
 	if result == nil || len(result.Content) == 0 {
 		return nil, nil, nil
 	}
@@ -369,46 +481,7 @@ func WriteOverlayToModifier(result *OverlayResult, m *pdf.Modifier) ([]byte, *pd
 	if len(result.FontObjects) > 0 {
 		fontDict := make(pdf.Dict)
 		for _, fo := range result.FontObjects {
-			fontRef := m.AllocObject()
-
-			if len(fo.Data) > 0 {
-				// TrueType font with embedded data.
-				fontFileRef := m.AllocObject()
-				compressed, err := pdf.CompressFlate(fo.Data)
-				if err != nil {
-					return nil, nil, fmt.Errorf("compress font: %w", err)
-				}
-				m.SetObject(fontFileRef, pdf.Stream{
-					Dict: pdf.Dict{
-						pdf.Name("Length1"): pdf.Integer(len(fo.Data)),
-						pdf.Name("Filter"):  pdf.Name("FlateDecode"),
-					},
-					Content: compressed,
-				})
-
-				descRef := m.AllocObject()
-				m.SetObject(descRef, pdf.Dict{
-					pdf.Name("Type"):      pdf.Name("FontDescriptor"),
-					pdf.Name("FontName"):  pdf.Name(fo.Family),
-					pdf.Name("FontFile2"): fontFileRef,
-				})
-
-				m.SetObject(fontRef, pdf.Dict{
-					pdf.Name("Type"):           pdf.Name("Font"),
-					pdf.Name("Subtype"):        pdf.Name("TrueType"),
-					pdf.Name("BaseFont"):       pdf.Name(fo.Family),
-					pdf.Name("FontDescriptor"): descRef,
-				})
-			} else {
-				// Standard Type1 font.
-				m.SetObject(fontRef, pdf.Dict{
-					pdf.Name("Type"):     pdf.Name("Font"),
-					pdf.Name("Subtype"):  pdf.Name("Type1"),
-					pdf.Name("BaseFont"): pdf.Name(fo.Family),
-				})
-			}
-
-			fontDict[pdf.Name(fo.ResName)] = fontRef
+			fontDict[pdf.Name(fo.ResName)] = reg.ref(m, fo)
 		}
 		resources[pdf.Name("Font")] = fontDict
 	}

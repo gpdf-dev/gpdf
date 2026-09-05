@@ -635,7 +635,7 @@ func (r *PDFRenderer) ensureFont(family string) (string, error) {
 		// after all text has been encoded (so we know which glyphs to subset).
 		rawData := r.ttFontData[family]
 		r.writer.OnBeforeClose(func(pw *pdf.Writer) error {
-			return r.writeType0Font(pw, family, ref, ttf, rawData)
+			return writeType0Font(pw, family, ref, ttf, rawData)
 		})
 		return resName, nil
 	}
@@ -651,22 +651,34 @@ func (r *PDFRenderer) ensureFont(family string) (string, error) {
 	return resName, nil
 }
 
+// objectSink is the subset of the PDF object-writing API shared by
+// [pdf.Writer] (new documents) and [pdf.Modifier] (incremental updates to an
+// existing document). It lets the composite-font writer below serve both the
+// normal render path and the overlay path.
+type objectSink interface {
+	AllocObject() pdf.ObjectRef
+	WriteObject(ref pdf.ObjectRef, obj pdf.Object) error
+}
+
 // writeType0Font writes the complete Type0 composite font structure required
-// for CJK and other non-WinAnsi text. The structure is:
+// for CJK, Arabic and other non-WinAnsi text. The structure is:
 //
 //	Type0 Font → DescendantFonts → CIDFont (CIDFontType2)
 //	                                 ├── FontDescriptor → FontFile2 (subsetted TTF)
 //	                                 ├── DW (default width)
 //	                                 └── W (per-glyph widths)
 //	           → ToUnicode CMap stream
-func (r *PDFRenderer) writeType0Font(pw *pdf.Writer, family string, fontRef pdf.ObjectRef, ttf *font.TrueTypeFont, rawData []byte) error {
+//
+// It must be called after all text using the font has been encoded, so that
+// the subset covers every glyph actually referenced.
+func writeType0Font(sink objectSink, family string, fontRef pdf.ObjectRef, ttf *font.TrueTypeFont, rawData []byte) error {
 	metrics := ttf.Metrics()
 
 	// Subset the font to include only used glyphs.
-	subsetData := r.subsetFontData(ttf, rawData)
+	subsetData := subsetFontData(ttf, rawData)
 
 	// Write FontFile2 (embedded font stream).
-	fontFileRef, err := writeCompressedStream(pw, subsetData, pdf.Dict{
+	fontFileRef, err := writeCompressedStream(sink, subsetData, pdf.Dict{
 		pdf.Name("Length1"): pdf.Integer(len(subsetData)),
 	})
 	if err != nil {
@@ -674,7 +686,7 @@ func (r *PDFRenderer) writeType0Font(pw *pdf.Writer, family string, fontRef pdf.
 	}
 
 	// Write FontDescriptor.
-	descRef, err := r.writeFontDescriptor(pw, family, metrics, fontFileRef)
+	descRef, err := writeFontDescriptor(sink, family, metrics, fontFileRef)
 	if err != nil {
 		return err
 	}
@@ -688,17 +700,17 @@ func (r *PDFRenderer) writeType0Font(pw *pdf.Writer, family string, fontRef pdf.
 		dw = spaceW * 1000 / metrics.UnitsPerEm
 	}
 
-	cidFontRef, err := r.writeCIDFont(pw, family, descRef, dw, wArray)
+	cidFontRef, err := writeCIDFont(sink, family, descRef, dw, wArray)
 	if err != nil {
 		return err
 	}
 
-	toUnicodeRef, err := writeToUnicodeCMap(pw, runeToGID)
+	toUnicodeRef, err := writeToUnicodeCMap(sink, runeToGID)
 	if err != nil {
 		return err
 	}
 
-	return pw.WriteObject(fontRef, pdf.Dict{
+	return sink.WriteObject(fontRef, pdf.Dict{
 		pdf.Name("Type"):            pdf.Name("Font"),
 		pdf.Name("Subtype"):         pdf.Name("Type0"),
 		pdf.Name("BaseFont"):        pdf.Name(family),
@@ -708,7 +720,7 @@ func (r *PDFRenderer) writeType0Font(pw *pdf.Writer, family string, fontRef pdf.
 	})
 }
 
-func (r *PDFRenderer) subsetFontData(ttf *font.TrueTypeFont, rawData []byte) []byte {
+func subsetFontData(ttf *font.TrueTypeFont, rawData []byte) []byte {
 	usedRunes := ttf.UsedRunes()
 	runes := make([]rune, 0, len(usedRunes))
 	for r := range usedRunes {
@@ -722,20 +734,20 @@ func (r *PDFRenderer) subsetFontData(ttf *font.TrueTypeFont, rawData []byte) []b
 	return subsetData
 }
 
-func writeCompressedStream(pw *pdf.Writer, data []byte, extraDict pdf.Dict) (pdf.ObjectRef, error) {
-	ref := pw.AllocObject()
+func writeCompressedStream(sink objectSink, data []byte, extraDict pdf.Dict) (pdf.ObjectRef, error) {
+	ref := sink.AllocObject()
 	dict := extraDict
 	content := data
 	if compressed, err := pdf.CompressFlate(data); err == nil {
 		dict[pdf.Name("Filter")] = pdf.Name("FlateDecode")
 		content = compressed
 	}
-	return ref, pw.WriteObject(ref, pdf.Stream{Dict: dict, Content: content})
+	return ref, sink.WriteObject(ref, pdf.Stream{Dict: dict, Content: content})
 }
 
-func (r *PDFRenderer) writeFontDescriptor(pw *pdf.Writer, family string, metrics font.Metrics, fontFileRef pdf.ObjectRef) (pdf.ObjectRef, error) {
-	descRef := pw.AllocObject()
-	return descRef, pw.WriteObject(descRef, pdf.Dict{
+func writeFontDescriptor(sink objectSink, family string, metrics font.Metrics, fontFileRef pdf.ObjectRef) (pdf.ObjectRef, error) {
+	descRef := sink.AllocObject()
+	return descRef, sink.WriteObject(descRef, pdf.Dict{
 		pdf.Name("Type"):        pdf.Name("FontDescriptor"),
 		pdf.Name("FontName"):    pdf.Name(family),
 		pdf.Name("Flags"):       pdf.Integer(4), // Symbolic
@@ -781,8 +793,8 @@ func buildGlyphWidthArray(ttf *font.TrueTypeFont, runeToGID map[rune]uint16, uni
 	return wArray
 }
 
-func (r *PDFRenderer) writeCIDFont(pw *pdf.Writer, family string, descRef pdf.ObjectRef, dw int, wArray pdf.Array) (pdf.ObjectRef, error) {
-	cidFontRef := pw.AllocObject()
+func writeCIDFont(sink objectSink, family string, descRef pdf.ObjectRef, dw int, wArray pdf.Array) (pdf.ObjectRef, error) {
+	cidFontRef := sink.AllocObject()
 	cidFontDict := pdf.Dict{
 		pdf.Name("Type"):     pdf.Name("Font"),
 		pdf.Name("Subtype"):  pdf.Name("CIDFontType2"),
@@ -799,12 +811,12 @@ func (r *PDFRenderer) writeCIDFont(pw *pdf.Writer, family string, descRef pdf.Ob
 	if len(wArray) > 0 {
 		cidFontDict[pdf.Name("W")] = wArray
 	}
-	return cidFontRef, pw.WriteObject(cidFontRef, cidFontDict)
+	return cidFontRef, sink.WriteObject(cidFontRef, cidFontDict)
 }
 
-func writeToUnicodeCMap(pw *pdf.Writer, runeToGID map[rune]uint16) (pdf.ObjectRef, error) {
+func writeToUnicodeCMap(sink objectSink, runeToGID map[rune]uint16) (pdf.ObjectRef, error) {
 	data := font.GenerateToUnicodeCMap(runeToGID)
-	return writeCompressedStream(pw, data, pdf.Dict{})
+	return writeCompressedStream(sink, data, pdf.Dict{})
 }
 
 // ensureImage ensures an image is registered and returns its resource name.

@@ -525,7 +525,7 @@ func TestSubsetFontData_InMemory(t *testing.T) {
 	// Encode characters to populate usedRunes.
 	ttf.Encode("ABC")
 
-	subsetData := r.subsetFontData(ttf, rawData)
+	subsetData := subsetFontData(ttf, rawData)
 	if len(subsetData) == 0 {
 		t.Error("subset data should not be empty")
 	}
@@ -533,9 +533,8 @@ func TestSubsetFontData_InMemory(t *testing.T) {
 
 func TestSubsetFontData_InMemory_NoUsedRunes(t *testing.T) {
 	ttf, rawData := buildAndParseTTF(t)
-	r, _ := newTestRenderer(t)
 	// No characters encoded.
-	subsetData := r.subsetFontData(ttf, rawData)
+	subsetData := subsetFontData(ttf, rawData)
 	if subsetData == nil {
 		t.Error("subset data should not be nil (fallback to raw data)")
 	}
@@ -600,11 +599,10 @@ func TestWriteFontDescriptor_InMemory(t *testing.T) {
 
 	var buf bytes.Buffer
 	w := pdf.NewWriter(&buf)
-	r := NewPDFRenderer(w)
 	metrics := ttf.Metrics()
 
 	fontFileRef := w.AllocObject()
-	descRef, err := r.writeFontDescriptor(w, "TestFont", metrics, fontFileRef)
+	descRef, err := writeFontDescriptor(w, "TestFont", metrics, fontFileRef)
 	if err != nil {
 		t.Fatalf("writeFontDescriptor error: %v", err)
 	}

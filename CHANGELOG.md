@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.0.13] - 2026-09-04
+
+### Fixed
+- Overlay text drawn in a font registered via `WithFont` is now embedded as a Type0/Identity-H composite font, so non-Latin scripts (Arabic, CJK, Cyrillic, …) render correctly instead of as `?` (#37)
+  - `document/render/overlay.go`: `renderText` emitted the raw UTF-8 bytes as a literal string (`(…) Tj`) while `WriteOverlayToModifier` registered the font as a bare `/Subtype /TrueType` dict with no `/Encoding`, `/Widths` or `/FirstChar`. Viewers read those bytes as single-byte codes and substituted a glyph for each one. Overlay text in a registered TrueType font is now encoded as big-endian glyph IDs (`<…> Tj`), matching what the normal render path has always done.
+  - `document/render/overlay.go`: new `OverlayFontRegistry` allocates one font object per family across every `Overlay` call, and `ExistingDocument.Save` flushes it once. A font used on many pages is therefore embedded a single time and subsetted over all glyphs the document actually uses, instead of once per page.
+  - `document/render/overlay.go`: bold/italic variants with no dedicated registered face now fall back to the base family's embedded font rather than silently degrading to Helvetica, mirroring `PDFRenderer.resolveTextFont`.
+  - `document/render/pdftarget.go`: the Type0/CIDFont writer (`writeType0Font`, `writeFontDescriptor`, `writeCIDFont`, `writeToUnicodeCMap`, `writeCompressedStream`, `subsetFontData`) is now written against an `objectSink` interface so it serves both `pdf.Writer` (new documents) and `pdf.Modifier` (incremental updates) instead of being duplicated.
+  - `document/render/overlay_test.go`, `template/overlay_test.go`: regression coverage for glyph-ID encoding, the variant fallback, the emitted `/Type0` + `/Identity-H` + `/FontFile2` structure, and single embedding across pages
+  - `_validation/validation_test.go`: `TestOverlayEmbeddedFont` validates an overlay-with-embedded-font PDF through pdfcpu
+- `ParseSignatureInfo` no longer truncates a CMS blob whose DER ends in a zero byte, which made ECDSA signature verification fail intermittently
+  - `signature/verify.go`: `extractContentsHex` stripped the fixed-width `/Contents` placeholder padding with `strings.TrimRight(hex, "0")`, so a signature whose own final byte was `0x00` came back one byte short and failed to parse as `asn1: syntax error: data truncated`. The outer DER tag-length header is now read to slice off exactly the signature, whatever it ends with. An all-zero placeholder is also rejected with a clear message instead of reaching the ASN.1 parser.
+  - This affected ECDSA in practice — its DER length and trailing byte vary per signature, so roughly 1 in 256 signatures hit it, which showed up as a flaky `TestSign_WithTimestamp_ECDSA` in CI. RSA was unaffected because its signature length is fixed.
+  - `signature/sign_test.go`: deterministic coverage for a payload ending in `0x00`, long-form DER lengths, and malformed contents
+
+## [1.0.12] - 2026-09-03
+
 ### Fixed
 - Reader now supports compressed object streams (`/ObjStm`) and predictor-encoded streams, so PDFs written with a cross-reference stream — the default for most modern producers — can be opened, overlaid and merged instead of failing with `pdf: object N not found in xref` (#35)
   - `pdf/objstm.go`: new `/ObjStm` reader — decodes the stream body, parses the `N` object-number/offset header pairs up to `/First`, and resolves objects from it. Decoded streams are cached so sibling objects do not re-inflate the same body, and each object is parsed from its own bounded slice of the body.
@@ -196,7 +213,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Reed-Solomon coefficient order in QR code encoder
 - binary.Write return value handling for errcheck lint
 
-[Unreleased]: https://github.com/gpdf-dev/gpdf/compare/v1.0.11...HEAD
+[Unreleased]: https://github.com/gpdf-dev/gpdf/compare/v1.0.13...HEAD
+[1.0.13]: https://github.com/gpdf-dev/gpdf/compare/v1.0.12...v1.0.13
+[1.0.12]: https://github.com/gpdf-dev/gpdf/compare/v1.0.11...v1.0.12
 [1.0.11]: https://github.com/gpdf-dev/gpdf/compare/v1.0.10...v1.0.11
 [1.0.10]: https://github.com/gpdf-dev/gpdf/compare/v1.0.9...v1.0.10
 [1.0.9]: https://github.com/gpdf-dev/gpdf/compare/v1.0.8...v1.0.9
