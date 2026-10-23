@@ -2038,3 +2038,35 @@ func TestRowBuildSetsBreakInsideAvoid(t *testing.T) {
 		})
 	}
 }
+
+// TestRowBuildTableRowIsSplittable verifies that rows containing a table
+// (directly or nested in a column box) use BreakInside=BreakAuto, so the
+// table starts on the current page and paginates itself with a repeated
+// header instead of the whole row being pushed to the next page.
+func TestRowBuildTableRowIsSplittable(t *testing.T) {
+	tests := []struct {
+		name string
+		fn   func(c *ColBuilder)
+	}{
+		{"Direct", func(c *ColBuilder) {
+			c.Table([]string{"A"}, [][]string{{"1"}})
+		}},
+		{"Nested", func(c *ColBuilder) {
+			c.nodes = append(c.nodes, &document.Box{Content: []document.DocumentNode{&document.Table{}}})
+		}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			rb := &RowBuilder{}
+			rb.Col(4, func(c *ColBuilder) { c.Text("side") })
+			rb.Col(8, tc.fn)
+			box, ok := rb.build(document.Mm(10), true).(*document.Box)
+			if !ok {
+				t.Fatal("expected *document.Box")
+			}
+			if box.BreakPolicy.BreakInside != document.BreakAuto {
+				t.Errorf("expected BreakInside=BreakAuto for a row containing a table, got %v", box.BreakPolicy.BreakInside)
+			}
+		})
+	}
+}

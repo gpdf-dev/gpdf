@@ -135,13 +135,15 @@ func (r *RowBuilder) Col(span int, fn func(c *ColBuilder)) {
 // that a row which does not fit in the remaining vertical space on the
 // current page is moved as a whole to the next page, rather than splitting
 // between its columns.
+//
+// Rows containing a table are the exception: tables paginate themselves
+// (splitting between body rows and repeating the header), so such rows use
+// BreakAuto and the table starts on the current page instead of being
+// pushed to the next one.
 func (r *RowBuilder) build(height document.Value, auto bool) document.DocumentNode {
 	box := &document.Box{
 		BoxStyle: document.BoxStyle{
 			Direction: document.DirectionHorizontal,
-		},
-		BreakPolicy: document.BreakPolicy{
-			BreakInside: document.BreakAvoid,
 		},
 	}
 
@@ -164,7 +166,28 @@ func (r *RowBuilder) build(height document.Value, auto bool) document.DocumentNo
 		box.Content = append(box.Content, colBox)
 	}
 
+	if !containsTable(box.Content) {
+		box.BreakPolicy.BreakInside = document.BreakAvoid
+	}
+
 	return box
+}
+
+// containsTable reports whether any of the given nodes, or their
+// descendants, is a table.
+func containsTable(nodes []document.DocumentNode) bool {
+	for _, n := range nodes {
+		if n == nil {
+			continue
+		}
+		if n.NodeType() == document.NodeTable {
+			return true
+		}
+		if containsTable(n.Children()) {
+			return true
+		}
+	}
+	return false
 }
 
 // ColBuilder constructs content within a column.
