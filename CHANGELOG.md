@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- A multi-page table preceded by other rows no longer moves entirely to the next page, leaving the first page mostly blank. Since #24 every row was `BreakInside=BreakAvoid`, so a row containing a table that did not fit in the remaining space was deferred as a whole; the table now starts on the current page, repeats its header on each page, and renders every body row exactly once
+  - `template/grid.go`: `RowBuilder.build()` keeps `BreakAvoid` for ordinary rows but uses `BreakAuto` for rows that contain a table (tables paginate themselves)
+  - Example tests: `_examples/{builder,json,gotemplate}/39_table_after_content_test.go` with shared golden
+
 ## [1.0.13] - 2026-09-04
 
 ### Fixed
