@@ -7,8 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- JSON schema / Go template: `richText` element for paragraphs with mixed inline styles, equivalent to `ColBuilder.RichText` (#43)
+  - Usable as a column shorthand (`"richText": {...}`) or as an element (`{"type": "richText", "richText": {...}}`). `style` is the paragraph-level style and the base style of every fragment; each fragment's `style` is applied on top of it
+  - `_examples/{builder,json,gotemplate}/40_rich_text_test.go` with shared golden — the JSON output is byte-identical to the Builder API
+- JSON schema / Go template: `box` element, a styled container (width, height, padding, margin, background, border) that stacks nested elements vertically, equivalent to `ColBuilder.Box`. Boxes can be nested (#42)
+  - `_examples/{builder,json,gotemplate}/41_box_test.go` with shared golden
+- Full ISO 216 / ISO 269 page sizes: `A0`–`A10`, `B0`–`B10`, `C0`–`C10` and `DL` in `document` and re-exported from `gpdf`; the JSON `page.size` accepts the same names (#32)
+- `document.Size.Landscape()` returns the landscape orientation of a size, e.g. `document.A4.Landscape()`; the JSON schema gains `page.orientation` (`"portrait"` / `"landscape"`) (#33)
+- `schema/gpdf.schema.json`: definitions for `richText`, `box`, `border`, the new page sizes and `orientation`
+
 ### Fixed
-- A multi-page table preceded by other rows no longer moves entirely to the next page, leaving the first page mostly blank. Since #24 every row was `BreakInside=BreakAvoid`, so a row containing a table that did not fit in the remaining space was deferred as a whole; the table now starts on the current page, repeats its header on each page, and renders every body row exactly once
+- The current page number in a repeated header/footer no longer stays at `1` on automatically paginated overflow pages (#44)
+  - `document/layout/paging.go`: header/footer nodes are laid out once and the same `*document.Text` is shared by every page, so `ResolvePageNumbers` replacing the placeholder in place made page 1's number stick on every following page. Placeholders are now resolved on a per-page copy of the text node (copy-on-write); the caller's `Document` is no longer mutated, so it can also be rendered again
+  - `document/layout/layout_test.go`, `template/pagenumber_test.go`: regression tests covering shared nodes and a footer across 3+ auto-generated pages
+  - `_examples/testdata/golden/37_row_break_avoid.pdf` regenerated: its second page previously showed page number `1`
+- A nested box is no longer stretched over its parent's bottom padding and border when a row's columns are equalized in height
+  - `document/layout/block.go`: `stretchLastChild` extended the last child to the parent's full height, ignoring that children are placed inside the parent's padding and border. It now stops at the parent box's bottom margin + border + padding
+- A multi-page table preceded by other rows no longer moves entirely to the next page, leaving the first page mostly blank. Since #24 every row was `BreakInside=BreakAvoid`, so a row containing a table that did not fit in the remaining space was deferred as a whole; the table now starts on the current page, repeats its header on each page, and renders every body row exactly once (#45, #47)
   - `template/grid.go`: `RowBuilder.build()` keeps `BreakAvoid` for ordinary rows but uses `BreakAuto` for rows that contain a table (tables paginate themselves)
   - Example tests: `_examples/{builder,json,gotemplate}/39_table_after_content_test.go` with shared golden
 

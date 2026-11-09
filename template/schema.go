@@ -48,9 +48,15 @@ type SchemaPageBody struct {
 }
 
 // SchemaPage defines page-level settings.
+//
+// Size accepts the ISO 216 / ISO 269 names "A0"-"A10", "B0"-"B10",
+// "C0"-"C10", "DL", plus "Letter" and "Legal" (case-insensitive).
+// Orientation "landscape" swaps the page to landscape; "portrait" (the
+// default) keeps the size as is.
 type SchemaPage struct {
-	Size    string `json:"size"`              // "A4", "A3", "Letter", "Legal"
-	Margins string `json:"margins,omitempty"` // e.g., "15mm", "20pt"
+	Size        string `json:"size"`                  // e.g. "A4", "A6", "Letter"
+	Orientation string `json:"orientation,omitempty"` // "portrait" (default) or "landscape"
+	Margins     string `json:"margins,omitempty"`     // e.g., "15mm", "20pt"
 }
 
 // SchemaMeta defines document metadata.
@@ -89,14 +95,18 @@ type SchemaCol struct {
 	Barcode *SchemaBarcode `json:"barcode,omitempty"`
 	Style   *SchemaStyle   `json:"style,omitempty"` // applies to text shorthand
 
+	RichText *SchemaRichText `json:"richText,omitempty"`
+	Box      *SchemaBox      `json:"box,omitempty"`
+
 	// Multiple elements in one column.
 	Elements []SchemaElement `json:"elements,omitempty"`
 }
 
 // SchemaElement defines a single content element within a column.
 type SchemaElement struct {
-	// Type selects the element kind: "text", "image", "table", "list",
-	// "line", "spacer", "qrcode", "barcode", "pageNumber", "totalPages".
+	// Type selects the element kind: "text", "richText", "image", "table",
+	// "list", "line", "spacer", "qrcode", "barcode", "box", "pageNumber",
+	// "totalPages".
 	Type    string       `json:"type"`
 	Content string       `json:"content,omitempty"` // for text
 	Style   *SchemaStyle `json:"style,omitempty"`
@@ -108,6 +118,52 @@ type SchemaElement struct {
 	Height  string         `json:"height,omitempty"` // for spacer
 	QRCode  *SchemaQRCode  `json:"qrcode,omitempty"`
 	Barcode *SchemaBarcode `json:"barcode,omitempty"`
+
+	RichText *SchemaRichText `json:"richText,omitempty"`
+	Box      *SchemaBox      `json:"box,omitempty"`
+}
+
+// SchemaRichText defines a paragraph made of inline fragments with
+// individual styles, equivalent to [ColBuilder.RichText].
+//
+// Style is the paragraph-level (block) style; it also serves as the base
+// style of every fragment. Each fragment's Style is applied on top of it.
+//
+//	"richText": {
+//	  "style": {"align": "left"},
+//	  "fragments": [
+//	    {"text": "Welcome to "},
+//	    {"text": "gpdf", "style": {"bold": true, "color": "#007BFF"}}
+//	  ]
+//	}
+type SchemaRichText struct {
+	Style     *SchemaStyle             `json:"style,omitempty"`
+	Fragments []SchemaRichTextFragment `json:"fragments"`
+}
+
+// SchemaRichTextFragment is a single inline span within a rich text
+// paragraph.
+type SchemaRichTextFragment struct {
+	Text  string       `json:"text"`
+	Style *SchemaStyle `json:"style,omitempty"`
+}
+
+// SchemaBox defines a styled container that stacks its elements
+// vertically, equivalent to [ColBuilder.Box]. Boxes can be nested to build
+// layouts that the flat row/column grid cannot express on its own.
+//
+// Padding / Margin are uniform values; Paddings / Margins override them
+// with per-edge values in CSS order [top, right, bottom, left].
+type SchemaBox struct {
+	Width      string          `json:"width,omitempty"`
+	Height     string          `json:"height,omitempty"`
+	Padding    string          `json:"padding,omitempty"`
+	Paddings   []string        `json:"paddings,omitempty"`
+	Margin     string          `json:"margin,omitempty"`
+	Margins    []string        `json:"margins,omitempty"`
+	Background string          `json:"background,omitempty"`
+	Border     *SchemaBorder   `json:"border,omitempty"`
+	Elements   []SchemaElement `json:"elements,omitempty"`
 }
 
 // SchemaStyle defines text styling properties.
@@ -258,18 +314,71 @@ func parseValue(s string) (document.Value, error) {
 
 // parsePageSize converts a page size name to document.Size.
 func parsePageSize(s string) (document.Size, error) {
-	switch strings.ToLower(strings.TrimSpace(s)) {
-	case "a4":
-		return document.A4, nil
-	case "a3":
-		return document.A3, nil
-	case "letter":
-		return document.Letter, nil
-	case "legal":
-		return document.Legal, nil
-	default:
-		return document.Size{}, fmt.Errorf("unknown page size: %q", s)
+	if size, ok := pageSizes[strings.ToLower(strings.TrimSpace(s))]; ok {
+		return size, nil
 	}
+	return document.Size{}, fmt.Errorf("unknown page size: %q", s)
+}
+
+// schemaPageSize resolves the page size and orientation of a SchemaPage.
+// An empty size defaults to A4.
+func schemaPageSize(p SchemaPage) (document.Size, error) {
+	size := document.A4
+	if p.Size != "" {
+		var err error
+		if size, err = parsePageSize(p.Size); err != nil {
+			return document.Size{}, err
+		}
+	}
+	switch strings.ToLower(strings.TrimSpace(p.Orientation)) {
+	case "", "portrait":
+		return size, nil
+	case "landscape":
+		return size.Landscape(), nil
+	default:
+		return document.Size{}, fmt.Errorf("unknown page orientation: %q", p.Orientation)
+	}
+}
+
+// pageSizes maps lowercase page-size names accepted by the JSON schema to
+// their dimensions.
+var pageSizes = map[string]document.Size{
+	"a0":     document.A0,
+	"a1":     document.A1,
+	"a2":     document.A2,
+	"a3":     document.A3,
+	"a4":     document.A4,
+	"a5":     document.A5,
+	"a6":     document.A6,
+	"a7":     document.A7,
+	"a8":     document.A8,
+	"a9":     document.A9,
+	"a10":    document.A10,
+	"b0":     document.B0,
+	"b1":     document.B1,
+	"b2":     document.B2,
+	"b3":     document.B3,
+	"b4":     document.B4,
+	"b5":     document.B5,
+	"b6":     document.B6,
+	"b7":     document.B7,
+	"b8":     document.B8,
+	"b9":     document.B9,
+	"b10":    document.B10,
+	"c0":     document.C0,
+	"c1":     document.C1,
+	"c2":     document.C2,
+	"c3":     document.C3,
+	"c4":     document.C4,
+	"c5":     document.C5,
+	"c6":     document.C6,
+	"c7":     document.C7,
+	"c8":     document.C8,
+	"c9":     document.C9,
+	"c10":    document.C10,
+	"dl":     document.DL,
+	"letter": document.Letter,
+	"legal":  document.Legal,
 }
 
 // namedColors maps color name strings to their pdf.Color values.
@@ -405,15 +514,22 @@ func applySchemaStyle(ss *SchemaStyle) []TextOption {
 // into [document.Edges]. Paddings, when present, overrides Padding and
 // follows the CSS [top, right, bottom, left] order.
 func parseSchemaPadding(ss *SchemaStyle) (document.Edges, bool) {
-	if len(ss.Paddings) > 0 {
-		edges, err := parseEdgeList(ss.Paddings)
+	return parseSchemaEdges(ss.Padding, ss.Paddings)
+}
+
+// parseSchemaEdges resolves a uniform value and an optional per-edge list
+// (CSS [top, right, bottom, left] order) into [document.Edges]. The list,
+// when present, takes precedence over the uniform value.
+func parseSchemaEdges(uniform string, perEdge []string) (document.Edges, bool) {
+	if len(perEdge) > 0 {
+		edges, err := parseEdgeList(perEdge)
 		if err != nil {
 			return document.Edges{}, false
 		}
 		return edges, true
 	}
-	if ss.Padding != "" {
-		v, err := parseValue(ss.Padding)
+	if uniform != "" {
+		v, err := parseValue(uniform)
 		if err != nil {
 			return document.Edges{}, false
 		}
@@ -581,8 +697,8 @@ func isFilePath(s string) bool {
 func buildFromSchema(schema *Schema, opts []Option) (*Document, error) {
 	var docOpts []Option
 
-	if schema.Page.Size != "" {
-		size, err := parsePageSize(schema.Page.Size)
+	if schema.Page.Size != "" || schema.Page.Orientation != "" {
+		size, err := schemaPageSize(schema.Page)
 		if err != nil {
 			return nil, err
 		}
@@ -710,6 +826,8 @@ func buildSchemaColContent(c *ColBuilder, col SchemaCol) {
 	if col.Barcode != nil {
 		buildSchemaBarcode(c, col.Barcode)
 	}
+	buildSchemaRichText(c, col.RichText)
+	buildSchemaBox(c, col.Box)
 }
 
 // buildSchemaElement adds a single element to a ColBuilder.
@@ -734,6 +852,10 @@ func buildSchemaElement(c *ColBuilder, elem SchemaElement) {
 		buildSchemaQRCode(c, elem.QRCode)
 	case "barcode":
 		buildSchemaBarcode(c, elem.Barcode)
+	case "richtext":
+		buildSchemaRichText(c, elem.RichText)
+	case "box":
+		buildSchemaBox(c, elem.Box)
 	case "pagenumber":
 		opts := applySchemaStyle(elem.Style)
 		c.PageNumber(opts...)
@@ -741,6 +863,58 @@ func buildSchemaElement(c *ColBuilder, elem SchemaElement) {
 		opts := applySchemaStyle(elem.Style)
 		c.TotalPages(opts...)
 	}
+}
+
+// buildSchemaRichText adds a rich text paragraph to a ColBuilder.
+func buildSchemaRichText(c *ColBuilder, rt *SchemaRichText) {
+	if rt == nil || len(rt.Fragments) == 0 {
+		return
+	}
+	c.RichText(func(b *RichTextBuilder) {
+		for _, f := range rt.Fragments {
+			b.Span(f.Text, applySchemaStyle(f.Style)...)
+		}
+	}, applySchemaStyle(rt.Style)...)
+}
+
+// buildSchemaBox adds a styled container with nested elements to a
+// ColBuilder.
+func buildSchemaBox(c *ColBuilder, sb *SchemaBox) {
+	if sb == nil {
+		return
+	}
+	c.Box(func(inner *ColBuilder) {
+		for _, elem := range sb.Elements {
+			buildSchemaElement(inner, elem)
+		}
+	}, schemaBoxOptions(sb)...)
+}
+
+// schemaBoxOptions converts the styling fields of a SchemaBox into
+// BoxOptions. Invalid values are skipped, matching the rest of the schema.
+func schemaBoxOptions(sb *SchemaBox) []BoxOption {
+	var opts []BoxOption
+	if v, err := parseValue(sb.Width); sb.Width != "" && err == nil {
+		opts = append(opts, WithBoxWidth(v))
+	}
+	if v, err := parseValue(sb.Height); sb.Height != "" && err == nil {
+		opts = append(opts, WithBoxHeight(v))
+	}
+	if e, ok := parseSchemaEdges(sb.Padding, sb.Paddings); ok {
+		opts = append(opts, WithBoxPadding(e))
+	}
+	if e, ok := parseSchemaEdges(sb.Margin, sb.Margins); ok {
+		opts = append(opts, WithBoxMargin(e))
+	}
+	if sb.Background != "" {
+		if col, err := parseColor(sb.Background); err == nil {
+			opts = append(opts, WithBoxBackground(col))
+		}
+	}
+	if spec, ok := parseSchemaBorder(sb.Border); ok {
+		opts = append(opts, WithBoxBorder(spec))
+	}
+	return opts
 }
 
 func buildSchemaImage(c *ColBuilder, img *SchemaImage) {
