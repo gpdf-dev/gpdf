@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- Rounded corners: `BorderRadius` on `document.Style` / `document.BoxStyle`. Backgrounds are filled as a rounded rectangle (cubic Bézier corners), uniform borders are stroked along the rounded shape (mixed borders keep square corners), and images are clipped to it. The radius is clamped to half the width and height (#46)
+  - Builder: `WithBoxRadius`, `WithImageRadius`, `WithTextRadius`; JSON / Go template: `borderRadius` on `box`, `image` and `style`
+  - Thanks to the patch proposed in #46, whose API this follows
+- Opacity: `Opacity` on `document.Style` / `document.BoxStyle`, rendered with an ExtGState (`/ca`, `/CA`) so fills, strokes, text and images all honor it — also in `gpdf.Open(...).Overlay` / `EachPage`, so overlay text no longer has to hide the page beneath it (#41)
+  - Builder: `WithTextOpacity`, `WithImageOpacity`, `WithBoxOpacity`; JSON / Go template: `opacity` on `box`, `image` and `style`
+  - A child with its own opacity replaces the inherited value rather than multiplying it. PDF/A-1 forbids transparency
+- Hyperlinks: `Link` (URI) on `document.Style` / `document.BoxStyle`, written as `/Link` annotations with a URI action. Wrapped text gets one clickable area per line, and rich-text spans can link individually. Links also work in overlays (#34)
+  - Builder: `ColBuilder.Link(text, url, opts...)` (blue + underlined by default), `WithTextLink`, `WithImageLink`, `WithBoxLink`; JSON / Go template: `{"type": "link", "content": ..., "style": {"link": ...}}` and `link` on `box`, `image` and `style`
+  - `pdf.PageObject.Annots` and `pdf.Modifier.AddAnnotations` for writing page annotations
+- Page backgrounds: `template.WithBackgroundColor` and `template.WithBackgroundImage(data, BackgroundFit(...), BackgroundOpacity(...))` (also re-exported from `gpdf`) draw a full-page color and/or image beneath the content of every page, including overflow pages. The image is centered and defaults to `FitCover` (#36)
+  - Model: `document.PageBackground`, `document.Page.Background`, `layout.PageLayout.Background`; JSON / Go template: `page.background` (`color`, `image`, `fit`, `opacity`)
+- SVG images: `ColBuilder.Image` (and `WithBackgroundImage`) accept SVG data, detected from the content, and embed it as resolution-independent vector graphics — a PDF Form XObject placed exactly like a raster image, deduplicated per document and also supported in overlays (#12)
+  - New zero-dependency package `svg`: path data (all commands incl. arcs), rect/circle/ellipse/line/polyline/polygon, g/use/symbol/defs/switch/nested svg, transforms, viewBox + `preserveAspectRatio` (meet / none), fill/stroke properties incl. dashes, caps, joins and opacities, presentation attributes, `style` attributes and `<style>` sheets with tag/.class/#id selectors, CSS colors incl. named colors and `currentColor`
+  - Not supported (ignored): text, embedded raster images, clip paths, masks, filters, markers, patterns. Gradients are approximated by their first stop color. One SVG user unit (px) maps to one point, matching gpdf's 72 DPI raster images
+  - `document.ImageSVG`; unparseable SVG is skipped by the builder instead of failing the document
+  - JSON / Go template: `image.src` additionally accepts inline SVG markup and non-base64 data URIs (`data:image/svg+xml;utf8,…`)
+  - `_examples/{builder,json,gotemplate}/46_svg_test.go` with shared golden (SVG fixtures in `_examples/testdata/svg/`), and a fuzz test for the SVG parser
+- `schema/gpdf.schema.json`: `background` definition, `link` element type, and `borderRadius` / `opacity` / `link` on `style`, `image` and `box`
+- Example tests `_examples/{builder,json,gotemplate}/{42_border_radius,43_opacity,44_links,45_page_background}_test.go` with shared goldens (the JSON / Go template output is byte-identical to the Builder API), and a `visual_effects` case in `_validation`
+- Documents that don't use the new options render byte-for-byte as before; all existing goldens are unchanged
+
 ## [1.0.14] - 2026-11-09
 
 ### Added

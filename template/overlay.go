@@ -115,7 +115,10 @@ func (d *ExistingDocument) Overlay(pageIndex int, fn func(p *PageBuilder)) error
 		return fmt.Errorf("gpdf: write overlay: %w", err)
 	}
 
-	return d.modifier.OverlayPage(pageIndex, content, resources)
+	if err := d.modifier.OverlayPage(pageIndex, content, resources); err != nil {
+		return err
+	}
+	return d.modifier.AddAnnotations(pageIndex, result.Annots...)
 }
 
 // EachPage applies the overlay function to every page.

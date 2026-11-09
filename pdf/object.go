@@ -335,6 +335,9 @@ type PageObject struct {
 	MediaBox  Rectangle
 	Resources ResourceDict
 	Contents  []ObjectRef
+	// Annots lists the page's annotation objects (e.g. link annotations).
+	// It is written as the page's /Annots array when non-empty.
+	Annots []ObjectRef
 }
 
 // ---------------------------------------------------------------------------

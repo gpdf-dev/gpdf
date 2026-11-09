@@ -1,10 +1,14 @@
 package template
 
 import (
+	"bytes"
+	"math"
+
 	"github.com/gpdf-dev/gpdf/barcode"
 	"github.com/gpdf-dev/gpdf/document"
 	"github.com/gpdf-dev/gpdf/pdf"
 	"github.com/gpdf-dev/gpdf/qrcode"
+	"github.com/gpdf-dev/gpdf/svg"
 )
 
 // gridColumns is the total number of columns in the grid system.
@@ -208,7 +212,11 @@ func (c *ColBuilder) Text(text string, opts ...TextOption) {
 	})
 }
 
-// Image adds an image element to the column.
+// Image adds an image element to the column. src may be PNG, JPEG or SVG
+// data; the format is detected from the content. SVG is embedded as
+// resolution-independent vector graphics (see package svg for the
+// supported subset), with one SVG user unit (px) mapped to one point.
+// SVG data that cannot be parsed is skipped.
 func (c *ColBuilder) Image(src []byte, opts ...ImageOption) {
 	imgCfg := imageConfig{
 		fitMode: document.FitContain,
@@ -219,6 +227,9 @@ func (c *ColBuilder) Image(src []byte, opts ...ImageOption) {
 
 	format := detectImageFormat(src)
 	w, h := extractImageDimensions(src, format)
+	if format == document.ImageSVG && w == 0 {
+		return // unparseable SVG: skip, consistent with QRCode/Barcode
+	}
 
 	imgNode := &document.Image{
 		Source: document.ImageSource{
@@ -252,6 +263,9 @@ func (c *ColBuilder) Image(src []byte, opts ...ImageOption) {
 	if imgCfg.background != nil {
 		imgNode.ImgStyle.Background = imgCfg.background
 	}
+	imgNode.ImgStyle.BorderRadius = imgCfg.radius
+	imgNode.ImgStyle.Opacity = imgCfg.opacity
+	imgNode.ImgStyle.Link = imgCfg.link
 
 	c.nodes = append(c.nodes, imgNode)
 }
@@ -278,8 +292,11 @@ func (c *ColBuilder) Box(fn func(c *ColBuilder), opts ...BoxOption) {
 	box := &document.Box{
 		Content: inner.buildNodes(),
 		BoxStyle: document.BoxStyle{
-			Width:  cfg.width,
-			Height: cfg.height,
+			Width:        cfg.width,
+			Height:       cfg.height,
+			BorderRadius: cfg.radius,
+			Opacity:      cfg.opacity,
+			Link:         cfg.link,
 		},
 	}
 	if cfg.border != nil {
@@ -295,6 +312,29 @@ func (c *ColBuilder) Box(fn func(c *ColBuilder), opts ...BoxOption) {
 		box.BoxStyle.Margin = cfg.margin
 	}
 	c.nodes = append(c.nodes, box)
+}
+
+// Link adds a hyperlink: text that opens url when clicked in a PDF viewer.
+// The text is blue and underlined by default; opts are applied afterwards
+// and can override that look (e.g. [TextColor]). Wrapped link text gets a
+// clickable area per line.
+//
+//	c.Link("gpdf.dev", "https://gpdf.dev")
+//
+// To link part of a sentence, use [ColBuilder.RichText] with a span that
+// carries [WithTextLink].
+func (c *ColBuilder) Link(text, url string, opts ...TextOption) {
+	style := c.defaultStyle()
+	style.Color = pdf.RGBHex(0x0645AD)
+	style.TextDecoration |= document.DecorationUnderline
+	style.Link = url
+	for _, opt := range opts {
+		opt(&style)
+	}
+	c.nodes = append(c.nodes, &document.Text{
+		Content:   text,
+		TextStyle: style,
+	})
 }
 
 // Table adds a table with header and body rows.
@@ -627,7 +667,25 @@ func detectImageFormat(data []byte) document.ImageFormat {
 	if len(data) >= 3 && data[0] == 0xFF && data[1] == 0xD8 && data[2] == 0xFF {
 		return document.ImageJPEG
 	}
+	if isSVGData(data) {
+		return document.ImageSVG
+	}
 	return document.ImagePNG
+}
+
+// isSVGData reports whether data looks like an SVG document: text that
+// starts with '<' (after an optional BOM and whitespace) and contains an
+// <svg element near the start.
+func isSVGData(data []byte) bool {
+	head := bytes.TrimPrefix(data, []byte("\xEF\xBB\xBF"))
+	head = bytes.TrimLeft(head, " \t\r\n")
+	if len(head) == 0 || head[0] != '<' {
+		return false
+	}
+	if len(head) > 4096 {
+		head = head[:4096]
+	}
+	return bytes.Contains(head, []byte("<svg"))
 }
 
 // extractImageDimensions returns the pixel width and height from image binary data.
@@ -637,8 +695,21 @@ func extractImageDimensions(data []byte, format document.ImageFormat) (int, int)
 		return extractPNGDimensions(data)
 	case document.ImageJPEG:
 		return extractJPEGDimensions(data)
+	case document.ImageSVG:
+		return extractSVGDimensions(data)
 	}
 	return 0, 0
+}
+
+// extractSVGDimensions returns the intrinsic size of an SVG in points,
+// rounded to whole points (minimum 1). Unparseable SVG yields 0, 0, which
+// makes the layout engine skip the image.
+func extractSVGDimensions(data []byte) (int, int) {
+	img, err := svg.Parse(data)
+	if err != nil {
+		return 0, 0
+	}
+	return max(int(math.Round(img.Width)), 1), max(int(math.Round(img.Height)), 1)
 }
 
 // extractPNGDimensions reads width and height from the PNG IHDR chunk.

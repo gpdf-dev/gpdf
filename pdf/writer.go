@@ -144,6 +144,14 @@ func (pw *Writer) AddPage(page PageObject) error {
 		pageDict[Name("Contents")] = arr
 	}
 
+	if len(page.Annots) > 0 {
+		annots := make(Array, len(page.Annots))
+		for i, ref := range page.Annots {
+			annots[i] = ref
+		}
+		pageDict[Name("Annots")] = annots
+	}
+
 	if err := pw.WriteObject(pageRef, pageDict); err != nil {
 		return err
 	}

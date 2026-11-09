@@ -46,7 +46,7 @@ func TestSchemaJSON_DefsPresent(t *testing.T) {
 
 	expected := []string{
 		"dimension", "color",
-		"page", "metadata",
+		"page", "background", "metadata",
 		"row", "rowDef", "col", "element",
 		"style", "richText", "image", "table", "list", "line",
 		"qrcode", "barcode", "border", "box",

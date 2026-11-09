@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="180" viewBox="0 0 320 180">
+  <style>
+    .grid { stroke: #CFD8DC; stroke-width: 1; stroke-dasharray: 4 3 }
+    .bar { fill: #5C6BC0 }
+    .bar.hi, #peak { fill: #26A69A }
+    .axis { stroke: #455A64; stroke-width: 2 }
+  </style>
+  <g transform="translate(30 10)">
+    <line class="grid" x1="0" y1="40" x2="280" y2="40"/>
+    <line class="grid" x1="0" y1="80" x2="280" y2="80"/>
+    <line class="grid" x1="0" y1="120" x2="280" y2="120"/>
+    <rect class="bar" x="10" y="90" width="30" height="70"/>
+    <rect class="bar" x="55" y="60" width="30" height="100"/>
+    <rect class="bar" x="100" y="75" width="30" height="85"/>
+    <rect id="peak" class="bar" x="145" y="20" width="30" height="140"/>
+    <rect class="bar" x="190" y="50" width="30" height="110"/>
+    <rect class="bar" x="235" y="35" width="30" height="125"/>
+    <polyline points="25,85 70,55 115,70 160,15 205,45 250,30" fill="none" stroke="#EF6C00" stroke-width="3" stroke-opacity="0.8" stroke-linejoin="round"/>
+    <path class="axis" d="M0 0V160H280" fill="none"/>
+  </g>
+</svg>

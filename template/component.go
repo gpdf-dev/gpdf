@@ -98,6 +98,9 @@ type imageConfig struct {
 	align      document.TextAlign
 	border     *BorderSpec
 	background *pdf.Color
+	radius     document.Value
+	opacity    float64
+	link       string
 }
 
 // FitWidth sets the image to fit within the specified width.
@@ -285,6 +288,9 @@ type boxConfig struct {
 	hasMargin  bool
 	width      document.Value
 	height     document.Value
+	radius     document.Value
+	opacity    float64
+	link       string
 }
 
 // WithBoxBorder draws a border around the box using the given [BorderSpec].

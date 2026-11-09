@@ -1,5 +1,7 @@
 package document
 
+import "github.com/gpdf-dev/gpdf/pdf"
+
 const (
 	// PageNumberPlaceholder is a sentinel string embedded in text nodes to
 	// mark where the current page number should appear. It is replaced after
@@ -21,6 +23,28 @@ type Page struct {
 	Content []DocumentNode
 	// PageStyle provides default style properties for content on this page.
 	PageStyle Style
+	// Background is painted beneath all other content on this page and on
+	// any continuation pages created when its content overflows. Nil means
+	// no background.
+	Background *PageBackground
+}
+
+// PageBackground describes a full-page background drawn before any other
+// page content: an optional solid color, then an optional image on top.
+type PageBackground struct {
+	// Color fills the whole page when non-nil.
+	Color *pdf.Color
+	// Image is drawn over Color when non-nil. It is centered on the page
+	// and scaled according to FitMode.
+	Image *ImageSource
+	// FitMode controls how Image is scaled relative to the page:
+	// FitContain (the zero value) fits the whole image inside the page,
+	// FitCover fills the page and crops the overflow, FitStretch fills the
+	// page exactly, and FitOriginal uses the intrinsic size (1px = 1pt).
+	FitMode ImageFitMode
+	// Opacity is the constant alpha applied to the background (color and
+	// image). The zero value means fully opaque.
+	Opacity float64
 }
 
 // NodeType returns NodePage.

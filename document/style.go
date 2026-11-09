@@ -29,6 +29,22 @@ type Style struct {
 	Margin  Edges
 	Padding Edges
 	Border  BorderEdges
+
+	// BorderRadius rounds the corners of the background and of a uniform
+	// border, and clips images to the rounded shape. The radius is clamped
+	// to half the width and height. The zero value draws square corners.
+	BorderRadius Value
+
+	// Opacity is the constant alpha (0.0–1.0) applied to the node and its
+	// descendants, for fills, strokes, text and images alike. The zero
+	// value means "unset" (fully opaque). A descendant with its own
+	// Opacity replaces the inherited value rather than multiplying it.
+	// Note that PDF/A-1 forbids transparency.
+	Opacity float64
+
+	// Link is a URI (e.g. "https://gpdf.dev") that the node's area links
+	// to. For wrapped text, each line becomes its own clickable area.
+	Link string
 }
 
 // DefaultStyle returns a Style with sensible defaults: 12pt black text,
