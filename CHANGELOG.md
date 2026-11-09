@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.0.14] - 2026-11-09
+
 ### Added
 - JSON schema / Go template: `richText` element for paragraphs with mixed inline styles, equivalent to `ColBuilder.RichText` (#43)
   - Usable as a column shorthand (`"richText": {...}`) or as an element (`{"type": "richText", "richText": {...}}`). `style` is the paragraph-level style and the base style of every fragment; each fragment's `style` is applied on top of it
@@ -234,7 +236,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Reed-Solomon coefficient order in QR code encoder
 - binary.Write return value handling for errcheck lint
 
-[Unreleased]: https://github.com/gpdf-dev/gpdf/compare/v1.0.13...HEAD
+[Unreleased]: https://github.com/gpdf-dev/gpdf/compare/v1.0.14...HEAD
+[1.0.14]: https://github.com/gpdf-dev/gpdf/compare/v1.0.13...v1.0.14
 [1.0.13]: https://github.com/gpdf-dev/gpdf/compare/v1.0.12...v1.0.13
 [1.0.12]: https://github.com/gpdf-dev/gpdf/compare/v1.0.11...v1.0.12
 [1.0.11]: https://github.com/gpdf-dev/gpdf/compare/v1.0.10...v1.0.11
