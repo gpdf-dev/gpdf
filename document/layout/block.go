@@ -755,7 +755,30 @@ func stretchLastChild(children []PlacedNode, parentHeight float64) {
 	if remaining > last.Size.Height {
 		last.Size.Height = remaining
 	}
-	stretchLastChild(last.Children, last.Size.Height)
+	// Children of a box are positioned inside its margin, border and
+	// padding, so the space available to them ends that far above the
+	// box's bottom edge. Without this, a nested box would be stretched
+	// over its parent's bottom padding and border.
+	stretchLastChild(last.Children, last.Size.Height-boxBottomInset(last))
+}
+
+// boxBottomInset returns the combined bottom margin, border width and
+// padding of a placed Box node, or 0 for any other node type.
+func boxBottomInset(pn *PlacedNode) float64 {
+	box, ok := pn.Node.(*document.Box)
+	if !ok {
+		return 0
+	}
+	style := box.Style()
+	fontSize := style.FontSize
+	if fontSize <= 0 {
+		fontSize = 12
+	}
+	w := pn.Size.Width
+	margin := style.Margin.Resolve(w, pn.Size.Height, fontSize)
+	padding := style.Padding.Resolve(w, pn.Size.Height, fontSize)
+	bw := resolveBorderWidths(style.Border, w, fontSize)
+	return margin.Bottom + bw.Bottom + padding.Bottom
 }
 
 // createOverflowNode wraps remaining children in a lightweight container

@@ -3011,8 +3011,9 @@ func TestResolvePageNumbers_SinglePage(t *testing.T) {
 		},
 	}
 	ResolvePageNumbers(pages)
-	if textNode.Content != "Page 1 of 1" {
-		t.Errorf("Content = %q, want %q", textNode.Content, "Page 1 of 1")
+	got := pages[0].Children[0].Node.(*document.Text).Content
+	if got != "Page 1 of 1" {
+		t.Errorf("Content = %q, want %q", got, "Page 1 of 1")
 	}
 }
 
@@ -3032,10 +3033,11 @@ func TestResolvePageNumbers_MultiplePages(t *testing.T) {
 		}
 	}
 	ResolvePageNumbers(pages)
-	for i, tn := range textNodes {
+	for i := range textNodes {
 		wantStr := fmt.Sprintf("%d/3", i+1)
-		if tn.Content != wantStr {
-			t.Errorf("Page %d: Content = %q, want %q", i+1, tn.Content, wantStr)
+		got := pages[i].Children[0].Node.(*document.Text).Content
+		if got != wantStr {
+			t.Errorf("Page %d: Content = %q, want %q", i+1, got, wantStr)
 		}
 	}
 }
@@ -3059,9 +3061,85 @@ func TestResolvePageNumbers_NestedChildren(t *testing.T) {
 		},
 	}
 	ResolvePageNumbers(pages)
-	if textNode.Content != "Page 1" {
-		t.Errorf("Content = %q, want %q", textNode.Content, "Page 1")
+	got := pages[0].Children[0].Children[0].Node.(*document.Text).Content
+	if got != "Page 1" {
+		t.Errorf("Content = %q, want %q", got, "Page 1")
 	}
+}
+
+// Regression test for #44: header/footer text nodes are shared across all
+// auto-paginated pages, so resolving must not mutate the shared node.
+func TestResolvePageNumbers_SharedNodeAcrossPages(t *testing.T) {
+	shared := &document.Text{
+		Content:   "Page " + document.PageNumberPlaceholder + " / " + document.TotalPagesPlaceholder,
+		TextStyle: document.DefaultStyle(),
+	}
+	pages := make([]PageLayout, 4)
+	for i := range pages {
+		pages[i] = PageLayout{
+			Size: document.A4,
+			Children: offsetNodes([]PlacedNode{
+				{Node: &document.Box{}, Children: []PlacedNode{{Node: shared}}},
+			}, 0, 0),
+		}
+	}
+	ResolvePageNumbers(pages)
+	for i := range pages {
+		want := fmt.Sprintf("Page %d / 4", i+1)
+		got := pages[i].Children[0].Children[0].Node.(*document.Text).Content
+		if got != want {
+			t.Errorf("page %d: Content = %q, want %q", i+1, got, want)
+		}
+	}
+	if !strings.Contains(shared.Content, document.PageNumberPlaceholder) {
+		t.Errorf("shared node was mutated: %q", shared.Content)
+	}
+}
+
+// Regression test for #44 through the full paginator: a flowing body that
+// overflows onto several pages must get a distinct page number in the
+// repeated footer of each page.
+func TestPaginator_AutoPaginatedFooterPageNumbers(t *testing.T) {
+	paginator := NewPaginator(document.A4, document.UniformEdges(document.Pt(50)), &mockFontResolver{})
+	style := document.Style{FontSize: 12, LineHeight: 1.2}
+	var body []document.DocumentNode
+	for range 150 {
+		body = append(body, &document.Text{Content: "Body line", TextStyle: style})
+	}
+	paginator.SetHeaderFooter(nil, []document.DocumentNode{&document.Text{
+		Content:   document.PageNumberPlaceholder + "/" + document.TotalPagesPlaceholder,
+		TextStyle: style,
+	}})
+	doc := &document.Document{
+		Pages: []*document.Page{{
+			Size:    document.A4,
+			Margins: document.UniformEdges(document.Pt(50)),
+			Content: body,
+		}},
+	}
+	pages := paginator.Paginate(doc)
+	if len(pages) < 3 {
+		t.Fatalf("expected at least 3 pages, got %d", len(pages))
+	}
+	ResolvePageNumbers(pages)
+	for i, p := range pages {
+		want := fmt.Sprintf("%d/%d", i+1, len(pages))
+		if !hasTextContent(p.Children, want) {
+			t.Errorf("page %d: footer %q not found", i+1, want)
+		}
+	}
+}
+
+func hasTextContent(nodes []PlacedNode, want string) bool {
+	for _, n := range nodes {
+		if tn, ok := n.Node.(*document.Text); ok && tn.Content == want {
+			return true
+		}
+		if hasTextContent(n.Children, want) {
+			return true
+		}
+	}
+	return false
 }
 
 func TestPaginatorWithHeaderFooter(t *testing.T) {
@@ -3645,5 +3723,34 @@ func TestListItemNode_StyleViaList(t *testing.T) {
 	s1 := children[1].Style()
 	if s1.FontSize != 16 {
 		t.Errorf("item 1: expected item style override (16), got FontSize=%g", s1.FontSize)
+	}
+}
+
+// TestStretchLastChild_RespectsBoxBottomInset verifies that stretching a
+// row's columns does not extend a nested box over its parent's bottom
+// padding and border.
+func TestStretchLastChild_RespectsBoxBottomInset(t *testing.T) {
+	outer := &document.Box{BoxStyle: document.BoxStyle{
+		Padding: document.UniformEdges(document.Pt(20)),
+		Border:  document.UniformBorder(document.Pt(2), document.BorderSolid, pdf.Black),
+	}}
+	col := []PlacedNode{{
+		Node: &document.Box{},
+		Size: document.Size{Width: 200, Height: 80},
+		Children: []PlacedNode{{
+			Node: outer,
+			Size: document.Size{Width: 200, Height: 80},
+			Children: []PlacedNode{{
+				Node:     &document.Box{},
+				Position: document.Point{Y: 22},
+				Size:     document.Size{Width: 156, Height: 30},
+			}},
+		}},
+	}}
+	stretchPlacedNodes(col, 80)
+	got := col[0].Children[0].Children[0].Size.Height
+	// 80 (outer) - 22 (inner Y) - 20 (padding) - 2 (border) = 36
+	if !approxEqual(got, 36, 0.01) {
+		t.Errorf("nested box height = %.2f, want 36", got)
 	}
 }

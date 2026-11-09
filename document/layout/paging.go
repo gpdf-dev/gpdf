@@ -1,7 +1,7 @@
 package layout
 
 import (
-	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/gpdf-dev/gpdf/document"
@@ -205,13 +205,21 @@ func ResolvePageNumbers(pages []PageLayout) {
 
 // resolvePageNumbersInNodes recursively replaces placeholder strings in
 // text nodes.
+//
+// Header/footer nodes are laid out once and the same *document.Text is
+// shared by every physical page, so placeholders are resolved on a
+// per-page copy (copy-on-write) instead of mutating the shared node.
+// This also leaves the caller's Document untouched so it can be
+// rendered again.
 func resolvePageNumbersInNodes(nodes []PlacedNode, pageNum, totalPages int) {
 	for i := range nodes {
 		if textNode, ok := nodes[i].Node.(*document.Text); ok {
 			if strings.Contains(textNode.Content, document.PageNumberPlaceholder) ||
 				strings.Contains(textNode.Content, document.TotalPagesPlaceholder) {
-				textNode.Content = strings.ReplaceAll(textNode.Content, document.PageNumberPlaceholder, fmt.Sprintf("%d", pageNum))
-				textNode.Content = strings.ReplaceAll(textNode.Content, document.TotalPagesPlaceholder, fmt.Sprintf("%d", totalPages))
+				clone := *textNode
+				clone.Content = strings.ReplaceAll(clone.Content, document.PageNumberPlaceholder, strconv.Itoa(pageNum))
+				clone.Content = strings.ReplaceAll(clone.Content, document.TotalPagesPlaceholder, strconv.Itoa(totalPages))
+				nodes[i].Node = &clone
 			}
 		}
 		if len(nodes[i].Children) > 0 {
