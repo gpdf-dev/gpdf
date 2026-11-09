@@ -750,6 +750,13 @@ document.A3      // 297mm x 420mm
 document.Letter  // 8.5in x 11in
 document.Legal   // 8.5in x 14in
 
+// ISO 216 / ISO 269 (v1.0.14+): A0–A10, B0–B10, C0–C10, DL
+document.A6      // 105mm x 148mm
+document.DL      // 110mm x 220mm (envelope)
+
+// Landscape orientation (v1.0.14+)
+template.WithPageSize(document.A4.Landscape())
+
 // 均一マージン
 template.WithMargins(document.UniformEdges(document.Mm(20)))
 
@@ -784,7 +791,7 @@ doc.Render(f)
 
 | 関数 | 説明 |
 |---|---|
-| `WithPageSize(size)` | ページサイズを設定 (A4, A3, Letter, Legal) |
+| `WithPageSize(size)` | ページサイズを設定 (A0–A10, B0–B10, C0–C10, DL, Letter, Legal) |
 | `WithMargins(edges)` | ページマージンを設定 |
 | `WithFont(family, data)` | TrueTypeフォントを登録 |
 | `WithDefaultFont(family, size)` | デフォルトフォントを設定 |

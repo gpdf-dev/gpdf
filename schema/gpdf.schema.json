@@ -73,8 +73,13 @@
       "properties": {
         "size": {
           "type": "string",
-          "description": "Page size.",
-          "enum": ["A4", "A3", "Letter", "Legal"]
+          "description": "Page size (ISO 216 A/B series, ISO 269 C series and DL, or US Letter/Legal). Case-insensitive.",
+          "enum": ["A0", "A1", "A2", "A3", "A4", "A5", "A6", "A7", "A8", "A9", "A10", "B0", "B1", "B2", "B3", "B4", "B5", "B6", "B7", "B8", "B9", "B10", "C0", "C1", "C2", "C3", "C4", "C5", "C6", "C7", "C8", "C9", "C10", "DL", "Letter", "Legal"]
+        },
+        "orientation": {
+          "type": "string",
+          "description": "Page orientation. \"landscape\" swaps width and height of the page size.",
+          "enum": ["portrait", "landscape"]
         },
         "margins": {
           "$ref": "#/$defs/dimension",
@@ -177,6 +182,14 @@
           "$ref": "#/$defs/barcode",
           "description": "Shorthand: barcode element."
         },
+        "richText": {
+          "$ref": "#/$defs/richText",
+          "description": "Shorthand: rich text paragraph with mixed inline styles."
+        },
+        "box": {
+          "$ref": "#/$defs/box",
+          "description": "Shorthand: styled container with nested elements."
+        },
         "style": {
           "$ref": "#/$defs/style",
           "description": "Text style applied to the text shorthand field."
@@ -197,7 +210,7 @@
         "type": {
           "type": "string",
           "description": "Element type.",
-          "enum": ["text", "image", "table", "list", "line", "spacer", "qrcode", "barcode", "pageNumber", "totalPages"]
+          "enum": ["text", "richText", "image", "table", "list", "line", "spacer", "qrcode", "barcode", "box", "pageNumber", "totalPages"]
         },
         "content": {
           "type": "string",
@@ -234,6 +247,14 @@
         "barcode": {
           "$ref": "#/$defs/barcode",
           "description": "Barcode configuration (for type \"barcode\")."
+        },
+        "richText": {
+          "$ref": "#/$defs/richText",
+          "description": "Rich text configuration (for type \"richText\")."
+        },
+        "box": {
+          "$ref": "#/$defs/box",
+          "description": "Box configuration (for type \"box\")."
         }
       }
     },
@@ -287,6 +308,37 @@
         "textIndent": {
           "$ref": "#/$defs/dimension",
           "description": "First-line text indent (e.g. \"24pt\", \"10mm\")."
+        }
+      }
+    },
+    "richText": {
+      "type": "object",
+      "description": "Paragraph composed of inline fragments with individual styles. The block style is the base style of every fragment.",
+      "required": ["fragments"],
+      "additionalProperties": false,
+      "properties": {
+        "style": {
+          "$ref": "#/$defs/style",
+          "description": "Paragraph-level style (alignment etc.), also used as the base style of each fragment."
+        },
+        "fragments": {
+          "type": "array",
+          "description": "Inline text spans in order.",
+          "items": {
+            "type": "object",
+            "required": ["text"],
+            "additionalProperties": false,
+            "properties": {
+              "text": {
+                "type": "string",
+                "description": "Fragment text. Go template expressions are supported via FromTemplate."
+              },
+              "style": {
+                "$ref": "#/$defs/style",
+                "description": "Style overrides for this fragment."
+              }
+            }
+          }
         }
       }
     },
@@ -439,6 +491,83 @@
           "type": "string",
           "description": "Barcode format.",
           "enum": ["code128"]
+        }
+      }
+    },
+    "border": {
+      "type": "object",
+      "description": "Border specification.",
+      "additionalProperties": false,
+      "properties": {
+        "width": {
+          "$ref": "#/$defs/dimension",
+          "description": "Uniform border width."
+        },
+        "widths": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/dimension" },
+          "minItems": 4,
+          "maxItems": 4,
+          "description": "Per-edge widths in CSS order [top, right, bottom, left]."
+        },
+        "color": {
+          "$ref": "#/$defs/color",
+          "description": "Border color."
+        },
+        "style": {
+          "type": "string",
+          "enum": ["solid", "dashed", "dotted", "none"],
+          "description": "Border line style."
+        }
+      }
+    },
+    "box": {
+      "type": "object",
+      "description": "Styled container that stacks its elements vertically. Boxes can be nested.",
+      "additionalProperties": false,
+      "properties": {
+        "width": {
+          "$ref": "#/$defs/dimension",
+          "description": "Explicit box width."
+        },
+        "height": {
+          "$ref": "#/$defs/dimension",
+          "description": "Explicit box height."
+        },
+        "padding": {
+          "$ref": "#/$defs/dimension",
+          "description": "Uniform inner padding."
+        },
+        "paddings": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/dimension" },
+          "minItems": 1,
+          "maxItems": 4,
+          "description": "Per-edge padding in CSS order [top, right, bottom, left]. Overrides padding."
+        },
+        "margin": {
+          "$ref": "#/$defs/dimension",
+          "description": "Uniform outer margin."
+        },
+        "margins": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/dimension" },
+          "minItems": 1,
+          "maxItems": 4,
+          "description": "Per-edge margin in CSS order [top, right, bottom, left]. Overrides margin."
+        },
+        "background": {
+          "$ref": "#/$defs/color",
+          "description": "Background fill color."
+        },
+        "border": {
+          "$ref": "#/$defs/border",
+          "description": "Border around the box."
+        },
+        "elements": {
+          "type": "array",
+          "description": "Elements placed inside the box.",
+          "items": { "$ref": "#/$defs/element" }
         }
       }
     },

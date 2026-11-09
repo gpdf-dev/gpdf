@@ -157,7 +157,7 @@ func (d *Document) Render(w io.Writer) error {
 	pages := paginator.Paginate(doc)
 
 	// 4. Replace page-number placeholders.
-	layout.ResolvePageNumbers(pages)
+	layout.ResolvePageNumbersWithFonts(pages, d.fontResolver)
 
 	// 5. Render to PDF.
 	pw := pdf.NewWriter(w)

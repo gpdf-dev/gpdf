@@ -757,6 +757,13 @@ document.A3      // 297mm x 420mm
 document.Letter  // 8.5in x 11in
 document.Legal   // 8.5in x 14in
 
+// ISO 216 / ISO 269 (v1.0.14+): A0–A10, B0–B10, C0–C10, DL
+document.A6      // 105mm x 148mm
+document.DL      // 110mm x 220mm (envelope)
+
+// Landscape orientation (v1.0.14+)
+template.WithPageSize(document.A4.Landscape())
+
 // Márgenes uniformes
 template.WithMargins(document.UniformEdges(document.Mm(20)))
 
@@ -791,7 +798,7 @@ doc.Render(f)
 
 | Función | Descripción |
 |---|---|
-| `WithPageSize(size)` | Establecer tamaño de página (A4, A3, Letter, Legal) |
+| `WithPageSize(size)` | Establecer tamaño de página (A0–A10, B0–B10, C0–C10, DL, Letter, Legal) |
 | `WithMargins(edges)` | Establecer márgenes de página |
 | `WithFont(family, data)` | Registrar una fuente TrueType |
 | `WithDefaultFont(family, size)` | Establecer la fuente predeterminada |

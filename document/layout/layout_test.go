@@ -3011,8 +3011,9 @@ func TestResolvePageNumbers_SinglePage(t *testing.T) {
 		},
 	}
 	ResolvePageNumbers(pages)
-	if textNode.Content != "Page 1 of 1" {
-		t.Errorf("Content = %q, want %q", textNode.Content, "Page 1 of 1")
+	got := pages[0].Children[0].Node.(*document.Text).Content
+	if got != "Page 1 of 1" {
+		t.Errorf("Content = %q, want %q", got, "Page 1 of 1")
 	}
 }
 
@@ -3032,10 +3033,11 @@ func TestResolvePageNumbers_MultiplePages(t *testing.T) {
 		}
 	}
 	ResolvePageNumbers(pages)
-	for i, tn := range textNodes {
+	for i := range textNodes {
 		wantStr := fmt.Sprintf("%d/3", i+1)
-		if tn.Content != wantStr {
-			t.Errorf("Page %d: Content = %q, want %q", i+1, tn.Content, wantStr)
+		got := pages[i].Children[0].Node.(*document.Text).Content
+		if got != wantStr {
+			t.Errorf("Page %d: Content = %q, want %q", i+1, got, wantStr)
 		}
 	}
 }
@@ -3059,9 +3061,85 @@ func TestResolvePageNumbers_NestedChildren(t *testing.T) {
 		},
 	}
 	ResolvePageNumbers(pages)
-	if textNode.Content != "Page 1" {
-		t.Errorf("Content = %q, want %q", textNode.Content, "Page 1")
+	got := pages[0].Children[0].Children[0].Node.(*document.Text).Content
+	if got != "Page 1" {
+		t.Errorf("Content = %q, want %q", got, "Page 1")
 	}
+}
+
+// Regression test for #44: header/footer text nodes are shared across all
+// auto-paginated pages, so resolving must not mutate the shared node.
+func TestResolvePageNumbers_SharedNodeAcrossPages(t *testing.T) {
+	shared := &document.Text{
+		Content:   "Page " + document.PageNumberPlaceholder + " / " + document.TotalPagesPlaceholder,
+		TextStyle: document.DefaultStyle(),
+	}
+	pages := make([]PageLayout, 4)
+	for i := range pages {
+		pages[i] = PageLayout{
+			Size: document.A4,
+			Children: offsetNodes([]PlacedNode{
+				{Node: &document.Box{}, Children: []PlacedNode{{Node: shared}}},
+			}, 0, 0),
+		}
+	}
+	ResolvePageNumbers(pages)
+	for i := range pages {
+		want := fmt.Sprintf("Page %d / 4", i+1)
+		got := pages[i].Children[0].Children[0].Node.(*document.Text).Content
+		if got != want {
+			t.Errorf("page %d: Content = %q, want %q", i+1, got, want)
+		}
+	}
+	if !strings.Contains(shared.Content, document.PageNumberPlaceholder) {
+		t.Errorf("shared node was mutated: %q", shared.Content)
+	}
+}
+
+// Regression test for #44 through the full paginator: a flowing body that
+// overflows onto several pages must get a distinct page number in the
+// repeated footer of each page.
+func TestPaginator_AutoPaginatedFooterPageNumbers(t *testing.T) {
+	paginator := NewPaginator(document.A4, document.UniformEdges(document.Pt(50)), &mockFontResolver{})
+	style := document.Style{FontSize: 12, LineHeight: 1.2}
+	var body []document.DocumentNode
+	for range 150 {
+		body = append(body, &document.Text{Content: "Body line", TextStyle: style})
+	}
+	paginator.SetHeaderFooter(nil, []document.DocumentNode{&document.Text{
+		Content:   document.PageNumberPlaceholder + "/" + document.TotalPagesPlaceholder,
+		TextStyle: style,
+	}})
+	doc := &document.Document{
+		Pages: []*document.Page{{
+			Size:    document.A4,
+			Margins: document.UniformEdges(document.Pt(50)),
+			Content: body,
+		}},
+	}
+	pages := paginator.Paginate(doc)
+	if len(pages) < 3 {
+		t.Fatalf("expected at least 3 pages, got %d", len(pages))
+	}
+	ResolvePageNumbers(pages)
+	for i, p := range pages {
+		want := fmt.Sprintf("%d/%d", i+1, len(pages))
+		if !hasTextContent(p.Children, want) {
+			t.Errorf("page %d: footer %q not found", i+1, want)
+		}
+	}
+}
+
+func hasTextContent(nodes []PlacedNode, want string) bool {
+	for _, n := range nodes {
+		if tn, ok := n.Node.(*document.Text); ok && tn.Content == want {
+			return true
+		}
+		if hasTextContent(n.Children, want) {
+			return true
+		}
+	}
+	return false
 }
 
 func TestPaginatorWithHeaderFooter(t *testing.T) {
@@ -3645,5 +3723,112 @@ func TestListItemNode_StyleViaList(t *testing.T) {
 	s1 := children[1].Style()
 	if s1.FontSize != 16 {
 		t.Errorf("item 1: expected item style override (16), got FontSize=%g", s1.FontSize)
+	}
+}
+
+// TestStretchLastChild_RespectsBoxBottomInset verifies that stretching a
+// row's columns does not extend a nested box over its parent's bottom
+// padding and border.
+func TestStretchLastChild_RespectsBoxBottomInset(t *testing.T) {
+	outer := &document.Box{BoxStyle: document.BoxStyle{
+		Padding: document.UniformEdges(document.Pt(20)),
+		Border:  document.UniformBorder(document.Pt(2), document.BorderSolid, pdf.Black),
+	}}
+	col := []PlacedNode{{
+		Node: &document.Box{},
+		Size: document.Size{Width: 200, Height: 80},
+		Children: []PlacedNode{{
+			Node: outer,
+			Size: document.Size{Width: 200, Height: 80},
+			Children: []PlacedNode{{
+				Node:     &document.Box{},
+				Position: document.Point{Y: 22},
+				Size:     document.Size{Width: 156, Height: 30},
+			}},
+		}},
+	}}
+	stretchPlacedNodes(col, 80)
+	got := col[0].Children[0].Children[0].Size.Height
+	// 80 (outer) - 22 (inner Y) - 20 (padding) - 2 (border) = 36
+	if !approxEqual(got, 36, 0.01) {
+		t.Errorf("nested box height = %.2f, want 36", got)
+	}
+}
+
+func TestPlaceholderProxy_RestoreLines(t *testing.T) {
+	ph, tp := document.PageNumberPlaceholder, document.TotalPagesPlaceholder
+	tests := []struct {
+		name  string
+		text  string
+		lines []string // lines as broken from the proxy text
+		want  []string
+	}{
+		{"no placeholder", "hello world", []string{"hello", "world"}, []string{"hello", "world"}},
+		{"single line", "Page " + ph + " of " + tp, []string{"Page 0 of 0"}, []string{"Page " + ph + " of " + tp}},
+		{"wrapped at space", "Page " + ph + " of " + tp, []string{"Page 0", "of 0"}, []string{"Page " + ph, "of " + tp}},
+		{"placeholder alone", ph, []string{"0"}, []string{ph}},
+		{"literal zero kept", "0 " + ph + " 0", []string{"0 0 0"}, []string{"0 " + ph + " 0"}},
+		{"newline separator", ph + "\n" + tp, []string{"0", "0"}, []string{ph, tp}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := newPlaceholderProxy(tt.text)
+			got := p.restoreLines(tt.lines)
+			if strings.Join(got, "|") != strings.Join(tt.want, "|") {
+				t.Errorf("restoreLines = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+// TestLayoutText_PlaceholderNotWrapped verifies that a page-number
+// placeholder in a column narrower than the sentinel string is laid out as
+// a single short line instead of being split into fragments.
+func TestLayoutText_PlaceholderNotWrapped(t *testing.T) {
+	fl := &FlowLayout{}
+	style := document.Style{FontSize: 20, LineHeight: 1.2}
+	res := fl.LayoutText(document.PageNumberPlaceholder, style, Constraints{
+		AvailableWidth:  30,
+		AvailableHeight: 500,
+		FontResolver:    &mockFontResolver{},
+	})
+	if len(res.Children) != 1 {
+		t.Fatalf("placeholder split into %d lines, want 1", len(res.Children))
+	}
+	if got := res.Children[0].Node.(*document.Text).Content; got != document.PageNumberPlaceholder {
+		t.Errorf("line content = %q, want the placeholder", got)
+	}
+}
+
+// TestResolvePageNumbersWithFonts_Realigns verifies that centered and
+// right-aligned lines are re-anchored after the placeholder is replaced.
+func TestResolvePageNumbersWithFonts_Realigns(t *testing.T) {
+	fr := &mockFontResolver{}
+	const avail = 200.0
+	for _, align := range []document.TextAlign{document.AlignLeft, document.AlignCenter, document.AlignRight} {
+		style := document.Style{FontSize: 10, LineHeight: 1.2, TextAlign: align}
+		res := (&FlowLayout{}).LayoutText(document.TotalPagesPlaceholder, style, Constraints{
+			AvailableWidth: avail, AvailableHeight: 100, FontResolver: fr,
+		})
+		pages := make([]PageLayout, 123) // 3-digit total page count
+		for i := range pages {
+			pages[i].Children = offsetNodes(res.Children, 0, 0)
+		}
+		ResolvePageNumbersWithFonts(pages, fr)
+		line := pages[0].Children[0]
+		w := fr.MeasureString(ResolvedFont{}, "123", 10)
+		if !approxEqual(line.Size.Width, w, 0.01) {
+			t.Errorf("align %v: width = %.2f, want %.2f", align, line.Size.Width, w)
+		}
+		var wantX float64
+		switch align {
+		case document.AlignCenter:
+			wantX = (avail - w) / 2
+		case document.AlignRight:
+			wantX = avail - w
+		}
+		if !approxEqual(line.Position.X, wantX, 0.01) {
+			t.Errorf("align %v: x = %.2f, want %.2f", align, line.Position.X, wantX)
+		}
 	}
 }

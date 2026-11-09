@@ -144,8 +144,8 @@ func TestExample_35_Border(t *testing.T) {
 }
 
 // TestExample_35b_BoxBorder demonstrates the new ColBuilder.Box container with
-// border, background, and padding. Builder-only because the JSON / Go-template
-// schema does not yet expose a "box" element.
+// border, background, and padding. The JSON / Go-template equivalent of
+// "box" is covered by the 41_box examples.
 func TestExample_35b_BoxBorder(t *testing.T) {
 	doc := template.New(
 		template.WithPageSize(document.A4),

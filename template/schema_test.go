@@ -56,6 +56,12 @@ func TestParsePageSize(t *testing.T) {
 		{"A3", document.A3},
 		{"Letter", document.Letter},
 		{"legal", document.Legal},
+		{"A0", document.A0},
+		{"A6", document.A6},
+		{"a10", document.A10},
+		{"B5", document.B5},
+		{"C4", document.C4},
+		{" dl ", document.DL},
 	}
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
@@ -71,6 +77,38 @@ func TestParsePageSize(t *testing.T) {
 
 	if _, err := parsePageSize("Unknown"); err == nil {
 		t.Error("parsePageSize(Unknown) expected error")
+	}
+}
+
+func TestSchemaPageSizeOrientation(t *testing.T) {
+	tests := []struct {
+		page SchemaPage
+		want document.Size
+	}{
+		{SchemaPage{Size: "A4"}, document.A4},
+		{SchemaPage{Size: "A4", Orientation: "portrait"}, document.A4},
+		{SchemaPage{Size: "A4", Orientation: "landscape"}, document.A4.Landscape()},
+		{SchemaPage{Size: "letter", Orientation: "Landscape"}, document.Letter.Landscape()},
+		{SchemaPage{Orientation: "landscape"}, document.A4.Landscape()},
+	}
+	for _, tt := range tests {
+		got, err := schemaPageSize(tt.page)
+		if err != nil {
+			t.Fatalf("schemaPageSize(%+v) error: %v", tt.page, err)
+		}
+		if got != tt.want {
+			t.Errorf("schemaPageSize(%+v) = %+v, want %+v", tt.page, got, tt.want)
+		}
+	}
+	if _, err := schemaPageSize(SchemaPage{Size: "A4", Orientation: "sideways"}); err == nil {
+		t.Error("expected error for unknown orientation")
+	}
+	doc, err := FromJSON([]byte(`{"page":{"size":"A5","orientation":"landscape"},"body":[]}`), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if doc.config.PageSize != document.A5.Landscape() {
+		t.Errorf("FromJSON page size = %+v, want %+v", doc.config.PageSize, document.A5.Landscape())
 	}
 }
 
@@ -387,7 +425,7 @@ func TestBuildFromSchema_WithOptions(t *testing.T) {
 
 func TestBuildFromSchema_InvalidPageSize(t *testing.T) {
 	schema := &Schema{
-		Page: SchemaPage{Size: "B5"},
+		Page: SchemaPage{Size: "B11"},
 		Body: []SchemaRow{},
 	}
 	if _, err := buildFromSchema(schema, nil); err == nil {

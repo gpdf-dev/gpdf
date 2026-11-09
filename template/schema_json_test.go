@@ -48,8 +48,8 @@ func TestSchemaJSON_DefsPresent(t *testing.T) {
 		"dimension", "color",
 		"page", "metadata",
 		"row", "rowDef", "col", "element",
-		"style", "image", "table", "list", "line",
-		"qrcode", "barcode",
+		"style", "richText", "image", "table", "list", "line",
+		"qrcode", "barcode", "border", "box",
 		"absolute", "pageBody",
 	}
 	sort.Strings(expected)
