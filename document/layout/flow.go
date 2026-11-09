@@ -59,8 +59,15 @@ func (fl *FlowLayout) LayoutText(text string, style document.Style, constraints 
 	// Resolve text indent for the first line, against the inner width.
 	indent := style.TextIndent.Resolve(inner.AvailableWidth, fontSize)
 
+	// Page-number placeholders are measured and wrapped as a single digit
+	// stand-in so the long sentinel string neither wraps nor skews the
+	// alignment; each line's content keeps the placeholder so it can be
+	// resolved after pagination.
+	proxy := newPlaceholderProxy(text)
+
 	// Break text into lines, using a narrower first line when indented.
-	lines := breakTextLinesIndented(text, style, fontSize, indent, inner)
+	measured := breakTextLinesIndented(proxy.text, style, fontSize, indent, inner)
+	lines := proxy.restoreLines(measured)
 
 	var placed []PlacedNode
 	cursorY := 0.0
@@ -71,7 +78,7 @@ func (fl *FlowLayout) LayoutText(text string, style document.Style, constraints 
 			return overflowResult(lines[i:], style, constraints.AvailableWidth, cursorY+verticalInset, placed)
 		}
 
-		lineWidth := measureLineWidth(line, style, fontSize, inner)
+		lineWidth := measureLineWidth(measured[i], style, fontSize, inner)
 		lineIndent := 0.0
 		if i == 0 {
 			lineIndent = indent
@@ -94,6 +101,115 @@ func (fl *FlowLayout) LayoutText(text string, style document.Style, constraints 
 		},
 		Children: placed,
 	}
+}
+
+// placeholderStandIn is the text measured in place of a page-number
+// placeholder during layout. A single digit approximates the width of the
+// final number and, being one rune, can never be split across lines. The
+// exact width is corrected by ResolvePageNumbersWithFonts.
+const placeholderStandIn = "0"
+
+// placeholderProxy is text with page-number placeholders replaced by
+// placeholderStandIn, remembering where each placeholder was.
+type placeholderProxy struct {
+	text  string
+	spans []placeholderSpan // in ascending offset order
+}
+
+type placeholderSpan struct {
+	offset      int // byte offset of the stand-in in text
+	placeholder string
+}
+
+// newPlaceholderProxy replaces page-number placeholders in text with
+// stand-ins. Text without placeholders is returned unchanged.
+func newPlaceholderProxy(text string) placeholderProxy {
+	if !strings.Contains(text, document.PageNumberPlaceholder) &&
+		!strings.Contains(text, document.TotalPagesPlaceholder) {
+		return placeholderProxy{text: text}
+	}
+	var b strings.Builder
+	var spans []placeholderSpan
+	for rest := text; rest != ""; {
+		i, ph := nextPlaceholder(rest)
+		if i < 0 {
+			b.WriteString(rest)
+			break
+		}
+		b.WriteString(rest[:i])
+		spans = append(spans, placeholderSpan{offset: b.Len(), placeholder: ph})
+		b.WriteString(placeholderStandIn)
+		rest = rest[i+len(ph):]
+	}
+	return placeholderProxy{text: b.String(), spans: spans}
+}
+
+// nextPlaceholder returns the index and value of the first page-number
+// placeholder in s, or -1 when there is none.
+func nextPlaceholder(s string) (int, string) {
+	pi := strings.Index(s, document.PageNumberPlaceholder)
+	ti := strings.Index(s, document.TotalPagesPlaceholder)
+	switch {
+	case pi < 0 && ti < 0:
+		return -1, ""
+	case ti < 0 || (pi >= 0 && pi < ti):
+		return pi, document.PageNumberPlaceholder
+	default:
+		return ti, document.TotalPagesPlaceholder
+	}
+}
+
+// restoreLines maps lines broken from the proxy text back to the original
+// text by putting the placeholders back in place of their stand-ins. Line
+// breakers return verbatim substrings in order (separators such as a space
+// or newline at a break may be dropped), which lets each line be located
+// by scanning forward.
+func (p placeholderProxy) restoreLines(lines []string) []string {
+	if len(p.spans) == 0 {
+		return lines
+	}
+	out := make([]string, len(lines))
+	cursor, si := 0, 0
+	for i, line := range lines {
+		start := locateLine(p.text, line, cursor)
+		end := start + len(line)
+		if end > len(p.text) || p.text[start:end] != line {
+			out[i] = line // not located; leave the stand-in as is
+			continue
+		}
+		var b strings.Builder
+		prev := start
+		for si < len(p.spans) && p.spans[si].offset < end {
+			sp := p.spans[si]
+			if sp.offset >= start {
+				b.WriteString(p.text[prev:sp.offset])
+				b.WriteString(sp.placeholder)
+				prev = sp.offset + len(placeholderStandIn)
+			}
+			si++
+		}
+		b.WriteString(p.text[prev:end])
+		out[i] = b.String()
+		cursor = end
+	}
+	return out
+}
+
+// locateLine returns the byte offset of line in text, searching from
+// cursor. A line normally starts at cursor or right after one dropped
+// separator.
+func locateLine(text, line string, cursor int) int {
+	for _, c := range []int{cursor, cursor + 1} {
+		if c <= len(text) && strings.HasPrefix(text[c:], line) {
+			return c
+		}
+	}
+	if cursor <= len(text) {
+		if i := strings.Index(text[cursor:], line); i >= 0 {
+			return cursor + i
+		}
+	}
+	return cursor
 }
 
 // breakTextLinesIndented splits text into wrapped lines, using a narrower

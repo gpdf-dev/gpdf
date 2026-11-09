@@ -3754,3 +3754,81 @@ func TestStretchLastChild_RespectsBoxBottomInset(t *testing.T) {
 		t.Errorf("nested box height = %.2f, want 36", got)
 	}
 }
+
+func TestPlaceholderProxy_RestoreLines(t *testing.T) {
+	ph, tp := document.PageNumberPlaceholder, document.TotalPagesPlaceholder
+	tests := []struct {
+		name  string
+		text  string
+		lines []string // lines as broken from the proxy text
+		want  []string
+	}{
+		{"no placeholder", "hello world", []string{"hello", "world"}, []string{"hello", "world"}},
+		{"single line", "Page " + ph + " of " + tp, []string{"Page 0 of 0"}, []string{"Page " + ph + " of " + tp}},
+		{"wrapped at space", "Page " + ph + " of " + tp, []string{"Page 0", "of 0"}, []string{"Page " + ph, "of " + tp}},
+		{"placeholder alone", ph, []string{"0"}, []string{ph}},
+		{"literal zero kept", "0 " + ph + " 0", []string{"0 0 0"}, []string{"0 " + ph + " 0"}},
+		{"newline separator", ph + "\n" + tp, []string{"0", "0"}, []string{ph, tp}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := newPlaceholderProxy(tt.text)
+			got := p.restoreLines(tt.lines)
+			if strings.Join(got, "|") != strings.Join(tt.want, "|") {
+				t.Errorf("restoreLines = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+// TestLayoutText_PlaceholderNotWrapped verifies that a page-number
+// placeholder in a column narrower than the sentinel string is laid out as
+// a single short line instead of being split into fragments.
+func TestLayoutText_PlaceholderNotWrapped(t *testing.T) {
+	fl := &FlowLayout{}
+	style := document.Style{FontSize: 20, LineHeight: 1.2}
+	res := fl.LayoutText(document.PageNumberPlaceholder, style, Constraints{
+		AvailableWidth:  30,
+		AvailableHeight: 500,
+		FontResolver:    &mockFontResolver{},
+	})
+	if len(res.Children) != 1 {
+		t.Fatalf("placeholder split into %d lines, want 1", len(res.Children))
+	}
+	if got := res.Children[0].Node.(*document.Text).Content; got != document.PageNumberPlaceholder {
+		t.Errorf("line content = %q, want the placeholder", got)
+	}
+}
+
+// TestResolvePageNumbersWithFonts_Realigns verifies that centered and
+// right-aligned lines are re-anchored after the placeholder is replaced.
+func TestResolvePageNumbersWithFonts_Realigns(t *testing.T) {
+	fr := &mockFontResolver{}
+	const avail = 200.0
+	for _, align := range []document.TextAlign{document.AlignLeft, document.AlignCenter, document.AlignRight} {
+		style := document.Style{FontSize: 10, LineHeight: 1.2, TextAlign: align}
+		res := (&FlowLayout{}).LayoutText(document.TotalPagesPlaceholder, style, Constraints{
+			AvailableWidth: avail, AvailableHeight: 100, FontResolver: fr,
+		})
+		pages := make([]PageLayout, 123) // 3-digit total page count
+		for i := range pages {
+			pages[i].Children = offsetNodes(res.Children, 0, 0)
+		}
+		ResolvePageNumbersWithFonts(pages, fr)
+		line := pages[0].Children[0]
+		w := fr.MeasureString(ResolvedFont{}, "123", 10)
+		if !approxEqual(line.Size.Width, w, 0.01) {
+			t.Errorf("align %v: width = %.2f, want %.2f", align, line.Size.Width, w)
+		}
+		var wantX float64
+		switch align {
+		case document.AlignCenter:
+			wantX = (avail - w) / 2
+		case document.AlignRight:
+			wantX = avail - w
+		}
+		if !approxEqual(line.Position.X, wantX, 0.01) {
+			t.Errorf("align %v: x = %.2f, want %.2f", align, line.Position.X, wantX)
+		}
+	}
+}

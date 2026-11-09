@@ -196,10 +196,23 @@ func adjustAbsoluteOrigins(nodes []PlacedNode, marginX, marginY float64) {
 
 // ResolvePageNumbers walks all pages and replaces page-number placeholder
 // strings in text nodes with the actual page number and total page count.
+//
+// Lines keep the position computed during layout. Use
+// [ResolvePageNumbersWithFonts] to also re-measure the resolved lines so
+// that centered and right-aligned page numbers stay aligned.
 func ResolvePageNumbers(pages []PageLayout) {
+	ResolvePageNumbersWithFonts(pages, nil)
+}
+
+// ResolvePageNumbersWithFonts is like [ResolvePageNumbers] but, when fr
+// is non-nil, re-measures every resolved text line and shifts centered
+// and right-aligned lines so they stay aligned with the actual digits.
+// During layout each placeholder is measured as a single digit; this
+// corrects the difference once the real number is known.
+func ResolvePageNumbersWithFonts(pages []PageLayout, fr FontResolver) {
 	total := len(pages)
 	for i := range pages {
-		resolvePageNumbersInNodes(pages[i].Children, i+1, total)
+		resolvePageNumbersInNodes(pages[i].Children, i+1, total, fr)
 	}
 }
 
@@ -211,7 +224,7 @@ func ResolvePageNumbers(pages []PageLayout) {
 // per-page copy (copy-on-write) instead of mutating the shared node.
 // This also leaves the caller's Document untouched so it can be
 // rendered again.
-func resolvePageNumbersInNodes(nodes []PlacedNode, pageNum, totalPages int) {
+func resolvePageNumbersInNodes(nodes []PlacedNode, pageNum, totalPages int, fr FontResolver) {
 	for i := range nodes {
 		if textNode, ok := nodes[i].Node.(*document.Text); ok {
 			if strings.Contains(textNode.Content, document.PageNumberPlaceholder) ||
@@ -220,12 +233,38 @@ func resolvePageNumbersInNodes(nodes []PlacedNode, pageNum, totalPages int) {
 				clone.Content = strings.ReplaceAll(clone.Content, document.PageNumberPlaceholder, strconv.Itoa(pageNum))
 				clone.Content = strings.ReplaceAll(clone.Content, document.TotalPagesPlaceholder, strconv.Itoa(totalPages))
 				nodes[i].Node = &clone
+				if fr != nil && len(nodes[i].Children) == 0 {
+					realignLine(&nodes[i], &clone, fr)
+				}
 			}
 		}
 		if len(nodes[i].Children) > 0 {
-			resolvePageNumbersInNodes(nodes[i].Children, pageNum, totalPages)
+			resolvePageNumbersInNodes(nodes[i].Children, pageNum, totalPages, fr)
 		}
 	}
+}
+
+// realignLine re-measures a resolved text line and keeps it anchored to
+// its alignment: the center for centered text, the right edge for
+// right-aligned text, and the left edge otherwise. Justified lines are
+// left as laid out.
+func realignLine(pn *PlacedNode, t *document.Text, fr FontResolver) {
+	style := t.TextStyle
+	if style.TextAlign == document.AlignJustify {
+		return
+	}
+	fontSize := style.FontSize
+	if fontSize <= 0 {
+		fontSize = 12
+	}
+	newWidth := measureLineWidth(t.Content, style, fontSize, Constraints{FontResolver: fr})
+	switch style.TextAlign {
+	case document.AlignCenter:
+		pn.Position.X += (pn.Size.Width - newWidth) / 2
+	case document.AlignRight:
+		pn.Position.X += pn.Size.Width - newWidth
+	}
+	pn.Size.Width = newWidth
 }
 
 // offsetNodes shifts all placed node positions by the given dx and dy.
