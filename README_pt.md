@@ -30,7 +30,10 @@ Biblioteca de geração de PDF em Go puro, sem dependências externas, com arqui
 - **Esquema JSON** — definir documentos inteiramente em JSON
 - **Múltiplas unidades** — pt, mm, cm, in, em, %
 - **Espaços de cor** — RGB, escala de cinza, CMYK
-- **Imagens** — incorporação de JPEG e PNG com opções de ajuste
+- **Imagens** — JPEG, PNG e SVG (incorporado como gráficos vetoriais) com opções de ajuste
+- **Cantos arredondados e opacidade** — raio de borda para caixas, texto e imagens; transparência para qualquer elemento, incluindo sobreposições
+- **Hiperlinks** — links URI clicáveis em texto, trechos de texto rico, imagens e caixas
+- **Fundos de página** — cor e/ou imagem de fundo em página inteira em todas as páginas
 - **Posicionamento absoluto** — posicionar elementos em coordenadas XY exatas na página
 - **Sobreposição de PDF existente** — abrir PDFs existentes e adicionar texto, imagens, carimbos por cima
 - **Achatamento de formulários** — achatar campos AcroForm em conteúdo de página estático, preservando anotações que não são widgets

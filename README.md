@@ -31,7 +31,10 @@ A pure Go, zero-dependency PDF generation library with a layered architecture an
 - **JSON schema** — define documents entirely in JSON
 - **Multiple units** — pt, mm, cm, in, em, %
 - **Color spaces** — RGB, Grayscale, CMYK
-- **Images** — JPEG and PNG embedding with fit options
+- **Images** — JPEG, PNG and SVG (embedded as vector graphics) with fit options
+- **Rounded corners & opacity** — border radius for boxes, text and images; transparency for any element, including overlays
+- **Hyperlinks** — clickable URI links on text, rich-text spans, images and boxes
+- **Page backgrounds** — full-page background color and/or image on every page
 - **Absolute positioning** — place elements at exact XY coordinates on the page
 - **Existing PDF overlay** — open existing PDFs and add text, images, stamps on top
 - **Form flattening** — flatten AcroForm fields into static page content, preserving non-widget annotations

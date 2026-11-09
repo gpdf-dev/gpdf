@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.0.15] - 2026-11-09
+
 ### Added
 - Rounded corners: `BorderRadius` on `document.Style` / `document.BoxStyle`. Backgrounds are filled as a rounded rectangle (cubic Bézier corners), uniform borders are stroked along the rounded shape (mixed borders keep square corners), and images are clipped to it. The radius is clamped to half the width and height (#46)
   - Builder: `WithBoxRadius`, `WithImageRadius`, `WithTextRadius`; JSON / Go template: `borderRadius` on `box`, `image` and `style`
@@ -262,7 +264,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Reed-Solomon coefficient order in QR code encoder
 - binary.Write return value handling for errcheck lint
 
-[Unreleased]: https://github.com/gpdf-dev/gpdf/compare/v1.0.14...HEAD
+[Unreleased]: https://github.com/gpdf-dev/gpdf/compare/v1.0.15...HEAD
+[1.0.15]: https://github.com/gpdf-dev/gpdf/compare/v1.0.14...v1.0.15
 [1.0.14]: https://github.com/gpdf-dev/gpdf/compare/v1.0.13...v1.0.14
 [1.0.13]: https://github.com/gpdf-dev/gpdf/compare/v1.0.12...v1.0.13
 [1.0.12]: https://github.com/gpdf-dev/gpdf/compare/v1.0.11...v1.0.12
