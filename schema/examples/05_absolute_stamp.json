@@ -1,0 +1,29 @@
+{
+  "page": { "size": "A5", "orientation": "landscape", "margins": "12mm", "background": { "color": "#FAFAF7" } },
+  "body": [
+    { "row": { "cols": [
+      { "span": 12, "box": {
+        "padding": "8mm",
+        "background": "white",
+        "border": { "width": "1pt", "color": "#B0BEC5" },
+        "borderRadius": "6pt",
+        "elements": [
+          { "type": "text", "content": "Certificate of Completion", "style": { "size": 22, "bold": true, "align": "center", "color": "#37474F" } },
+          { "type": "spacer", "height": "6mm" },
+          { "type": "text", "content": "This certifies that", "style": { "align": "center", "color": "gray(0.45)" } },
+          { "type": "spacer", "height": "2mm" },
+          { "type": "text", "content": "Jordan Lee", "style": { "size": 26, "italic": true, "align": "center" } },
+          { "type": "spacer", "height": "2mm" },
+          { "type": "text", "content": "has completed the gpdf JSON authoring course.", "style": { "align": "center", "color": "gray(0.45)" } },
+          { "type": "spacer", "height": "8mm" },
+          { "type": "link", "content": "Verify at gpdf.dev", "style": { "align": "center", "size": 9, "link": "https://gpdf.dev" } }
+        ]
+      }}
+    ]}}
+  ],
+  "absolute": [
+    { "x": "158mm", "y": "88mm", "width": "30mm", "origin": "page", "elements": [
+      { "type": "text", "content": "VERIFIED", "style": { "size": 10, "bold": true, "align": "center", "color": "white", "background": "#C62828", "padding": "2mm", "borderRadius": "3pt" } }
+    ]}
+  ]
+}

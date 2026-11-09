@@ -339,6 +339,17 @@
           "$ref": "#/$defs/dimension",
           "description": "First-line text indent (e.g. \"24pt\", \"10mm\")."
         },
+        "padding": {
+          "$ref": "#/$defs/dimension",
+          "description": "Uniform padding inside the text element (e.g. \"10mm\"). The padded area is part of the element height and is filled by background."
+        },
+        "paddings": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/dimension" },
+          "minItems": 1,
+          "maxItems": 4,
+          "description": "Per-edge padding in CSS order [top, right, bottom, left]. Overrides padding."
+        },
         "borderRadius": {
           "$ref": "#/$defs/dimension",
           "description": "Rounds the corners of the text background and uniform border."
@@ -414,6 +425,22 @@
           "description": "Horizontal alignment of the image.",
           "enum": ["left", "center", "right"]
         },
+        "minWidth": {
+          "$ref": "#/$defs/dimension",
+          "description": "Minimum display width. When the remaining space is narrower, the image moves to the next page instead of shrinking."
+        },
+        "minHeight": {
+          "$ref": "#/$defs/dimension",
+          "description": "Minimum display height. When the remaining space is shorter, the image moves to the next page instead of shrinking."
+        },
+        "border": {
+          "$ref": "#/$defs/border",
+          "description": "Border around the image."
+        },
+        "background": {
+          "$ref": "#/$defs/color",
+          "description": "Color drawn behind the image (visible around a \"contain\" fit or through transparency)."
+        },
         "borderRadius": {
           "$ref": "#/$defs/dimension",
           "description": "Clips the image to rounded corners of this radius."
@@ -466,6 +493,27 @@
           "type": "string",
           "description": "Vertical alignment of cell content.",
           "enum": ["top", "middle", "bottom"]
+        },
+        "columnAlign": {
+          "type": "array",
+          "description": "Per-column horizontal alignment, in column order.",
+          "items": { "type": "string", "enum": ["left", "center", "right"] }
+        },
+        "border": {
+          "$ref": "#/$defs/border",
+          "description": "Outer frame around the whole table."
+        },
+        "cellBorder": {
+          "$ref": "#/$defs/border",
+          "description": "Border drawn around every header and body cell (a uniform grid)."
+        },
+        "borderCollapse": {
+          "type": "boolean",
+          "description": "Merge adjacent cell borders into a single line (like CSS border-collapse: collapse). Default false (separated)."
+        },
+        "background": {
+          "$ref": "#/$defs/color",
+          "description": "Fill color of the table's outer box."
         }
       }
     },

@@ -380,5 +380,6 @@ doc, err := template.FromJSON(schema, data,
 
 ## See Also
 
+- [AI authoring spec](../schema/gpdf-json-spec.en.md) -- Single-file canonical spec (prose + JSON Schema + verified examples) for having an AI write gpdf JSON. Published at https://gpdf.dev/spec/gpdf-json-spec.en.md
 - [Go Templates](04-go-templates.md) -- More advanced data binding with loops and conditionals
 - [Elements](05-elements.md) -- Detailed reference for each element type

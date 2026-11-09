@@ -1,0 +1,8 @@
+{
+  "page": { "size": "A4", "margins": "20mm" },
+  "body": [
+    { "row": { "cols": [
+      { "span": 12, "text": "Hello, World!", "style": { "size": 24, "bold": true } }
+    ]}}
+  ]
+}

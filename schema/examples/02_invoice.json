@@ -1,0 +1,67 @@
+{
+  "page": { "size": "A4", "margins": "18mm" },
+  "metadata": { "title": "Invoice INV-2026-0042", "author": "ACME Corp" },
+  "header": [
+    { "row": { "cols": [
+      { "span": 6, "text": "ACME Corp", "style": { "size": 16, "bold": true, "color": "#1A237E" } },
+      { "span": 6, "text": "INVOICE", "style": { "size": 16, "bold": true, "align": "right", "color": "gray(0.4)" } }
+    ]}},
+    { "row": { "cols": [
+      { "span": 12, "elements": [
+        { "type": "spacer", "height": "3mm" },
+        { "type": "line", "line": { "color": "#1A237E", "thickness": "1pt" } },
+        { "type": "spacer", "height": "6mm" }
+      ]}
+    ]}}
+  ],
+  "footer": [
+    { "row": { "cols": [
+      { "span": 8, "text": "Payment due within 30 days. Thank you for your business.", "style": { "size": 8, "color": "gray(0.5)" } },
+      { "span": 4, "elements": [
+        { "type": "pageNumber", "style": { "size": 8, "align": "right", "color": "gray(0.5)" } }
+      ]}
+    ]}}
+  ],
+  "body": [
+    { "row": { "cols": [
+      { "span": 6, "elements": [
+        { "type": "text", "content": "Bill to", "style": { "size": 9, "color": "gray(0.5)" } },
+        { "type": "text", "content": "Globex Inc.", "style": { "bold": true } },
+        { "type": "text", "content": "123 Market Street" },
+        { "type": "text", "content": "San Francisco, CA 94103" }
+      ]},
+      { "span": 6, "elements": [
+        { "type": "text", "content": "Invoice no.  INV-2026-0042", "style": { "align": "right" } },
+        { "type": "text", "content": "Issued  2026-11-09", "style": { "align": "right" } },
+        { "type": "text", "content": "Due  2026-12-09", "style": { "align": "right" } }
+      ]}
+    ]}},
+    { "row": { "cols": [ { "span": 12, "spacer": "8mm" } ]}},
+    { "row": { "cols": [
+      { "span": 12, "table": {
+        "header": ["Description", "Qty", "Unit price", "Amount"],
+        "rows": [
+          ["PDF generation - Pro plan (monthly)", "1", "$49.00", "$49.00"],
+          ["Additional documents (per 1,000)", "12", "$2.00", "$24.00"],
+          ["Priority support", "1", "$15.00", "$15.00"]
+        ],
+        "columnWidths": [52, 12, 18, 18],
+        "columnAlign": ["left", "right", "right", "right"],
+        "headerStyle": { "color": "white", "background": "#1A237E" },
+        "stripeColor": "#F3F4F8",
+        "cellBorder": { "width": "0.5pt", "color": "gray(0.8)" },
+        "borderCollapse": true
+      }}
+    ]}},
+    { "row": { "cols": [ { "span": 12, "spacer": "4mm" } ]}},
+    { "row": { "cols": [
+      { "span": 8, "qrcode": { "data": "https://example.com/pay/INV-2026-0042", "size": "24mm" } },
+      { "span": 4, "elements": [
+        { "type": "text", "content": "Subtotal   $88.00", "style": { "align": "right" } },
+        { "type": "text", "content": "Tax (10%)   $8.80", "style": { "align": "right" } },
+        { "type": "spacer", "height": "2mm" },
+        { "type": "text", "content": "Total   $96.80", "style": { "align": "right", "bold": true, "size": 14, "color": "#1A237E" } }
+      ]}
+    ]}}
+  ]
+}

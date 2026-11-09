@@ -1,0 +1,98 @@
+{
+  "page": { "size": "A4", "margins": "20mm" },
+  "metadata": { "title": "Quarterly Report Q3 2026", "author": "ACME Corp" },
+  "footer": [
+    { "row": { "cols": [
+      { "span": 10, "text": "ACME Corp - Confidential", "style": { "size": 8, "color": "gray(0.5)" } },
+      { "span": 2, "elements": [
+        { "type": "pageNumber", "style": { "size": 8, "align": "right", "color": "gray(0.5)" } }
+      ]}
+    ]}}
+  ],
+  "pages": [
+    { "body": [
+      { "row": { "cols": [
+        { "span": 12, "elements": [
+          { "type": "text", "content": "Quarterly Report", "style": { "size": 28, "bold": true, "color": "#0D47A1" } },
+          { "type": "text", "content": "Q3 2026 | Prepared by the Finance team", "style": { "size": 12, "color": "gray(0.4)" } },
+          { "type": "spacer", "height": "8mm" }
+        ]}
+      ]}},
+      { "row": { "cols": [
+        { "span": 4, "box": {
+          "padding": "4mm", "background": "#E3F2FD", "borderRadius": "4pt",
+          "elements": [
+            { "type": "text", "content": "Revenue", "style": { "size": 9, "color": "gray(0.4)" } },
+            { "type": "text", "content": "$1.24M", "style": { "size": 20, "bold": true } }
+          ]
+        }},
+        { "span": 4, "box": {
+          "padding": "4mm", "background": "#E8F5E9", "borderRadius": "4pt",
+          "elements": [
+            { "type": "text", "content": "Customers", "style": { "size": 9, "color": "gray(0.4)" } },
+            { "type": "text", "content": "8,512", "style": { "size": 20, "bold": true } }
+          ]
+        }},
+        { "span": 4, "box": {
+          "padding": "4mm", "background": "#FFF3E0", "borderRadius": "4pt",
+          "elements": [
+            { "type": "text", "content": "Churn", "style": { "size": 9, "color": "gray(0.4)" } },
+            { "type": "text", "content": "1.8%", "style": { "size": 20, "bold": true } }
+          ]
+        }}
+      ]}},
+      { "row": { "cols": [ { "span": 12, "spacer": "8mm" } ]}},
+      { "row": { "cols": [
+        { "span": 12, "richText": {
+          "fragments": [
+            { "text": "Revenue grew " },
+            { "text": "18% quarter over quarter", "style": { "bold": true, "color": "#1B5E20" } },
+            { "text": ", driven by the self-serve plan. See the " },
+            { "text": "pricing page", "style": { "underline": true, "color": "#0D47A1", "link": "https://example.com/pricing" } },
+            { "text": " for the plan changes that shipped in July." }
+          ]
+        }}
+      ]}},
+      { "row": { "cols": [ { "span": 12, "spacer": "6mm" } ]}},
+      { "row": { "cols": [
+        { "span": 12, "elements": [
+          { "type": "text", "content": "Highlights", "style": { "size": 14, "bold": true } },
+          { "type": "spacer", "height": "2mm" },
+          { "type": "list", "list": { "items": [
+            "Self-serve signups up 32%",
+            "Enterprise pipeline doubled",
+            "Support response time under 2 hours"
+          ]}}
+        ]}
+      ]}}
+    ]},
+    { "body": [
+      { "row": { "cols": [
+        { "span": 12, "elements": [
+          { "type": "text", "content": "Revenue by region", "style": { "size": 14, "bold": true } },
+          { "type": "spacer", "height": "3mm" },
+          { "type": "table", "table": {
+            "header": ["Region", "Q2", "Q3", "Change"],
+            "rows": [
+              ["North America", "$620K", "$731K", "+17.9%"],
+              ["Europe", "$310K", "$372K", "+20.0%"],
+              ["Asia Pacific", "$120K", "$137K", "+14.2%"]
+            ],
+            "columnWidths": [40, 20, 20, 20],
+            "columnAlign": ["left", "right", "right", "right"],
+            "headerStyle": { "color": "white", "background": "#0D47A1" },
+            "stripeColor": "#F5F5F5"
+          }},
+          { "type": "spacer", "height": "6mm" },
+          { "type": "text", "content": "Next steps", "style": { "size": 14, "bold": true } },
+          { "type": "spacer", "height": "2mm" },
+          { "type": "list", "list": { "type": "ordered", "items": [
+            "Expand the APAC sales team",
+            "Launch annual billing",
+            "Publish the Q4 roadmap"
+          ]}}
+        ]}
+      ]}}
+    ]}
+  ]
+}

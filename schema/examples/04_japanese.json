@@ -1,0 +1,48 @@
+{
+  "page": { "size": "A4", "margins": "20mm" },
+  "metadata": { "title": "御見積書", "author": "株式会社サンプル" },
+  "body": [
+    { "row": { "cols": [
+      { "span": 12, "text": "御見積書", "style": { "size": 24, "bold": true, "align": "center", "letterSpacing": 4 } }
+    ]}},
+    { "row": { "cols": [ { "span": 12, "spacer": "8mm" } ]}},
+    { "row": { "cols": [
+      { "span": 7, "elements": [
+        { "type": "text", "content": "株式会社グローバル 御中", "style": { "size": 14, "bold": true } },
+        { "type": "spacer", "height": "2mm" },
+        { "type": "text", "content": "下記の通りお見積り申し上げます。" }
+      ]},
+      { "span": 5, "elements": [
+        { "type": "text", "content": "株式会社サンプル", "style": { "bold": true, "align": "right" } },
+        { "type": "text", "content": "〒100-0001 東京都千代田区1-1", "style": { "size": 9, "align": "right" } },
+        { "type": "text", "content": "発行日 2026年11月9日", "style": { "size": 9, "align": "right" } }
+      ]}
+    ]}},
+    { "row": { "cols": [ { "span": 12, "spacer": "6mm" } ]}},
+    { "row": { "cols": [
+      { "span": 12, "table": {
+        "header": ["品目", "数量", "単価", "金額"],
+        "rows": [
+          ["PDF 生成ライブラリ導入支援", "1", "¥300,000", "¥300,000"],
+          ["帳票テンプレート作成（請求書・納品書）", "2", "¥80,000", "¥160,000"],
+          ["保守サポート（12ヶ月）", "1", "¥120,000", "¥120,000"]
+        ],
+        "columnWidths": [52, 12, 18, 18],
+        "columnAlign": ["left", "right", "right", "right"],
+        "headerStyle": { "color": "white", "background": "#263238" },
+        "cellBorder": { "width": "0.5pt", "color": "gray(0.75)" },
+        "borderCollapse": true
+      }}
+    ]}},
+    { "row": { "cols": [ { "span": 12, "spacer": "4mm" } ]}},
+    { "row": { "cols": [
+      { "span": 7, "text": "" },
+      { "span": 5, "box": {
+        "padding": "3mm", "background": "#ECEFF1",
+        "elements": [
+          { "type": "text", "content": "合計金額（税込） ¥638,000", "style": { "size": 13, "bold": true, "align": "right" } }
+        ]
+      }}
+    ]}}
+  ]
+}
