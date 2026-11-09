@@ -15,6 +15,9 @@ package validation_test
 import (
 	"bytes"
 	"fmt"
+	"image"
+	"image/color"
+	"image/png"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -52,6 +55,7 @@ func testPDFs() []testPDF {
 		{"list", genList},
 		{"qrcode", genQRCode},
 		{"barcode", genBarcode},
+		{"visual_effects", genVisualEffects},
 	}
 }
 
@@ -284,6 +288,49 @@ func genQRCode() ([]byte, error) {
 		r.Col(12, func(c *template.ColBuilder) {
 			c.Text("QR Code:", template.Bold())
 			c.QRCode("https://gpdf.dev", template.QRSize(document.Mm(30)))
+		})
+	})
+	return doc.Generate()
+}
+
+// genVisualEffects exercises border radius, opacity, link annotations,
+// page backgrounds and SVG images together.
+func genVisualEffects() ([]byte, error) {
+	img := image.NewRGBA(image.Rect(0, 0, 40, 20))
+	for y := 0; y < 20; y++ {
+		for x := 0; x < 40; x++ {
+			img.Set(x, y, color.RGBA{R: 66, G: 133, B: 244, A: 255})
+		}
+	}
+	var pngBuf bytes.Buffer
+	if err := png.Encode(&pngBuf, img); err != nil {
+		return nil, err
+	}
+	pngData := pngBuf.Bytes()
+
+	doc := template.New(
+		template.WithPageSize(document.A4),
+		template.WithBackgroundColor(pdf.RGBHex(0xFFFDF5)),
+		template.WithBackgroundImage(pngData, template.BackgroundOpacity(0.2)),
+	)
+	page := doc.AddPage()
+	page.AutoRow(func(r *template.RowBuilder) {
+		r.Col(12, func(c *template.ColBuilder) {
+			c.Link("gpdf.dev", "https://gpdf.dev")
+			c.Box(func(c *template.ColBuilder) {
+				c.Text("Rounded, translucent card", template.WithTextOpacity(0.8))
+			},
+				template.WithBoxBackground(pdf.RGBHex(0xE8EAF6)),
+				template.WithBoxRadius(document.Mm(3)),
+				template.WithBoxOpacity(0.6),
+				template.WithBoxLink("https://gpdf.dev/docs"),
+			)
+			c.Image(pngData, template.FitWidth(document.Mm(30)),
+				template.WithImageRadius(document.Mm(3)), template.WithImageLink("https://gpdf.dev"))
+			c.Image([]byte(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">`+
+				`<circle cx="24" cy="24" r="20" fill="#1565C0" fill-opacity="0.6"/>`+
+				`<path d="M14 25l7 7 14-14" fill="none" stroke="white" stroke-width="4" stroke-linecap="round"/></svg>`),
+				template.FitWidth(document.Mm(20)))
 		})
 	})
 	return doc.Generate()

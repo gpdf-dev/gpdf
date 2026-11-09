@@ -29,6 +29,14 @@ type PDFRenderer struct {
 	pageContent []byte                        // accumulated content stream for the current page
 	pageWidth   float64                       // current page width for MediaBox
 	pageHeight  float64                       // current page height for Y-coordinate conversion
+
+	gsMap   map[string]string   // alpha key -> ExtGState resource name (e.g., "GS1")
+	gsDicts map[string]pdf.Dict // ExtGState resource name -> dictionary
+
+	alpha      float64    // constant alpha currently in effect (1 = opaque)
+	bgSuppress *pdf.Color // inherited background that children must not repaint
+	pageAnnots []pdf.Dict // link annotations collected for the current page
+	formCount  int        // number of SVG form XObjects registered
 }
 
 // NewPDFRenderer creates a PDFRenderer that writes to the given pdf.Writer.
@@ -41,6 +49,9 @@ func NewPDFRenderer(w *pdf.Writer) *PDFRenderer {
 		imageRefs:  make(map[string]pdf.ObjectRef),
 		ttFonts:    make(map[string]*font.TrueTypeFont),
 		ttFontData: make(map[string][]byte),
+		gsMap:      make(map[string]string),
+		gsDicts:    make(map[string]pdf.Dict),
+		alpha:      1,
 	}
 }
 
@@ -71,6 +82,9 @@ func (r *PDFRenderer) BeginPage(size document.Size) error {
 	r.pageContent = nil
 	r.pageWidth = size.Width
 	r.pageHeight = size.Height
+	r.alpha = 1
+	r.bgSuppress = nil
+	r.pageAnnots = nil
 	return nil
 }
 
@@ -110,6 +124,19 @@ func (r *PDFRenderer) EndPage() error {
 		resources.XObject = xobjDict
 	}
 
+	if len(r.gsDicts) > 0 {
+		gsDict := make(pdf.Dict, len(r.gsDicts))
+		for name, d := range r.gsDicts {
+			gsDict[pdf.Name(name)] = d
+		}
+		resources.ExtGState = gsDict
+	}
+
+	annots, err := r.writePageAnnots()
+	if err != nil {
+		return err
+	}
+
 	page := pdf.PageObject{
 		MediaBox: pdf.Rectangle{
 			LLX: 0,
@@ -119,6 +146,7 @@ func (r *PDFRenderer) EndPage() error {
 		},
 		Resources: resources,
 		Contents:  []pdf.ObjectRef{contentRef},
+		Annots:    annots,
 	}
 
 	if err := r.writer.AddPage(page); err != nil {
@@ -126,6 +154,23 @@ func (r *PDFRenderer) EndPage() error {
 	}
 
 	return nil
+}
+
+// writePageAnnots writes the link annotations collected for the current
+// page as indirect objects and returns their references.
+func (r *PDFRenderer) writePageAnnots() ([]pdf.ObjectRef, error) {
+	if len(r.pageAnnots) == 0 {
+		return nil, nil
+	}
+	refs := make([]pdf.ObjectRef, 0, len(r.pageAnnots))
+	for _, a := range r.pageAnnots {
+		ref := r.writer.AllocObject()
+		if err := r.writer.WriteObject(ref, a); err != nil {
+			return nil, fmt.Errorf("render: failed to write link annotation: %w", err)
+		}
+		refs = append(refs, ref)
+	}
+	return refs, nil
 }
 
 // RenderText draws text at the given layout position. The Y coordinate is
@@ -354,30 +399,7 @@ func writePathStyle(buf *strings.Builder, style PathStyle, hasFill, hasStroke bo
 // writePathSegments emits PDF path-construction operators (m, l, c, h)
 // for each segment, converting Y coordinates from layout to PDF space.
 func (r *PDFRenderer) writePathSegments(buf *strings.Builder, path document.Path) {
-	for _, seg := range path.Segments {
-		switch seg.Op {
-		case document.PathMoveTo:
-			if len(seg.Points) >= 1 {
-				p := seg.Points[0]
-				fmt.Fprintf(buf, "%g %g m\n", p.X, r.pageHeight-p.Y)
-			}
-		case document.PathLineTo:
-			if len(seg.Points) >= 1 {
-				p := seg.Points[0]
-				fmt.Fprintf(buf, "%g %g l\n", p.X, r.pageHeight-p.Y)
-			}
-		case document.PathCurveTo:
-			if len(seg.Points) >= 3 {
-				c1, c2, ep := seg.Points[0], seg.Points[1], seg.Points[2]
-				fmt.Fprintf(buf, "%g %g %g %g %g %g c\n",
-					c1.X, r.pageHeight-c1.Y,
-					c2.X, r.pageHeight-c2.Y,
-					ep.X, r.pageHeight-ep.Y)
-			}
-		case document.PathClose:
-			buf.WriteString("h\n")
-		}
-	}
+	writePathOps(buf, path, r.pageHeight)
 }
 
 // writePaintOp emits the appropriate PDF paint operator based on fill/stroke flags.
@@ -430,6 +452,12 @@ func (r *PDFRenderer) RenderDocument(pages []layout.PageLayout, info document.Do
 			return err
 		}
 
+		if page.Background != nil {
+			if err := r.renderPageBackground(*page.Background, page.Size); err != nil {
+				return err
+			}
+		}
+
 		if err := r.renderPlacedNodes(page.Children, 0, 0); err != nil {
 			return err
 		}
@@ -467,55 +495,185 @@ func (r *PDFRenderer) renderPlacedNode(pn layout.PlacedNode, offsetX, offsetY fl
 	absY := pn.Position.Y + offsetY
 
 	style := pn.Node.Style()
+	bounds := document.Rectangle{X: absX, Y: absY, Width: pn.Size.Width, Height: pn.Size.Height}
+	var radius float64
+	if style.BorderRadius.Amount > 0 {
+		radius = style.BorderRadius.Resolve(pn.Size.Width, style.FontSize)
+	}
 
-	// Render background if present.
-	if style.Background != nil {
-		if err := r.RenderRect(document.Rectangle{
-			X:      absX,
-			Y:      absY,
-			Width:  pn.Size.Width,
-			Height: pn.Size.Height,
-		}, RectStyle{FillColor: style.Background}); err != nil {
+	prevAlpha, grouped := r.beginOpacity(style.Opacity)
+
+	if err := r.renderNodeDecoration(pn, &style, bounds, radius); err != nil {
+		return err
+	}
+	if err := r.renderNodeContent(pn, &style, bounds, radius); err != nil {
+		return err
+	}
+	r.addNodeLink(pn, &style, bounds)
+
+	// Render children with this node's absolute position as offset.
+	prevSuppress := r.bgSuppress
+	r.bgSuppress = childBgSuppress(style.Background, prevSuppress, radius, r.alpha)
+	err := r.renderPlacedNodes(pn.Children, absX, absY)
+	r.bgSuppress = prevSuppress
+
+	r.endOpacity(prevAlpha, grouped)
+	return err
+}
+
+// childBgSuppress returns the background that a node's children must not
+// repaint. Layout copies a text block's background onto each of its lines
+// (and rich-text runs); repainting it is invisible for opaque, square
+// backgrounds — which keeps existing output unchanged — but would show
+// through under transparency or square off rounded corners.
+func childBgSuppress(bg, prev *pdf.Color, radius, alpha float64) *pdf.Color {
+	if bg == nil || bg == prev {
+		return prev
+	}
+	if radius > 0 || alpha < 1 {
+		return bg
+	}
+	return nil
+}
+
+// renderNodeDecoration draws a node's background and borders.
+func (r *PDFRenderer) renderNodeDecoration(pn layout.PlacedNode, style *document.Style, bounds document.Rectangle, radius float64) error {
+	if style.Background != nil && style.Background != r.bgSuppress {
+		if radius > 0 {
+			var buf strings.Builder
+			writeRoundedFill(&buf, bounds, radius, *style.Background, r.pageHeight)
+			r.pageContent = append(r.pageContent, buf.String()...)
+		} else if err := r.RenderRect(bounds, RectStyle{FillColor: style.Background}); err != nil {
 			return err
 		}
 	}
 
-	// Render borders if any.
-	if err := r.renderBorders(pn, style, absX, absY); err != nil {
-		return err
+	if radius > 0 {
+		if side, ok := uniformBorder(style.Border); ok {
+			bw := side.Width.Resolve(pn.Size.Width, style.FontSize)
+			var buf strings.Builder
+			writeRoundedBorder(&buf, bounds, radius, bw, side.Color, r.pageHeight)
+			r.pageContent = append(r.pageContent, buf.String()...)
+			return nil
+		}
 	}
+	return r.renderBorders(pn, *style, bounds.X, bounds.Y)
+}
 
-	// Render node-specific content.
+// renderNodeContent draws the node-specific content of text and image nodes.
+func (r *PDFRenderer) renderNodeContent(pn layout.PlacedNode, style *document.Style, bounds document.Rectangle, radius float64) error {
+	pos := document.Point{X: bounds.X, Y: bounds.Y}
 	switch pn.Node.NodeType() {
 	case document.NodeText:
 		// Only render text for leaf nodes (individual lines from FlowLayout).
 		// Parent text nodes with children act as containers; their children
 		// carry the actual per-line content.
-		if len(pn.Children) == 0 {
-			textNode, ok := pn.Node.(*document.Text)
-			if ok {
-				if err := r.RenderText(textNode.Content, document.Point{X: absX, Y: absY}, style); err != nil {
-					return err
-				}
-				if err := r.renderTextDecoration(style, absX, absY, pn.Size.Width); err != nil {
-					return err
-				}
-			}
+		if len(pn.Children) > 0 {
+			return nil
 		}
+		textNode, ok := pn.Node.(*document.Text)
+		if !ok {
+			return nil
+		}
+		if err := r.RenderText(textNode.Content, pos, *style); err != nil {
+			return err
+		}
+		return r.renderTextDecoration(*style, bounds.X, bounds.Y, pn.Size.Width)
 	case document.NodeImage:
 		imgNode, ok := pn.Node.(*document.Image)
-		if ok {
-			if err := r.RenderImage(imgNode.Source, document.Point{X: absX, Y: absY}, pn.Size); err != nil {
-				return err
-			}
+		if !ok {
+			return nil
 		}
-	case document.NodeRichText:
-		// RichText lines act as containers. Background is handled above.
-		// Child Text nodes are rendered by the recursive call below.
+		if radius > 0 {
+			var clip strings.Builder
+			writeRoundedClip(&clip, bounds, radius, r.pageHeight)
+			r.pageContent = append(r.pageContent, clip.String()...)
+		}
+		if err := r.RenderImage(imgNode.Source, pos, pn.Size); err != nil {
+			return err
+		}
+		if radius > 0 {
+			r.pageContent = append(r.pageContent, "Q\n"...)
+		}
 	}
+	// RichText lines act as containers. Background is handled by
+	// renderNodeDecoration; child Text nodes are rendered recursively.
+	return nil
+}
 
-	// Render children with this node's absolute position as offset.
-	return r.renderPlacedNodes(pn.Children, absX, absY)
+// addNodeLink records a link annotation for the node's area when its
+// style carries a Link URI.
+func (r *PDFRenderer) addNodeLink(pn layout.PlacedNode, style *document.Style, bounds document.Rectangle) {
+	if style.Link == "" || bounds.Width <= 0 || bounds.Height <= 0 {
+		return
+	}
+	if !nodeEmitsLink(pn.Node.NodeType(), len(pn.Children) == 0) {
+		return
+	}
+	r.pageAnnots = append(r.pageAnnots, linkAnnotation(bounds, style.Link, r.pageHeight))
+}
+
+// beginOpacity starts a graphics-state group with the given constant alpha
+// when it differs from the alpha already in effect. It returns the previous
+// alpha and whether a group was opened; pass both to endOpacity.
+func (r *PDFRenderer) beginOpacity(v float64) (float64, bool) {
+	a, ok := normalizeOpacity(v)
+	if !ok || a == r.alpha {
+		return r.alpha, false
+	}
+	name := r.ensureExtGState(a)
+	r.pageContent = append(r.pageContent, "q\n/"+name+" gs\n"...)
+	prev := r.alpha
+	r.alpha = a
+	return prev, true
+}
+
+// endOpacity closes a group opened by beginOpacity.
+func (r *PDFRenderer) endOpacity(prev float64, grouped bool) {
+	if !grouped {
+		return
+	}
+	r.pageContent = append(r.pageContent, "Q\n"...)
+	r.alpha = prev
+}
+
+// ensureExtGState returns the resource name of an ExtGState that sets the
+// given constant alpha, registering it on first use.
+func (r *PDFRenderer) ensureExtGState(a float64) string {
+	key := alphaKey(a)
+	if name, ok := r.gsMap[key]; ok {
+		return name
+	}
+	name := fmt.Sprintf("GS%d", len(r.gsMap)+1)
+	r.gsMap[key] = name
+	r.gsDicts[name] = extGStateDict(a)
+	return name
+}
+
+// renderPageBackground paints a page background (color and/or image)
+// beneath all other page content. The image is clipped to the page.
+func (r *PDFRenderer) renderPageBackground(bg document.PageBackground, size document.Size) error {
+	prevAlpha, grouped := r.beginOpacity(bg.Opacity)
+	defer r.endOpacity(prevAlpha, grouped)
+
+	page := document.Rectangle{Width: size.Width, Height: size.Height}
+	if bg.Color != nil {
+		if err := r.RenderRect(page, RectStyle{FillColor: bg.Color}); err != nil {
+			return err
+		}
+	}
+	if bg.Image == nil || len(bg.Image.Data) == 0 {
+		return nil
+	}
+	dst := fitRect(float64(bg.Image.Width), float64(bg.Image.Height), page, bg.FitMode)
+	var clip strings.Builder
+	writeRoundedClip(&clip, page, 0, r.pageHeight)
+	r.pageContent = append(r.pageContent, clip.String()...)
+	if err := r.RenderImage(*bg.Image, document.Point{X: dst.X, Y: dst.Y}, document.Size{Width: dst.Width, Height: dst.Height}); err != nil {
+		return err
+	}
+	r.pageContent = append(r.pageContent, "Q\n"...)
+	return nil
 }
 
 // renderTextDecoration draws underline, strikethrough, and/or overline
@@ -834,6 +992,8 @@ func (r *PDFRenderer) ensureImage(key string, src document.ImageSource) (string,
 	var colorSpace, filter string
 
 	switch src.Format {
+	case document.ImageSVG:
+		return r.ensureSVGForm(key, src)
 	case document.ImageJPEG:
 		data = src.Data
 		w = src.Width
@@ -864,6 +1024,25 @@ func (r *PDFRenderer) ensureImage(key string, src document.ImageSource) (string,
 		return "", fmt.Errorf("render: failed to register image: %w", err)
 	}
 
+	r.imageMap[key] = resName
+	r.imageRefs[key] = ref
+	return resName, nil
+}
+
+// ensureSVGForm registers an SVG image as a Form XObject that draws the
+// vector graphics into the unit square, so it is placed exactly like an
+// image XObject (scale with cm, then Do).
+func (r *PDFRenderer) ensureSVGForm(key string, src document.ImageSource) (string, error) {
+	content, resources, err := svgFormContent(src.Data)
+	if err != nil {
+		return "", err
+	}
+	ref, err := writeCompressedStream(r.writer, content, svgFormDict(resources))
+	if err != nil {
+		return "", fmt.Errorf("render: failed to write SVG form: %w", err)
+	}
+	r.formCount++
+	resName := fmt.Sprintf("Fm%d", r.formCount)
 	r.imageMap[key] = resName
 	r.imageRefs[key] = ref
 	return resName, nil

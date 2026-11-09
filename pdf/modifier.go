@@ -115,6 +115,53 @@ func (m *Modifier) OverlayPage(pageIndex int, overlayContent []byte, resources *
 	return nil
 }
 
+// AddAnnotations appends annotation dictionaries (for example link
+// annotations) to the /Annots array of the specified page. Each annotation
+// is written as a new indirect object. Existing annotations are preserved,
+// and changes already made to the page in this update (such as
+// [Modifier.OverlayPage]) are kept.
+func (m *Modifier) AddAnnotations(pageIndex int, annots ...Dict) error {
+	if len(annots) == 0 {
+		return nil
+	}
+	info, err := m.reader.Page(pageIndex)
+	if err != nil {
+		return err
+	}
+
+	// Prefer the page dict already replaced in this update so that an
+	// earlier OverlayPage call is not discarded.
+	pageDict, ok := m.newObjects[info.Ref.Number].(Dict)
+	if !ok {
+		pageDict, err = m.reader.ResolveDict(info.Ref)
+		if err != nil {
+			return err
+		}
+	}
+
+	var merged Array
+	if existing, ok := pageDict[Name("Annots")]; ok {
+		if resolved, err := m.reader.Resolve(existing); err == nil {
+			if arr, ok := resolved.(Array); ok {
+				merged = append(merged, arr...)
+			}
+		}
+	}
+	for _, a := range annots {
+		ref := m.AllocObject()
+		m.SetObject(ref, a)
+		merged = append(merged, ref)
+	}
+
+	newPageDict := make(Dict, len(pageDict)+1)
+	for k, v := range pageDict {
+		newPageDict[k] = v
+	}
+	newPageDict[Name("Annots")] = merged
+	m.SetObject(info.Ref, newPageDict)
+	return nil
+}
+
 // Write outputs the complete modified PDF (original data + incremental update)
 // to the given writer.
 func (m *Modifier) Write(w io.Writer) error {

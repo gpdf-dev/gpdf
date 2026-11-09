@@ -52,6 +52,10 @@ var (
 	WithMetadata = template.WithMetadata
 	// WithWriterSetup registers a Writer configuration hook for extensions.
 	WithWriterSetup = template.WithWriterSetup
+	// WithBackgroundImage draws an image beneath the content of every page.
+	WithBackgroundImage = template.WithBackgroundImage
+	// WithBackgroundColor fills every page with a solid color beneath all content.
+	WithBackgroundColor = template.WithBackgroundColor
 )
 
 // Re-export page sizes for convenience. See [document.A4] and friends

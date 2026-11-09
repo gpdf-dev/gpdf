@@ -33,6 +33,9 @@ type Config struct {
 	Metadata    document.DocumentMetadata
 	rawFonts    map[string][]byte    // font family -> raw TTF data
 	WriterSetup func(pw *pdf.Writer) // hook to configure Writer before rendering
+	// Background is painted beneath the content of every page. Set it with
+	// [WithBackgroundColor] and/or [WithBackgroundImage].
+	Background *document.PageBackground
 }
 
 // Option configures a Document.
@@ -207,8 +210,9 @@ func (d *Document) buildDocument() *document.Document {
 
 	for _, pb := range d.pages {
 		page := &document.Page{
-			Size:    d.config.PageSize,
-			Margins: d.config.Margins,
+			Size:       d.config.PageSize,
+			Margins:    d.config.Margins,
+			Background: d.config.Background,
 		}
 
 		// Body content only — header and footer are handled by the

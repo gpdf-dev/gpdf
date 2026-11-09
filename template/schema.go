@@ -3,6 +3,7 @@ package template
 import (
 	"encoding/base64"
 	"fmt"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -54,9 +55,22 @@ type SchemaPageBody struct {
 // Orientation "landscape" swaps the page to landscape; "portrait" (the
 // default) keeps the size as is.
 type SchemaPage struct {
-	Size        string `json:"size"`                  // e.g. "A4", "A6", "Letter"
-	Orientation string `json:"orientation,omitempty"` // "portrait" (default) or "landscape"
-	Margins     string `json:"margins,omitempty"`     // e.g., "15mm", "20pt"
+	Size        string            `json:"size"`                  // e.g. "A4", "A6", "Letter"
+	Orientation string            `json:"orientation,omitempty"` // "portrait" (default) or "landscape"
+	Margins     string            `json:"margins,omitempty"`     // e.g., "15mm", "20pt"
+	Background  *SchemaBackground `json:"background,omitempty"`  // drawn beneath every page
+}
+
+// SchemaBackground defines a full-page background drawn beneath the
+// content of every page, equivalent to [WithBackgroundColor] and
+// [WithBackgroundImage].
+//
+//	"background": {"image": "letterhead.png", "fit": "cover", "opacity": 0.3}
+type SchemaBackground struct {
+	Color   string  `json:"color,omitempty"`   // "#RRGGBB" or named
+	Image   string  `json:"image,omitempty"`   // base64, data URI, or file path
+	Fit     string  `json:"fit,omitempty"`     // "cover" (default)|"contain"|"stretch"|"original"
+	Opacity float64 `json:"opacity,omitempty"` // 0.0–1.0; 0 means opaque
 }
 
 // SchemaMeta defines document metadata.
@@ -104,9 +118,12 @@ type SchemaCol struct {
 
 // SchemaElement defines a single content element within a column.
 type SchemaElement struct {
-	// Type selects the element kind: "text", "richText", "image", "table",
-	// "list", "line", "spacer", "qrcode", "barcode", "box", "pageNumber",
-	// "totalPages".
+	// Type selects the element kind: "text", "link", "richText", "image",
+	// "table", "list", "line", "spacer", "qrcode", "barcode", "box",
+	// "pageNumber", "totalPages".
+	//
+	// "link" is text that links to Style.Link and is drawn blue and
+	// underlined by default, equivalent to [ColBuilder.Link].
 	Type    string       `json:"type"`
 	Content string       `json:"content,omitempty"` // for text
 	Style   *SchemaStyle `json:"style,omitempty"`
@@ -164,6 +181,10 @@ type SchemaBox struct {
 	Background string          `json:"background,omitempty"`
 	Border     *SchemaBorder   `json:"border,omitempty"`
 	Elements   []SchemaElement `json:"elements,omitempty"`
+
+	BorderRadius string  `json:"borderRadius,omitempty"` // e.g. "6pt"
+	Opacity      float64 `json:"opacity,omitempty"`      // 0.0–1.0; 0 means opaque
+	Link         string  `json:"link,omitempty"`         // URI the whole box links to
 }
 
 // SchemaStyle defines text styling properties.
@@ -183,14 +204,17 @@ type SchemaStyle struct {
 	Underline     bool     `json:"underline,omitempty"`
 	Strikethrough bool     `json:"strikethrough,omitempty"`
 	LetterSpacing float64  `json:"letterSpacing,omitempty"`
-	TextIndent    string   `json:"textIndent,omitempty"` // e.g. "24pt", "10mm"
-	Padding       string   `json:"padding,omitempty"`    // uniform, e.g. "10mm"
-	Paddings      []string `json:"paddings,omitempty"`   // per-edge [top, right, bottom, left]
+	TextIndent    string   `json:"textIndent,omitempty"`   // e.g. "24pt", "10mm"
+	Padding       string   `json:"padding,omitempty"`      // uniform, e.g. "10mm"
+	Paddings      []string `json:"paddings,omitempty"`     // per-edge [top, right, bottom, left]
+	BorderRadius  string   `json:"borderRadius,omitempty"` // rounds the background, e.g. "4pt"
+	Opacity       float64  `json:"opacity,omitempty"`      // 0.0–1.0; 0 means opaque
+	Link          string   `json:"link,omitempty"`         // URI the text links to
 }
 
 // SchemaImage defines an image element.
 type SchemaImage struct {
-	Src        string        `json:"src"`                  // base64, data URI, or file path
+	Src        string        `json:"src"`                  // base64, data URI, file path, or inline SVG markup
 	Width      string        `json:"width,omitempty"`      // dimension
 	Height     string        `json:"height,omitempty"`     // dimension
 	MinWidth   string        `json:"minWidth,omitempty"`   // minimum display width; overflow to next page when violated
@@ -199,6 +223,10 @@ type SchemaImage struct {
 	Align      string        `json:"align,omitempty"`      // "left"|"center"|"right"
 	Border     *SchemaBorder `json:"border,omitempty"`     // optional border around the image
 	Background string        `json:"background,omitempty"` // "#RRGGBB" or named, drawn behind the image
+
+	BorderRadius string  `json:"borderRadius,omitempty"` // clips the image to rounded corners
+	Opacity      float64 `json:"opacity,omitempty"`      // 0.0–1.0; 0 means opaque
+	Link         string  `json:"link,omitempty"`         // URI the image links to
 }
 
 // SchemaTable defines a table element.
@@ -507,7 +535,35 @@ func applySchemaStyle(ss *SchemaStyle) []TextOption {
 	if e, ok := parseSchemaPadding(ss); ok {
 		opts = append(opts, TextPadding(e))
 	}
+	return appendSchemaTextEffects(opts, ss)
+}
+
+// appendSchemaTextEffects appends the border-radius, opacity and link
+// options of a SchemaStyle.
+func appendSchemaTextEffects(opts []TextOption, ss *SchemaStyle) []TextOption {
+	if v, ok := parseOptionalValue(ss.BorderRadius); ok {
+		opts = append(opts, WithTextRadius(v))
+	}
+	if ss.Opacity > 0 {
+		opts = append(opts, WithTextOpacity(ss.Opacity))
+	}
+	if ss.Link != "" {
+		opts = append(opts, WithTextLink(ss.Link))
+	}
 	return opts
+}
+
+// parseOptionalValue parses a dimension string, reporting false when it is
+// empty or invalid.
+func parseOptionalValue(s string) (document.Value, bool) {
+	if s == "" {
+		return document.Value{}, false
+	}
+	v, err := parseValue(s)
+	if err != nil {
+		return document.Value{}, false
+	}
+	return v, true
 }
 
 // parseSchemaPadding resolves [SchemaStyle.Padding] / [SchemaStyle.Paddings]
@@ -639,14 +695,28 @@ func decodeBase64Image(s string) ([]byte, error) {
 		if idx < 0 {
 			return nil, fmt.Errorf("invalid data URI")
 		}
-		s = s[idx+1:]
+		header, payload := s[:idx], s[idx+1:]
+		if !strings.Contains(header, ";base64") {
+			// Non-base64 data URI, e.g. "data:image/svg+xml;utf8,<svg …>".
+			text, err := url.PathUnescape(payload)
+			if err != nil {
+				return nil, fmt.Errorf("invalid data URI: %w", err)
+			}
+			return []byte(text), nil
+		}
+		s = payload
 	}
 	return base64.StdEncoding.DecodeString(s)
 }
 
 // loadImageData resolves the image source string to raw image bytes.
-// It supports data URIs, file:// URIs, file paths, and raw base64 strings.
+// It supports data URIs (base64 or URL-encoded), file:// URIs, file paths,
+// raw base64 strings, and inline SVG markup (a string starting with "<").
 func loadImageData(src string) ([]byte, error) {
+	// inline SVG markup
+	if trimmed := strings.TrimSpace(src); strings.HasPrefix(trimmed, "<") {
+		return []byte(trimmed), nil
+	}
 	// data URI
 	if strings.HasPrefix(src, "data:") {
 		return decodeBase64Image(src)
@@ -713,6 +783,12 @@ func buildFromSchema(schema *Schema, opts []Option) (*Document, error) {
 		docOpts = append(docOpts, WithMargins(document.UniformEdges(v)))
 	}
 
+	bgOpts, err := schemaBackgroundOptions(schema.Page.Background)
+	if err != nil {
+		return nil, err
+	}
+	docOpts = append(docOpts, bgOpts...)
+
 	if schema.Metadata != nil {
 		docOpts = append(docOpts, WithMetadata(document.DocumentMetadata{
 			Title:   schema.Metadata.Title,
@@ -754,6 +830,45 @@ func buildFromSchema(schema *Schema, opts []Option) (*Document, error) {
 	}
 
 	return doc, nil
+}
+
+// schemaBackgroundOptions converts a SchemaBackground into document
+// options. Unlike element-level fields, an unreadable background image or
+// invalid color is reported as an error because it affects every page.
+func schemaBackgroundOptions(bg *SchemaBackground) ([]Option, error) {
+	if bg == nil {
+		return nil, nil
+	}
+	var opts []Option
+	if bg.Color != "" {
+		col, err := parseColor(bg.Color)
+		if err != nil {
+			return nil, fmt.Errorf("invalid page background color: %w", err)
+		}
+		opts = append(opts, WithBackgroundColor(col))
+	}
+	var bgOpts []BackgroundOption
+	if bg.Fit != "" {
+		mode, ok := parseFitMode(bg.Fit)
+		if !ok {
+			return nil, fmt.Errorf("invalid page background fit: %q", bg.Fit)
+		}
+		bgOpts = append(bgOpts, BackgroundFit(mode))
+	}
+	if bg.Opacity > 0 {
+		bgOpts = append(bgOpts, BackgroundOpacity(bg.Opacity))
+	}
+	if bg.Image != "" {
+		data, err := loadImageData(bg.Image)
+		if err != nil {
+			return nil, fmt.Errorf("invalid page background image: %w", err)
+		}
+		opts = append(opts, WithBackgroundImage(data, bgOpts...))
+	} else if bg.Opacity > 0 {
+		// Opacity also applies to a color-only background.
+		opts = append(opts, func(c *Config) { BackgroundOpacity(bg.Opacity)(c.ensureBackground()) })
+	}
+	return opts, nil
 }
 
 // buildSchemaRows adds rows from the schema to a PageBuilder.
@@ -833,9 +948,8 @@ func buildSchemaColContent(c *ColBuilder, col SchemaCol) {
 // buildSchemaElement adds a single element to a ColBuilder.
 func buildSchemaElement(c *ColBuilder, elem SchemaElement) {
 	switch strings.ToLower(elem.Type) {
-	case "text":
-		opts := applySchemaStyle(elem.Style)
-		c.Text(elem.Content, opts...)
+	case "text", "link":
+		buildSchemaText(c, elem)
 	case "image":
 		buildSchemaImage(c, elem.Image)
 	case "table":
@@ -863,6 +977,17 @@ func buildSchemaElement(c *ColBuilder, elem SchemaElement) {
 		opts := applySchemaStyle(elem.Style)
 		c.TotalPages(opts...)
 	}
+}
+
+// buildSchemaText adds a "text" or "link" element to a ColBuilder. A link
+// takes its URI from Style.Link.
+func buildSchemaText(c *ColBuilder, elem SchemaElement) {
+	opts := applySchemaStyle(elem.Style)
+	if strings.EqualFold(elem.Type, "link") && elem.Style != nil && elem.Style.Link != "" {
+		c.Link(elem.Content, elem.Style.Link, opts...)
+		return
+	}
+	c.Text(elem.Content, opts...)
 }
 
 // buildSchemaRichText adds a rich text paragraph to a ColBuilder.
@@ -914,6 +1039,15 @@ func schemaBoxOptions(sb *SchemaBox) []BoxOption {
 	if spec, ok := parseSchemaBorder(sb.Border); ok {
 		opts = append(opts, WithBoxBorder(spec))
 	}
+	if v, ok := parseOptionalValue(sb.BorderRadius); ok {
+		opts = append(opts, WithBoxRadius(v))
+	}
+	if sb.Opacity > 0 {
+		opts = append(opts, WithBoxOpacity(sb.Opacity))
+	}
+	if sb.Link != "" {
+		opts = append(opts, WithBoxLink(sb.Link))
+	}
 	return opts
 }
 
@@ -944,7 +1078,23 @@ func buildSchemaImage(c *ColBuilder, img *SchemaImage) {
 			opts = append(opts, WithImageBackground(c2))
 		}
 	}
-	c.Image(data, opts...)
+	c.Image(data, append(opts, schemaImageEffectOpts(img)...)...)
+}
+
+// schemaImageEffectOpts converts the border-radius, opacity and link fields
+// of a SchemaImage into ImageOptions.
+func schemaImageEffectOpts(img *SchemaImage) []ImageOption {
+	var opts []ImageOption
+	if v, ok := parseOptionalValue(img.BorderRadius); ok {
+		opts = append(opts, WithImageRadius(v))
+	}
+	if img.Opacity > 0 {
+		opts = append(opts, WithImageOpacity(img.Opacity))
+	}
+	if img.Link != "" {
+		opts = append(opts, WithImageLink(img.Link))
+	}
+	return opts
 }
 
 // schemaImageDimensionOpts converts the dimension fields of a SchemaImage

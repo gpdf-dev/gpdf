@@ -793,6 +793,8 @@ func createOverflowNode(parent document.DocumentNode, remaining []document.Docum
 			Margin:  parent.Style().Margin,
 			Padding: parent.Style().Padding,
 			Border:  parent.Style().Border,
+			Opacity: parent.Style().Opacity,
+			Link:    parent.Style().Link,
 		},
 	}
 }

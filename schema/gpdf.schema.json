@@ -84,6 +84,36 @@
         "margins": {
           "$ref": "#/$defs/dimension",
           "description": "Uniform page margins (e.g. \"20mm\", \"15pt\")."
+        },
+        "background": {
+          "$ref": "#/$defs/background",
+          "description": "Background drawn beneath the content of every page."
+        }
+      }
+    },
+    "background": {
+      "type": "object",
+      "description": "Full-page background: an optional solid color with an optional image on top. Ignores page margins.",
+      "additionalProperties": false,
+      "properties": {
+        "color": {
+          "$ref": "#/$defs/color",
+          "description": "Solid fill color for the whole page."
+        },
+        "image": {
+          "type": "string",
+          "description": "Background image source: data URI, file path, or raw base64 string."
+        },
+        "fit": {
+          "type": "string",
+          "description": "How the image is scaled to the page (centered). Default \"cover\".",
+          "enum": ["cover", "contain", "stretch", "original"]
+        },
+        "opacity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Opacity of the background (0.0 transparent – 1.0 opaque). 0 or omitted means fully opaque."
         }
       }
     },
@@ -210,11 +240,11 @@
         "type": {
           "type": "string",
           "description": "Element type.",
-          "enum": ["text", "richText", "image", "table", "list", "line", "spacer", "qrcode", "barcode", "box", "pageNumber", "totalPages"]
+          "enum": ["text", "link", "richText", "image", "table", "list", "line", "spacer", "qrcode", "barcode", "box", "pageNumber", "totalPages"]
         },
         "content": {
           "type": "string",
-          "description": "Text content (for type \"text\")."
+          "description": "Text content (for type \"text\" or \"link\"; a link takes its URI from style.link)."
         },
         "style": {
           "$ref": "#/$defs/style",
@@ -308,6 +338,20 @@
         "textIndent": {
           "$ref": "#/$defs/dimension",
           "description": "First-line text indent (e.g. \"24pt\", \"10mm\")."
+        },
+        "borderRadius": {
+          "$ref": "#/$defs/dimension",
+          "description": "Rounds the corners of the text background and uniform border."
+        },
+        "opacity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Opacity of the text (0.0 transparent – 1.0 opaque). 0 or omitted means fully opaque."
+        },
+        "link": {
+          "type": "string",
+          "description": "URI the text links to (e.g. \"https://gpdf.dev\")."
         }
       }
     },
@@ -350,7 +394,7 @@
       "properties": {
         "src": {
           "type": "string",
-          "description": "Image source: data URI (data:image/png;base64,...), file path, or raw base64 string."
+          "description": "Image source (PNG, JPEG or SVG): data URI (data:image/png;base64,... or data:image/svg+xml;utf8,...), file path, raw base64 string, or inline SVG markup."
         },
         "width": {
           "$ref": "#/$defs/dimension",
@@ -369,6 +413,20 @@
           "type": "string",
           "description": "Horizontal alignment of the image.",
           "enum": ["left", "center", "right"]
+        },
+        "borderRadius": {
+          "$ref": "#/$defs/dimension",
+          "description": "Clips the image to rounded corners of this radius."
+        },
+        "opacity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Opacity of the image (0.0 transparent – 1.0 opaque). 0 or omitted means fully opaque."
+        },
+        "link": {
+          "type": "string",
+          "description": "URI the image links to (e.g. \"https://gpdf.dev\")."
         }
       }
     },
@@ -568,6 +626,20 @@
           "type": "array",
           "description": "Elements placed inside the box.",
           "items": { "$ref": "#/$defs/element" }
+        },
+        "borderRadius": {
+          "$ref": "#/$defs/dimension",
+          "description": "Rounds the corners of the box background and uniform border."
+        },
+        "opacity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Opacity of the box and its content (0.0 transparent – 1.0 opaque). 0 or omitted means fully opaque."
+        },
+        "link": {
+          "type": "string",
+          "description": "URI the box and its content links to (e.g. \"https://gpdf.dev\")."
         }
       }
     },

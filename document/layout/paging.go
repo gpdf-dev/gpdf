@@ -43,6 +43,10 @@ type PageLayout struct {
 	Size document.Size
 	// Children holds the positioned nodes on this page.
 	Children []PlacedNode
+	// Background is painted beneath Children, or nil for none. It is
+	// copied from the source [document.Page], including onto pages
+	// created when that page's content overflows.
+	Background *document.PageBackground
 }
 
 // Paginate processes the document's pages and their content, producing a
@@ -106,6 +110,7 @@ func (p *Paginator) Paginate(doc *document.Document) []PageLayout {
 				footerPlaced, footerHeight,
 				result.Children,
 			)
+			pl.Background = page.Background
 			pages = append(pages, pl)
 
 			remaining = result.Overflow

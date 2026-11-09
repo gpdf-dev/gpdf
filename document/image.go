@@ -21,6 +21,11 @@ const (
 	ImageJPEG ImageFormat = iota
 	// ImagePNG indicates PNG encoding.
 	ImagePNG
+	// ImageSVG indicates SVG vector graphics. SVG images are embedded as
+	// vector drawings (PDF Form XObjects), not rasterized. Width and Height
+	// hold the intrinsic size in points, rounded to whole points. See
+	// package svg for the supported feature subset.
+	ImageSVG
 )
 
 // Image is a leaf document node that renders an image within the

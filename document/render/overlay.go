@@ -22,6 +22,12 @@ type OverlayResult struct {
 	FontObjects map[string]fontObject
 	// ImageObjects contains image objects that need to be written.
 	ImageObjects map[string]imageObject
+	// ExtGStates maps ExtGState resource names to their dictionaries
+	// (used for opacity). They are written inline into the page resources.
+	ExtGStates pdf.Dict
+	// Annots holds link annotation dictionaries to append to the page's
+	// /Annots array (see [pdf.Modifier.AddAnnotations]).
+	Annots []pdf.Dict
 }
 
 type fontObject struct {
@@ -39,6 +45,11 @@ type imageObject struct {
 	Height     int
 	ColorSpace string
 	Filter     string
+
+	// IsForm marks an SVG image stored as a Form XObject: Data is the form
+	// content and FormResources its resource dictionary.
+	IsForm        bool
+	FormResources pdf.Dict
 }
 
 // OverlayRenderer renders document nodes to a content stream byte slice,
@@ -60,6 +71,12 @@ type OverlayRenderer struct {
 
 	fontDataMap map[string][]byte
 	fonts       map[string]*font.TrueTypeFont
+
+	gsMap      map[string]string // alpha key -> ExtGState resource name
+	gsDicts    pdf.Dict          // ExtGState resource name -> dictionary
+	alpha      float64           // constant alpha currently in effect
+	bgSuppress *pdf.Color        // inherited background children must not repaint
+	annots     []pdf.Dict        // collected link annotations
 }
 
 // NewOverlayRenderer creates a renderer that captures overlay content.
@@ -75,12 +92,18 @@ func NewOverlayRenderer(pageWidth, pageHeight float64, fonts map[string]*font.Tr
 		imageObjects: make(map[string]imageObject),
 		fontDataMap:  fontDataMap,
 		fonts:        fonts,
+		gsMap:        make(map[string]string),
+		gsDicts:      make(pdf.Dict),
+		alpha:        1,
 	}
 }
 
 // RenderOverlay renders the given placed nodes and returns the result.
 func (r *OverlayRenderer) RenderOverlay(nodes []layout.PlacedNode) (*OverlayResult, error) {
 	r.content = nil
+	r.annots = nil
+	r.alpha = 1
+	r.bgSuppress = nil
 
 	if err := r.renderPlacedNodes(nodes, 0, 0); err != nil {
 		return nil, err
@@ -97,11 +120,17 @@ func (r *OverlayRenderer) RenderOverlay(nodes []layout.PlacedNode) (*OverlayResu
 		resources[pdf.Name("Font")] = fontDict
 	}
 
+	if len(r.gsDicts) > 0 {
+		resources[pdf.Name("ExtGState")] = r.gsDicts
+	}
+
 	return &OverlayResult{
 		Content:      r.content,
 		Resources:    resources,
 		FontObjects:  r.fontObjects,
 		ImageObjects: r.imageObjects,
+		ExtGStates:   r.gsDicts,
+		Annots:       r.annots,
 	}, nil
 }
 
@@ -122,29 +151,94 @@ func (r *OverlayRenderer) renderPlacedNode(pn layout.PlacedNode, offsetX, offset
 	absX := pn.Position.X + offsetX
 	absY := pn.Position.Y + offsetY
 	style := pn.Node.Style()
-
-	// Background.
-	if style.Background != nil {
-		r.renderRect(document.Rectangle{
-			X: absX, Y: absY, Width: pn.Size.Width, Height: pn.Size.Height,
-		}, RectStyle{FillColor: style.Background})
+	bounds := document.Rectangle{X: absX, Y: absY, Width: pn.Size.Width, Height: pn.Size.Height}
+	var radius float64
+	if style.BorderRadius.Amount > 0 {
+		radius = style.BorderRadius.Resolve(pn.Size.Width, style.FontSize)
 	}
 
-	// Node-specific content.
+	prevAlpha, grouped := r.beginOpacity(style.Opacity)
+
+	// Background.
+	if style.Background != nil && style.Background != r.bgSuppress {
+		if radius > 0 {
+			var buf strings.Builder
+			writeRoundedFill(&buf, bounds, radius, *style.Background, r.pageHeight)
+			r.content = append(r.content, buf.String()...)
+		} else {
+			r.renderRect(bounds, RectStyle{FillColor: style.Background})
+		}
+	}
+
+	r.renderNodeContent(pn, &style, bounds, radius)
+
+	if style.Link != "" && bounds.Width > 0 && bounds.Height > 0 &&
+		nodeEmitsLink(pn.Node.NodeType(), len(pn.Children) == 0) {
+		r.annots = append(r.annots, linkAnnotation(bounds, style.Link, r.pageHeight))
+	}
+
+	prevSuppress := r.bgSuppress
+	r.bgSuppress = childBgSuppress(style.Background, prevSuppress, radius, r.alpha)
+	err := r.renderPlacedNodes(pn.Children, absX, absY)
+	r.bgSuppress = prevSuppress
+
+	r.endOpacity(prevAlpha, grouped)
+	return err
+}
+
+// renderNodeContent draws the node-specific content of text and image nodes.
+func (r *OverlayRenderer) renderNodeContent(pn layout.PlacedNode, style *document.Style, bounds document.Rectangle, radius float64) {
+	pos := document.Point{X: bounds.X, Y: bounds.Y}
 	switch pn.Node.NodeType() {
 	case document.NodeText:
 		if len(pn.Children) == 0 {
 			if textNode, ok := pn.Node.(*document.Text); ok {
-				r.renderText(textNode.Content, document.Point{X: absX, Y: absY}, style)
+				r.renderText(textNode.Content, pos, *style)
 			}
 		}
 	case document.NodeImage:
 		if imgNode, ok := pn.Node.(*document.Image); ok {
-			r.renderImage(imgNode.Source, document.Point{X: absX, Y: absY}, pn.Size)
+			if radius > 0 {
+				var clip strings.Builder
+				writeRoundedClip(&clip, bounds, radius, r.pageHeight)
+				r.content = append(r.content, clip.String()...)
+			}
+			r.renderImage(imgNode.Source, pos, pn.Size)
+			if radius > 0 {
+				r.content = append(r.content, "Q\n"...)
+			}
 		}
 	}
+}
 
-	return r.renderPlacedNodes(pn.Children, absX, absY)
+// beginOpacity starts a graphics-state group with the given constant alpha
+// when it differs from the alpha already in effect. See
+// [PDFRenderer.beginOpacity].
+func (r *OverlayRenderer) beginOpacity(v float64) (float64, bool) {
+	a, ok := normalizeOpacity(v)
+	if !ok || a == r.alpha {
+		return r.alpha, false
+	}
+	key := alphaKey(a)
+	name, ok := r.gsMap[key]
+	if !ok {
+		name = fmt.Sprintf("OvGS%d", len(r.gsMap)+1)
+		r.gsMap[key] = name
+		r.gsDicts[pdf.Name(name)] = extGStateDict(a)
+	}
+	r.content = append(r.content, "q\n/"+name+" gs\n"...)
+	prev := r.alpha
+	r.alpha = a
+	return prev, true
+}
+
+// endOpacity closes a group opened by beginOpacity.
+func (r *OverlayRenderer) endOpacity(prev float64, grouped bool) {
+	if !grouped {
+		return
+	}
+	r.content = append(r.content, "Q\n"...)
+	r.alpha = prev
 }
 
 func (r *OverlayRenderer) renderText(text string, pos document.Point, style document.Style) {
@@ -235,6 +329,9 @@ func (r *OverlayRenderer) renderRect(rect document.Rectangle, style RectStyle) {
 func (r *OverlayRenderer) renderImage(src document.ImageSource, pos document.Point, size document.Size) {
 	imgKey := overlayImageKey(src.Data)
 	resName := r.ensureImage(imgKey, src)
+	if resName == "" {
+		return
+	}
 
 	pdfY := r.pageHeight - pos.Y - size.Height
 
@@ -303,6 +400,18 @@ func (r *OverlayRenderer) ensureImage(key string, src document.ImageSource) stri
 	r.imageCount++
 	resName := fmt.Sprintf("OvIm%d", r.imageCount)
 	r.imageMap[key] = resName
+
+	if src.Format == document.ImageSVG {
+		content, resources, err := svgFormContent(src.Data)
+		if err != nil {
+			// Unparseable SVG: draw nothing rather than reference a
+			// missing XObject.
+			r.imageMap[key] = ""
+			return ""
+		}
+		r.imageObjects[key] = imageObject{ResName: resName, Data: content, IsForm: true, FormResources: resources}
+		return resName
+	}
 
 	var data, smaskData []byte
 	var w, h int
@@ -490,62 +599,17 @@ func WriteOverlayToModifierWithFonts(result *OverlayResult, m *pdf.Modifier, reg
 	if len(result.ImageObjects) > 0 {
 		xobjDict := make(pdf.Dict)
 		for _, io := range result.ImageObjects {
-			var smaskRef pdf.ObjectRef
-			if len(io.SmaskData) > 0 {
-				smaskRef = m.AllocObject()
-				smaskContent, err := pdf.CompressFlate(io.SmaskData)
-				if err != nil {
-					return nil, nil, fmt.Errorf("compress smask: %w", err)
-				}
-				m.SetObject(smaskRef, pdf.Stream{
-					Dict: pdf.Dict{
-						pdf.Name("Type"):             pdf.Name("XObject"),
-						pdf.Name("Subtype"):          pdf.Name("Image"),
-						pdf.Name("Width"):            pdf.Integer(io.Width),
-						pdf.Name("Height"):           pdf.Integer(io.Height),
-						pdf.Name("ColorSpace"):       pdf.Name("DeviceGray"),
-						pdf.Name("BitsPerComponent"): pdf.Integer(8),
-						pdf.Name("Filter"):           pdf.Name("FlateDecode"),
-					},
-					Content: smaskContent,
-				})
+			ref, err := writeOverlayImage(m, io)
+			if err != nil {
+				return nil, nil, err
 			}
-
-			imgRef := m.AllocObject()
-			imgDict := pdf.Dict{
-				pdf.Name("Type"):             pdf.Name("XObject"),
-				pdf.Name("Subtype"):          pdf.Name("Image"),
-				pdf.Name("Width"):            pdf.Integer(io.Width),
-				pdf.Name("Height"):           pdf.Integer(io.Height),
-				pdf.Name("ColorSpace"):       pdf.Name(io.ColorSpace),
-				pdf.Name("BitsPerComponent"): pdf.Integer(8),
-			}
-
-			if smaskRef.Number > 0 {
-				imgDict[pdf.Name("SMask")] = smaskRef
-			}
-
-			content := io.Data
-			switch io.Filter {
-			case "DCTDecode":
-				imgDict[pdf.Name("Filter")] = pdf.Name("DCTDecode")
-			default:
-				compressed, err := pdf.CompressFlate(content)
-				if err != nil {
-					return nil, nil, fmt.Errorf("compress image: %w", err)
-				}
-				imgDict[pdf.Name("Filter")] = pdf.Name("FlateDecode")
-				content = compressed
-			}
-
-			m.SetObject(imgRef, pdf.Stream{
-				Dict:    imgDict,
-				Content: content,
-			})
-
-			xobjDict[pdf.Name(io.ResName)] = imgRef
+			xobjDict[pdf.Name(io.ResName)] = ref
 		}
 		resources[pdf.Name("XObject")] = xobjDict
+	}
+
+	if len(result.ExtGStates) > 0 {
+		resources[pdf.Name("ExtGState")] = result.ExtGStates
 	}
 
 	if len(resources) == 0 {
@@ -553,4 +617,70 @@ func WriteOverlayToModifierWithFonts(result *OverlayResult, m *pdf.Modifier, reg
 	}
 
 	return result.Content, &resources, nil
+}
+
+// writeOverlayImage writes one overlay image (or SVG form) and its soft
+// mask to the modifier and returns the image's object reference.
+func writeOverlayImage(m *pdf.Modifier, io imageObject) (pdf.ObjectRef, error) {
+	if io.IsForm {
+		ref, err := writeCompressedStream(modifierSink{m: m}, io.Data, svgFormDict(io.FormResources))
+		if err != nil {
+			return pdf.ObjectRef{}, fmt.Errorf("write SVG form: %w", err)
+		}
+		return ref, nil
+	}
+	var smaskRef pdf.ObjectRef
+	if len(io.SmaskData) > 0 {
+		smaskRef = m.AllocObject()
+		smaskContent, err := pdf.CompressFlate(io.SmaskData)
+		if err != nil {
+			return pdf.ObjectRef{}, fmt.Errorf("compress smask: %w", err)
+		}
+		m.SetObject(smaskRef, pdf.Stream{
+			Dict: pdf.Dict{
+				pdf.Name("Type"):             pdf.Name("XObject"),
+				pdf.Name("Subtype"):          pdf.Name("Image"),
+				pdf.Name("Width"):            pdf.Integer(io.Width),
+				pdf.Name("Height"):           pdf.Integer(io.Height),
+				pdf.Name("ColorSpace"):       pdf.Name("DeviceGray"),
+				pdf.Name("BitsPerComponent"): pdf.Integer(8),
+				pdf.Name("Filter"):           pdf.Name("FlateDecode"),
+			},
+			Content: smaskContent,
+		})
+	}
+
+	imgRef := m.AllocObject()
+	imgDict := pdf.Dict{
+		pdf.Name("Type"):             pdf.Name("XObject"),
+		pdf.Name("Subtype"):          pdf.Name("Image"),
+		pdf.Name("Width"):            pdf.Integer(io.Width),
+		pdf.Name("Height"):           pdf.Integer(io.Height),
+		pdf.Name("ColorSpace"):       pdf.Name(io.ColorSpace),
+		pdf.Name("BitsPerComponent"): pdf.Integer(8),
+	}
+
+	if smaskRef.Number > 0 {
+		imgDict[pdf.Name("SMask")] = smaskRef
+	}
+
+	content := io.Data
+	switch io.Filter {
+	case "DCTDecode":
+		imgDict[pdf.Name("Filter")] = pdf.Name("DCTDecode")
+	default:
+		compressed, err := pdf.CompressFlate(content)
+		if err != nil {
+			return pdf.ObjectRef{}, fmt.Errorf("compress image: %w", err)
+		}
+		imgDict[pdf.Name("Filter")] = pdf.Name("FlateDecode")
+		content = compressed
+	}
+
+	m.SetObject(imgRef, pdf.Stream{
+		Dict:    imgDict,
+		Content: content,
+	})
+
+	return imgRef, nil
 }
