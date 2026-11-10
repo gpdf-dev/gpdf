@@ -8,14 +8,30 @@ import (
 )
 
 // SubsetTrueType creates a subset of a TrueType font containing only the
-// specified glyphs. The approach zeroes out unused glyph outlines in the
-// glyf table while preserving the overall font structure. This avoids the
-// complexity of rewriting loca offsets and table checksums from scratch.
+// specified glyphs, suitable for embedding as a PDF FontFile2 stream.
+//
+// Glyph IDs are preserved (CID == GID with Identity-H encoding), but:
+//   - outlines of unused glyphs are removed from glyf and loca is rebuilt,
+//   - metrics of unused glyphs are zeroed in hmtx,
+//   - tables a PDF renderer never consults (OpenType layout, font
+//     variations such as gvar/HVAR, vertical metrics, color, ...) are
+//     dropped, and
+//   - glyph names are stripped from post.
+//
+// The original cmap is kept as-is; use (*TrueTypeFont).Subset to also
+// shrink cmap to the used characters.
 //
 // The glyphIDs slice should include glyph 0 (.notdef). Composite glyphs
 // that reference other glyphs will have their component glyph IDs
-// automatically included.
+// automatically included. Fonts without glyf/loca outlines (e.g. CFF-based
+// OpenType) are returned unchanged.
 func SubsetTrueType(fontData []byte, glyphIDs []uint16) ([]byte, error) {
+	return subsetTrueType(fontData, glyphIDs, nil)
+}
+
+// subsetTrueType implements SubsetTrueType. When cmapping is non-nil, the
+// cmap table is replaced by one covering exactly those rune → GID pairs.
+func subsetTrueType(fontData []byte, glyphIDs []uint16, cmapping map[rune]uint16) ([]byte, error) {
 	if len(fontData) < 12 {
 		return nil, errors.New("font: data too short for subsetting")
 	}
@@ -25,23 +41,42 @@ func SubsetTrueType(fontData []byte, glyphIDs []uint16) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	// Build the set of glyph IDs to keep.
-	keepGlyphs := buildGlyphSet(fontData, tables, glyphIDs)
-
-	// Create a copy of the font data to modify.
-	result := make([]byte, len(fontData))
-	copy(result, fontData)
-
-	// Zero out unused glyphs in the glyf table.
-	if err := zeroUnusedGlyphs(result, tables, keepGlyphs); err != nil {
+	if err := checkTableBounds(fontData, tables); err != nil {
 		return nil, err
 	}
 
-	// Recalculate checksums for modified tables.
-	recalcTableChecksums(result, numTables)
+	_, hasGlyf := tables[tagGlyf]
+	_, hasLoca := tables[tagLoca]
+	_, hasHead := tables[tagHead]
+	if !hasGlyf || !hasLoca || !hasHead {
+		result := make([]byte, len(fontData))
+		copy(result, fontData)
+		return result, nil
+	}
 
-	return result, nil
+	keep := buildGlyphSet(fontData, tables, glyphIDs)
+
+	out := make(map[string][]byte, len(subsetKeepTables))
+	for tag, rec := range tables {
+		if subsetKeepTables[tag] {
+			out[tag] = fontData[rec.offset : rec.offset+rec.length]
+		}
+	}
+
+	format := getLocaFormat(fontData, tables[tagHead])
+	out[tagGlyf], out[tagLoca] = compactGlyf(fontData, tables, keep, format)
+	if hmtx, ok := out[tagHmtx]; ok {
+		out[tagHmtx] = zeroUnusedMetrics(hmtx, numberOfHMetrics(out[tagHhea]), keep)
+	}
+	if post, ok := out[tagPost]; ok && len(post) > postHeaderSize {
+		out[tagPost] = stripGlyphNames(post)
+	}
+	if cmapping != nil {
+		out[tagCmap] = buildUnicodeCmap(cmapping)
+	}
+
+	sfntVersion := binary.BigEndian.Uint32(fontData[0:4])
+	return assembleFont(sfntVersion, out), nil
 }
 
 // subsetTableRecord is a table record used during subsetting.
@@ -208,54 +243,6 @@ func getGlyphOffsets(data []byte, locaRec subsetTableRecord, format int16, gid u
 	start := int(binary.BigEndian.Uint32(data[idx : idx+4]))
 	end := int(binary.BigEndian.Uint32(data[idx+4 : idx+8]))
 	return start, end
-}
-
-// zeroUnusedGlyphs zeroes out glyph data in the glyf table for glyphs
-// not in the keep set.
-func zeroUnusedGlyphs(data []byte, tables map[string]subsetTableRecord, keep map[uint16]bool) error {
-	glyfRec, hasGlyf := tables[tagGlyf]
-	locaRec, hasLoca := tables[tagLoca]
-	headRec, hasHead := tables[tagHead]
-	if !hasGlyf || !hasLoca || !hasHead {
-		return nil // no glyf table to modify
-	}
-
-	indexToLocFormat := getLocaFormat(data, headRec)
-
-	// Determine total number of glyphs from loca table size.
-	var numGlyphs int
-	if indexToLocFormat == 0 {
-		numGlyphs = int(locaRec.length)/2 - 1
-	} else {
-		numGlyphs = int(locaRec.length)/4 - 1
-	}
-
-	for gid := 0; gid < numGlyphs; gid++ {
-		if keep[uint16(gid)] {
-			continue
-		}
-
-		glyfOff, glyfEnd := getGlyphOffsets(data, locaRec, indexToLocFormat, uint16(gid))
-		if glyfOff >= glyfEnd {
-			continue
-		}
-
-		absOff := int(glyfRec.offset) + glyfOff
-		absEnd := int(glyfRec.offset) + glyfEnd
-		if absEnd > len(data) {
-			absEnd = len(data)
-		}
-		if absOff >= absEnd {
-			continue
-		}
-
-		// Zero out the glyph data.
-		for i := absOff; i < absEnd; i++ {
-			data[i] = 0
-		}
-	}
-
-	return nil
 }
 
 // recalcTableChecksums recalculates checksums for all tables in the font.

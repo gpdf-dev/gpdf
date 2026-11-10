@@ -645,22 +645,28 @@ func (ttf *TrueTypeFont) Encode(text string) []byte {
 }
 
 // Subset creates a subsetted font containing only the specified runes.
-// It delegates to SubsetTrueType with the appropriate glyph IDs.
+// In addition to what SubsetTrueType does, the cmap table is rebuilt to
+// cover only these runes.
 func (ttf *TrueTypeFont) Subset(runes []rune) ([]byte, error) {
 	glyphIDs := make([]uint16, 0, len(runes)+1)
 	glyphIDs = append(glyphIDs, 0) // always include .notdef
 
 	seen := make(map[uint16]bool)
 	seen[0] = true
+	cmapping := make(map[rune]uint16, len(runes))
 	for _, r := range runes {
 		gid, ok := ttf.cmapTbl.lookup(r)
-		if ok && !seen[gid] {
+		if !ok {
+			continue
+		}
+		cmapping[r] = gid
+		if !seen[gid] {
 			glyphIDs = append(glyphIDs, gid)
 			seen[gid] = true
 		}
 	}
 
-	return SubsetTrueType(ttf.data, glyphIDs)
+	return subsetTrueType(ttf.data, glyphIDs, cmapping)
 }
 
 // UsedRunes returns the set of runes that have been encoded so far.

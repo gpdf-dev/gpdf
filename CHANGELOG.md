@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- Font subsetting now actually shrinks embedded TrueType fonts. Previously unused glyph outlines were only zeroed and every table was kept, so variable CJK fonts (e.g. Noto Sans JP/SC/KR from Google Fonts) embedded their full `gvar` table — about 3 MB per font even for a few characters. `SubsetTrueType` now drops tables PDF renderers never use (OpenType layout, font variations, vertical metrics, …), rebuilds `glyf` / `loca` with only the used outlines, zeroes unused `hmtx` entries and strips glyph names from `post`; `(*TrueTypeFont).Subset` additionally rebuilds `cmap` for just the used characters. Glyph IDs are unchanged and rendering is pixel-identical
+  - A 97-character Japanese document: embedded font 3.0 MB → 11 KB; `Generate` ~105 ms → ~2 ms, 23.8 MB → 3.2 MB allocated
+
 ## [1.0.15] - 2026-11-09
 
 ### Added

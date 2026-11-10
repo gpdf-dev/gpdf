@@ -979,8 +979,8 @@ func TestSubsetTrueType_Basic(t *testing.T) {
 		t.Fatalf("SubsetTrueType failed: %v", err)
 	}
 
-	if len(result) != len(data) {
-		t.Errorf("SubsetTrueType result length = %d, want %d", len(result), len(data))
+	if len(result) >= len(data) {
+		t.Errorf("SubsetTrueType result length = %d, want < %d", len(result), len(data))
 	}
 
 	err = ValidateTrueType(result)
