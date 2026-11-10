@@ -10,6 +10,21 @@
 
 Biblioteca de generación de PDF en Go puro, sin dependencias externas, con arquitectura por capas y API declarativa de constructores.
 
+<table>
+  <tr>
+    <td align="center" width="25%"><a href="_examples/builder/18_invoice_test.go"><img src="docs/assets/readme/invoice.png" alt="Factura" width="200"></a><br><sub>Factura</sub></td>
+    <td align="center" width="25%"><a href="_examples/showcase/showcase_test.go"><img src="docs/assets/readme/invoice_ja.png" alt="Factura en japonés (CJK)" width="200"></a><br><sub>Factura en japonés (CJK)</sub></td>
+    <td align="center" width="25%"><a href="_examples/builder/19_report_test.go"><img src="docs/assets/readme/report.png" alt="Informe" width="200"></a><br><sub>Informe</sub></td>
+    <td align="center" width="25%"><a href="_examples/builder/29_qr_barcode_invoice_test.go"><img src="docs/assets/readme/qr_barcode.png" alt="Código QR y de barras" width="200"></a><br><sub>Código QR y de barras</sub></td>
+  </tr>
+</table>
+
+<p align="center">
+  <a href="https://gpdf.dev/es"><b>Sitio web</b></a> · <a href="https://gpdf.dev/es/docs/quickstart"><b>Documentación</b></a> · <a href="#inicio-rápido"><b>Inicio rápido</b></a> · <a href="https://gpdf.dev/es/docs/examples"><b>Ejemplos</b></a>
+</p>
+
+<p align="center"><sub>Todas las muestras se generaron con gpdf — haz clic en una miniatura para ver su código fuente.</sub></p>
+
 ## Características
 
 - **Cero dependencias** — solo la biblioteca estándar de Go

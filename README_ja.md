@@ -10,6 +10,21 @@
 
 純粋なGoで実装された、外部依存ゼロのPDF生成ライブラリ。レイヤードアーキテクチャと宣言的なビルダーAPIを提供します。
 
+<table>
+  <tr>
+    <td align="center" width="25%"><a href="_examples/builder/18_invoice_test.go"><img src="docs/assets/readme/invoice.png" alt="請求書" width="200"></a><br><sub>請求書</sub></td>
+    <td align="center" width="25%"><a href="_examples/showcase/showcase_test.go"><img src="docs/assets/readme/invoice_ja.png" alt="日本語の請求書（CJK）" width="200"></a><br><sub>日本語の請求書（CJK）</sub></td>
+    <td align="center" width="25%"><a href="_examples/builder/19_report_test.go"><img src="docs/assets/readme/report.png" alt="レポート" width="200"></a><br><sub>レポート</sub></td>
+    <td align="center" width="25%"><a href="_examples/builder/29_qr_barcode_invoice_test.go"><img src="docs/assets/readme/qr_barcode.png" alt="QRコード・バーコード" width="200"></a><br><sub>QRコード・バーコード</sub></td>
+  </tr>
+</table>
+
+<p align="center">
+  <a href="https://gpdf.dev/ja"><b>Webサイト</b></a> · <a href="https://gpdf.dev/ja/docs/quickstart"><b>ドキュメント</b></a> · <a href="#クイックスタート"><b>クイックスタート</b></a> · <a href="https://gpdf.dev/ja/docs/examples"><b>サンプル集</b></a>
+</p>
+
+<p align="center"><sub>上のサンプルはすべて gpdf で生成しています。サムネイルをクリックするとソースコードを確認できます。</sub></p>
+
 ## 特徴
 
 - **外部依存ゼロ** — Go標準ライブラリのみ使用
