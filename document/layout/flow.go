@@ -75,7 +75,7 @@ func (fl *FlowLayout) LayoutText(text string, style document.Style, constraints 
 	for i, line := range lines {
 		// Check whether this line fits in the remaining vertical space.
 		if cursorY+lineSpacing > inner.AvailableHeight {
-			return overflowResult(lines[i:], style, constraints.AvailableWidth, cursorY+verticalInset, placed)
+			return overflowResult(remainingText(text, lines, i), style, constraints.AvailableWidth, cursorY+verticalInset, placed)
 		}
 
 		lineWidth := measureLineWidth(measured[i], style, fontSize, inner)
@@ -232,7 +232,7 @@ func breakTextLinesIndented(text string, style document.Style, fontSize, indent 
 	}
 
 	// The first element is the first line; re-break the rest at full width.
-	rest := joinLines(firstLines[1:])
+	rest := remainingText(text, firstLines, 1)
 	remaining := breakTextLines(rest, style, fontSize, constraints.AvailableWidth, constraints)
 	return append(firstLines[:1], remaining...)
 }
@@ -299,8 +299,8 @@ func placeLine(line string, lineWidth float64, style document.Style, isLastLine 
 }
 
 // overflowResult builds a Result for text that does not fit vertically.
-func overflowResult(remaining []string, style document.Style, availWidth, cursorY float64, placed []PlacedNode) Result {
-	overflowText := joinLines(remaining)
+// overflowText is the unplaced remainder of the source text.
+func overflowResult(overflowText string, style document.Style, availWidth, cursorY float64, placed []PlacedNode) Result {
 	overflow := &document.Text{
 		Content:   overflowText,
 		TextStyle: style,
@@ -739,8 +739,51 @@ func rebuildRichTextOverflow(lines [][]textRun, blockStyle document.Style, bp do
 	}
 }
 
-// joinLines concatenates lines with a single space separator, restoring
-// the original text for overflow handling.
+// remainingText returns the part of text that starts at lines[k], where
+// lines is the output of breaking text. It slices the source text instead
+// of joining lines so that what the line breaker consumed at each break
+// survives onto the next page unchanged: nothing for CJK and mid-word
+// breaks, one space for word wraps, and the newline for forced breaks.
+// If lines cannot be matched against text (a breaker that rewrote
+// whitespace), it falls back to joining the remaining lines with spaces.
+func remainingText(text string, lines []string, k int) string {
+	cursor := 0
+	for j := 0; j <= k; j++ {
+		start, ok := matchLine(text, lines[j], cursor, j > 0)
+		if !ok {
+			return joinLines(lines[k:])
+		}
+		if j == k {
+			return text[start:]
+		}
+		cursor = start + len(lines[j])
+	}
+	return joinLines(lines[k:])
+}
+
+// matchLine returns the byte offset at which line starts in text, given
+// that the previous line ended at cursor. A forced break always consumed
+// the newline at cursor; otherwise the line starts at cursor (CJK or
+// mid-word break) or right after a single consumed space (word wrap).
+func matchLine(text, line string, cursor int, afterBreak bool) (int, bool) {
+	if cursor > len(text) {
+		return 0, false
+	}
+	if afterBreak && cursor < len(text) && text[cursor] == '\n' {
+		cursor++
+		return cursor, strings.HasPrefix(text[cursor:], line)
+	}
+	if strings.HasPrefix(text[cursor:], line) {
+		return cursor, true
+	}
+	if afterBreak && cursor < len(text) && text[cursor] == ' ' && strings.HasPrefix(text[cursor+1:], line) {
+		return cursor + 1, true
+	}
+	return 0, false
+}
+
+// joinLines concatenates lines with a single space separator. It is the
+// fallback for [remainingText] when lines cannot be matched to the source.
 func joinLines(lines []string) string {
 	if len(lines) == 0 {
 		return ""
