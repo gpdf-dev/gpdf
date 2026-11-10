@@ -157,7 +157,10 @@ func (d *Document) Render(w io.Writer) error {
 	// 3. Paginate using the layout engine.
 	paginator := layout.NewPaginator(d.config.PageSize, d.config.Margins, d.fontResolver)
 	paginator.SetHeaderFooter(headerNodes, footerNodes)
-	pages := paginator.Paginate(doc)
+	pages, err := paginator.PaginateWithError(doc)
+	if err != nil {
+		return err
+	}
 
 	// 4. Replace page-number placeholders.
 	layout.ResolvePageNumbersWithFonts(pages, d.fontResolver)

@@ -485,7 +485,10 @@ func RenderOverlayContent(
 
 	// Run layout.
 	paginator := layout.NewPaginator(pageSize, margins, fontResolver)
-	layouts := paginator.Paginate(doc)
+	layouts, err := paginator.PaginateWithError(doc)
+	if err != nil {
+		return nil, err
+	}
 	layout.ResolvePageNumbersWithFonts(layouts, fontResolver)
 
 	if len(layouts) == 0 {

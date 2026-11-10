@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- `layout.(*Paginator).PaginateWithError` and the `layout.ErrContentDoesNotFit` sentinel error
+
+### Fixed
+- `Generate` / `Render` hung forever when content could not fit even on an empty page — a zero page size, margins larger than the page (e.g. the default 20 mm margins on a 50 × 30 mm label), a body area shorter than one line of text, or a header/footer taller than the page. They now return an error wrapping `layout.ErrContentDoesNotFit` that reports the body-area and page dimensions. `Paginate` keeps its signature and stops instead of looping
+- Text that continued onto the next page had its forced line breaks (`\n`) collapsed into spaces, and a space inserted at every CJK or mid-word line break of the overflow. The overflow is now sliced from the source text, so `"line five\nline six"` stays on two lines on page 2
+
 ## [1.0.16] - 2026-11-10
 
 ### Added

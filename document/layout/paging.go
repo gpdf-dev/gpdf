@@ -1,6 +1,9 @@
 package layout
 
 import (
+	"errors"
+	"fmt"
+	"reflect"
 	"strconv"
 	"strings"
 
@@ -49,75 +52,149 @@ type PageLayout struct {
 	Background *document.PageBackground
 }
 
+// ErrContentDoesNotFit is returned by [Paginator.PaginateWithError] when
+// content cannot be placed even on an empty page, for example because the
+// page size is zero or the margins, header and footer leave less room than
+// a single line of text needs. Without this check pagination would emit
+// empty pages forever. Use [errors.Is] to test for it; the wrapped error
+// message carries the page and content-area dimensions.
+var ErrContentDoesNotFit = errors.New("layout: content does not fit on an empty page")
+
 // Paginate processes the document's pages and their content, producing a
 // list of PageLayout values. Each input page is laid out within its content
 // area (page size minus margins). Content that overflows is automatically
 // continued on a new page with the same size and margins.
+//
+// If some content can never be placed (see [ErrContentDoesNotFit]),
+// Paginate stops and returns the pages produced so far. Use
+// [Paginator.PaginateWithError] to detect that case.
 func (p *Paginator) Paginate(doc *document.Document) []PageLayout {
+	pages, _ := p.PaginateWithError(doc)
+	return pages
+}
+
+// PaginateWithError is like [Paginator.Paginate] but reports content that
+// cannot be placed even on an empty page. In that case it returns the
+// pages produced so far together with an error wrapping
+// [ErrContentDoesNotFit].
+func (p *Paginator) PaginateWithError(doc *document.Document) ([]PageLayout, error) {
 	if doc == nil {
-		return nil
+		return nil, nil
 	}
 
 	var pages []PageLayout
 	block := NewBlockLayout()
 
 	for _, page := range doc.Pages {
-		pageSize := page.Size
-		if pageSize.Width <= 0 || pageSize.Height <= 0 {
-			pageSize = p.pageSize
-		}
-
-		margins := page.Margins
-		if margins == (document.Edges{}) {
-			margins = p.margins
-		}
-
-		resolvedMargins := margins.Resolve(pageSize.Width, pageSize.Height, 12)
-
-		contentWidth := pageSize.Width - resolvedMargins.Horizontal()
-		contentHeight := pageSize.Height - resolvedMargins.Vertical()
-
-		// Measure header and footer to determine body available height.
-		headerHeight, headerPlaced := p.measureSection(p.headerNodes, contentWidth, block)
-		footerHeight, footerPlaced := p.measureSection(p.footerNodes, contentWidth, block)
-
-		bodyHeight := contentHeight - headerHeight - footerHeight
-		if bodyHeight < 0 {
-			bodyHeight = 0
-		}
-
-		// Create a virtual container node for the page content.
-		container := &document.Box{
-			Content: page.Content,
-		}
-
-		var remaining document.DocumentNode = container
-
-		for remaining != nil {
-			constraints := Constraints{
-				AvailableWidth:  contentWidth,
-				AvailableHeight: bodyHeight,
-				PageWidth:       pageSize.Width,
-				PageHeight:      pageSize.Height,
-				FontResolver:    p.fontResolver,
-			}
-
-			result := block.Layout(remaining, constraints)
-
-			pl := p.composePageLayout(
-				pageSize, resolvedMargins, contentHeight,
-				headerPlaced, headerHeight,
-				footerPlaced, footerHeight,
-				result.Children,
-			)
-			pl.Background = page.Background
-			pages = append(pages, pl)
-
-			remaining = result.Overflow
+		var err error
+		pages, err = p.paginatePage(page, block, pages)
+		if err != nil {
+			return pages, err
 		}
 	}
 
-	return pages
+	return pages, nil
+}
+
+// paginatePage lays out a single source page, appending one PageLayout per
+// physical page (overflow included) to pages.
+func (p *Paginator) paginatePage(page *document.Page, block *BlockLayout, pages []PageLayout) ([]PageLayout, error) {
+	pageSize := page.Size
+	if pageSize.Width <= 0 || pageSize.Height <= 0 {
+		pageSize = p.pageSize
+	}
+
+	margins := page.Margins
+	if margins == (document.Edges{}) {
+		margins = p.margins
+	}
+
+	resolvedMargins := margins.Resolve(pageSize.Width, pageSize.Height, 12)
+
+	contentWidth := pageSize.Width - resolvedMargins.Horizontal()
+	contentHeight := pageSize.Height - resolvedMargins.Vertical()
+
+	// Measure header and footer to determine body available height.
+	headerHeight, headerPlaced := p.measureSection(p.headerNodes, contentWidth, block)
+	footerHeight, footerPlaced := p.measureSection(p.footerNodes, contentWidth, block)
+
+	bodyHeight := contentHeight - headerHeight - footerHeight
+	if bodyHeight < 0 {
+		bodyHeight = 0
+	}
+
+	constraints := Constraints{
+		AvailableWidth:  contentWidth,
+		AvailableHeight: bodyHeight,
+		PageWidth:       pageSize.Width,
+		PageHeight:      pageSize.Height,
+		FontResolver:    p.fontResolver,
+	}
+
+	// Create a virtual container node for the page content.
+	var remaining document.DocumentNode = &document.Box{
+		Content: page.Content,
+	}
+
+	emptyPages := 0
+	for remaining != nil {
+		result := block.Layout(remaining, constraints)
+
+		if result.Overflow != nil {
+			// Layout is deterministic, so an overflow identical to the
+			// input means the next page would come out exactly the same:
+			// nothing on it can ever be placed. As a backstop against
+			// overflow that changes without shrinking, also stop after a
+			// long run of pages that place nothing visible.
+			if hasVisibleContent(result.Children) {
+				emptyPages = 0
+			} else {
+				emptyPages++
+			}
+			if emptyPages > maxConsecutiveEmptyPages || reflect.DeepEqual(result.Overflow, remaining) {
+				return pages, fmt.Errorf("%w: body area is %.2f x %.2f pt on a %.2f x %.2f pt page; "+
+					"enlarge the page or reduce margins, header, footer or element size",
+					ErrContentDoesNotFit,
+					contentWidth, bodyHeight, pageSize.Width, pageSize.Height)
+			}
+		}
+
+		pl := p.composePageLayout(
+			pageSize, resolvedMargins, contentHeight,
+			headerPlaced, headerHeight,
+			footerPlaced, footerHeight,
+			result.Children,
+		)
+		pl.Background = page.Background
+		pages = append(pages, pl)
+
+		remaining = result.Overflow
+	}
+
+	return pages, nil
+}
+
+// maxConsecutiveEmptyPages bounds how many pages in a row may overflow
+// without placing any visible content before pagination gives up. Page
+// breaks around zero-height content can legitimately produce a few blank
+// pages; a long run means the layout is not making progress.
+const maxConsecutiveEmptyPages = 64
+
+// hasVisibleContent reports whether any leaf among the placed nodes
+// occupies vertical space, i.e. whether the page shows something.
+func hasVisibleContent(nodes []PlacedNode) bool {
+	for i := range nodes {
+		if len(nodes[i].Children) == 0 {
+			if nodes[i].Size.Height > 0 {
+				return true
+			}
+			continue
+		}
+		if hasVisibleContent(nodes[i].Children) {
+			return true
+		}
+	}
+	return false
 }
 
 // measureSection lays out a set of document nodes and returns the total
