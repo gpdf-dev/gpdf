@@ -7,7 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.0.16] - 2026-11-10
+
+### Added
+- `schema/gpdf-json-spec.{en,ja}.md`: a single-file JSON spec (prose, JSON Schema, verified examples) meant to be handed to an AI that writes gpdf JSON, covering the write → validate → render → inspect loop and inputs gpdf silently drops. `schema/spec_test.go` keeps the schema, examples and spec in sync with the Go decoder
+- README: rendered sample gallery (invoice, Japanese invoice, report, QR/barcode) and links to gpdf.dev at the top of all 6 READMEs; `_examples/showcase` and `scripts/readme-images.sh` regenerate the thumbnails
+
 ### Fixed
+- `schema/gpdf.schema.json`: 11 fields the JSON decoder accepts were rejected by `additionalProperties: false` — `style.padding` / `paddings`, `image.minWidth` / `minHeight` / `border` / `background`, `table.columnAlign` / `border` / `cellBorder` / `borderCollapse` / `background`
 - Font subsetting now actually shrinks embedded TrueType fonts. Previously unused glyph outlines were only zeroed and every table was kept, so variable CJK fonts (e.g. Noto Sans JP/SC/KR from Google Fonts) embedded their full `gvar` table — about 3 MB per font even for a few characters. `SubsetTrueType` now drops tables PDF renderers never use (OpenType layout, font variations, vertical metrics, …), rebuilds `glyf` / `loca` with only the used outlines, zeroes unused `hmtx` entries and strips glyph names from `post`; `(*TrueTypeFont).Subset` additionally rebuilds `cmap` for just the used characters. Glyph IDs are unchanged and rendering is pixel-identical
   - A 97-character Japanese document: embedded font 3.0 MB → 11 KB; `Generate` ~105 ms → ~2 ms, 23.8 MB → 3.2 MB allocated
 
@@ -268,7 +275,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Reed-Solomon coefficient order in QR code encoder
 - binary.Write return value handling for errcheck lint
 
-[Unreleased]: https://github.com/gpdf-dev/gpdf/compare/v1.0.15...HEAD
+[Unreleased]: https://github.com/gpdf-dev/gpdf/compare/v1.0.16...HEAD
+[1.0.16]: https://github.com/gpdf-dev/gpdf/compare/v1.0.15...v1.0.16
 [1.0.15]: https://github.com/gpdf-dev/gpdf/compare/v1.0.14...v1.0.15
 [1.0.14]: https://github.com/gpdf-dev/gpdf/compare/v1.0.13...v1.0.14
 [1.0.13]: https://github.com/gpdf-dev/gpdf/compare/v1.0.12...v1.0.13
