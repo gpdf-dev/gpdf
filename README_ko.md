@@ -10,6 +10,21 @@
 
 순수 Go로 구현된 외부 의존성 없는 PDF 생성 라이브러리. 레이어드 아키텍처와 선언적 빌더 API를 제공합니다.
 
+<table>
+  <tr>
+    <td align="center" width="25%"><a href="_examples/builder/18_invoice_test.go"><img src="docs/assets/readme/invoice.png" alt="인보이스" width="200"></a><br><sub>인보이스</sub></td>
+    <td align="center" width="25%"><a href="_examples/showcase/showcase_test.go"><img src="docs/assets/readme/invoice_ja.png" alt="일본어 청구서 (CJK)" width="200"></a><br><sub>일본어 청구서 (CJK)</sub></td>
+    <td align="center" width="25%"><a href="_examples/builder/19_report_test.go"><img src="docs/assets/readme/report.png" alt="리포트" width="200"></a><br><sub>리포트</sub></td>
+    <td align="center" width="25%"><a href="_examples/builder/29_qr_barcode_invoice_test.go"><img src="docs/assets/readme/qr_barcode.png" alt="QR 코드 & 바코드" width="200"></a><br><sub>QR 코드 & 바코드</sub></td>
+  </tr>
+</table>
+
+<p align="center">
+  <a href="https://gpdf.dev/ko"><b>웹사이트</b></a> · <a href="https://gpdf.dev/ko/docs/quickstart"><b>문서</b></a> · <a href="#빠른-시작"><b>빠른 시작</b></a> · <a href="https://gpdf.dev/ko/docs/examples"><b>예제</b></a>
+</p>
+
+<p align="center"><sub>위 샘플은 모두 gpdf로 생성되었습니다. 썸네일을 클릭하면 소스 코드를 볼 수 있습니다.</sub></p>
+
 ## 특징
 
 - **외부 의존성 제로** — Go 표준 라이브러리만 사용

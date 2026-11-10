@@ -10,6 +10,21 @@
 
 纯 Go 实现的零依赖 PDF 生成库，采用分层架构和声明式构建器 API。
 
+<table>
+  <tr>
+    <td align="center" width="25%"><a href="_examples/builder/18_invoice_test.go"><img src="docs/assets/readme/invoice.png" alt="发票" width="200"></a><br><sub>发票</sub></td>
+    <td align="center" width="25%"><a href="_examples/showcase/showcase_test.go"><img src="docs/assets/readme/invoice_ja.png" alt="日文发票（CJK）" width="200"></a><br><sub>日文发票（CJK）</sub></td>
+    <td align="center" width="25%"><a href="_examples/builder/19_report_test.go"><img src="docs/assets/readme/report.png" alt="报告" width="200"></a><br><sub>报告</sub></td>
+    <td align="center" width="25%"><a href="_examples/builder/29_qr_barcode_invoice_test.go"><img src="docs/assets/readme/qr_barcode.png" alt="二维码与条形码" width="200"></a><br><sub>二维码与条形码</sub></td>
+  </tr>
+</table>
+
+<p align="center">
+  <a href="https://gpdf.dev/zh"><b>官网</b></a> · <a href="https://gpdf.dev/zh/docs/quickstart"><b>文档</b></a> · <a href="#快速入门"><b>快速入门</b></a> · <a href="https://gpdf.dev/zh/docs/examples"><b>示例</b></a>
+</p>
+
+<p align="center"><sub>以上示例均由 gpdf 生成——点击缩略图即可查看源代码。</sub></p>
+
 ## 特性
 
 - **零依赖** — 仅使用 Go 标准库
