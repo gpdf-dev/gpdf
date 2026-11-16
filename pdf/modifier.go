@@ -107,7 +107,7 @@ func (m *Modifier) OverlayPage(pageIndex int, overlayContent []byte, resources *
 		if existingRes == nil {
 			existingRes = make(Dict)
 		}
-		merged := mergeResources(existingRes, *resources)
+		merged := mergeResources(m.resolveResourceEntries(existingRes, *resources), *resources)
 		newPageDict[Name("Resources")] = merged
 	}
 
@@ -309,6 +309,26 @@ func (m *Modifier) writeIncrementalXRef(w io.Writer, xref *XRefTable) error {
 	}
 
 	return nil
+}
+
+// resolveResourceEntries returns a copy of existing in which every entry the
+// overlay also has (such as /Font) is resolved when it is an indirect
+// reference, as LibreOffice and Ghostscript write them, so that
+// mergeResources merges into it instead of replacing it.
+func (m *Modifier) resolveResourceEntries(existing, overlay Dict) Dict {
+	result := make(Dict, len(existing))
+	for k, v := range existing {
+		result[k] = v
+		if _, inOverlay := overlay[k]; !inOverlay {
+			continue
+		}
+		if ref, isRef := v.(ObjectRef); isRef {
+			if d, err := m.reader.ResolveDict(ref); err == nil {
+				result[k] = d
+			}
+		}
+	}
+	return result
 }
 
 // mergeResources merges overlay resources into existing page resources.
