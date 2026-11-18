@@ -8,6 +8,10 @@ import (
 // pdfHeader is the PDF version header written at the start of every file.
 const pdfHeader = "%PDF-1.7\n"
 
+// binaryComment is the comment line placed after the header to mark the file
+// as binary (ISO 32000-1, 7.5.2). PDF/A requires it (ISO 19005-1/2, 6.1.2).
+const binaryComment = "%\xE2\xE3\xCF\xD3\n"
+
 // objectEntry records an allocated object.
 type objectEntry struct {
 	ref ObjectRef
@@ -42,18 +46,32 @@ type Writer struct {
 type countWriter struct {
 	w     io.Writer
 	count int64
+
+	// header is written in front of the first Write call. Deferring it lets
+	// extensions adjust the header (e.g. add the binary comment) after
+	// NewWriter returns but before any object is written.
+	header string
 }
 
 func (cw *countWriter) Write(p []byte) (int, error) {
+	if cw.header != "" {
+		h := cw.header
+		cw.header = ""
+		n, err := io.WriteString(cw.w, h)
+		cw.count += int64(n)
+		if err != nil {
+			return 0, err
+		}
+	}
 	n, err := cw.w.Write(p)
 	cw.count += int64(n)
 	return n, err
 }
 
 // NewWriter creates a new PDF Writer that writes to w.
-// The PDF header is written immediately.
+// The PDF header is emitted together with the first write to w.
 func NewWriter(w io.Writer) *Writer {
-	cw := &countWriter{w: w}
+	cw := &countWriter{w: w, header: pdfHeader}
 
 	pw := &Writer{
 		w:          cw,
@@ -63,10 +81,6 @@ func NewWriter(w io.Writer) *Writer {
 		nextObjNum: 1,
 		compress:   true,
 	}
-
-	// Write the PDF header immediately.
-	// We ignore errors here; they will surface on subsequent writes.
-	_, _ = io.WriteString(cw, pdfHeader)
 
 	// Pre-allocate catalog and page tree objects so they have stable refs.
 	pw.catalog = pw.AllocObject()
@@ -97,7 +111,7 @@ func (pw *Writer) WriteObject(ref ObjectRef, obj Object) error {
 		obj = pw.onWriteObject(ref, obj)
 	}
 
-	offset := pw.w.count
+	offset := pw.BytesWritten()
 	pw.xref.Add(ref.Number, offset, ref.Generation)
 
 	if _, err := fmt.Fprintf(pw.w, "%d %d obj\n", ref.Number, ref.Generation); err != nil {
@@ -401,10 +415,35 @@ func (pw *Writer) OnBeforeClose(fn func(pw *Writer) error) {
 	pw.beforeClose = append(pw.beforeClose, fn)
 }
 
-// BytesWritten returns the total number of bytes written so far.
+// BytesWritten returns the total number of bytes written so far,
+// including the PDF header even if it has not been flushed yet.
 // This is useful for calculating ByteRange offsets for digital signatures.
 func (pw *Writer) BytesWritten() int64 {
-	return pw.w.count
+	return pw.w.count + int64(len(pw.w.header))
+}
+
+// EnableBinaryComment adds a comment line of four bytes above 127 right after
+// the %PDF header, as required by PDF/A (ISO 19005, 6.1.2). It must be called
+// before any object is written; it reports false if the header has already
+// been flushed.
+func (pw *Writer) EnableBinaryComment() bool {
+	if pw.w.header == "" {
+		return false
+	}
+	pw.w.header = pdfHeader + binaryComment
+	return true
+}
+
+// Info returns the document metadata set with SetInfo.
+func (pw *Writer) Info() DocumentInfo {
+	return pw.info
+}
+
+// HasTrailerEntry reports whether an extension has already added key to the
+// trailer dictionary via AddTrailerEntry.
+func (pw *Writer) HasTrailerEntry(key Name) bool {
+	_, ok := pw.trailerExtra[key]
+	return ok
 }
 
 // RawWrite writes raw bytes directly to the output stream.
@@ -482,7 +521,7 @@ func (pw *Writer) writeCatalog() error {
 }
 
 func (pw *Writer) writeTrailer(infoRef ObjectRef) error {
-	xrefOffset := pw.w.count
+	xrefOffset := pw.BytesWritten()
 	if _, err := pw.xref.WriteTo(pw.w); err != nil {
 		return err
 	}

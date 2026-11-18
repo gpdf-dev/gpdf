@@ -316,10 +316,60 @@ func TestFillColorCmd_CMYK(t *testing.T) {
 
 func TestNewWriter_WritesHeader(t *testing.T) {
 	var buf bytes.Buffer
-	_ = pdf.NewWriter(&buf)
+	w := pdf.NewWriter(&buf)
+	if got := w.BytesWritten(); got != int64(len("%PDF-1.7\n")) {
+		t.Errorf("BytesWritten before first write = %d, want header length", got)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
 	got := buf.String()
 	if !strings.HasPrefix(got, "%PDF-1.7\n") {
 		t.Errorf("output does not start with PDF header: %q", got[:min(len(got), 20)])
+	}
+	if strings.HasPrefix(got, "%PDF-1.7\n%\xE2") {
+		t.Error("binary comment written without EnableBinaryComment")
+	}
+}
+
+func TestWriter_EnableBinaryComment(t *testing.T) {
+	var buf bytes.Buffer
+	w := pdf.NewWriter(&buf)
+	if !w.EnableBinaryComment() {
+		t.Fatal("EnableBinaryComment = false before any write")
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(buf.String(), "%PDF-1.7\n%\xE2\xE3\xCF\xD3\n") {
+		t.Errorf("header = %q, want binary comment after %%PDF line", buf.String()[:16])
+	}
+}
+
+func TestWriter_EnableBinaryCommentAfterWrite(t *testing.T) {
+	var buf bytes.Buffer
+	w := pdf.NewWriter(&buf)
+	ref := w.AllocObject()
+	if err := w.WriteObject(ref, pdf.Integer(1)); err != nil {
+		t.Fatal(err)
+	}
+	if w.EnableBinaryComment() {
+		t.Error("EnableBinaryComment = true after header was flushed")
+	}
+}
+
+func TestWriter_InfoAndHasTrailerEntry(t *testing.T) {
+	w := pdf.NewWriter(&bytes.Buffer{})
+	w.SetInfo(pdf.DocumentInfo{Title: "T"})
+	if w.Info().Title != "T" {
+		t.Errorf("Info().Title = %q", w.Info().Title)
+	}
+	if w.HasTrailerEntry(pdf.Name("ID")) {
+		t.Error("HasTrailerEntry(ID) = true before AddTrailerEntry")
+	}
+	w.AddTrailerEntry(pdf.Name("ID"), pdf.Array{})
+	if !w.HasTrailerEntry(pdf.Name("ID")) {
+		t.Error("HasTrailerEntry(ID) = false after AddTrailerEntry")
 	}
 }
 

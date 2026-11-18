@@ -138,3 +138,41 @@ func TestXMLEscape(t *testing.T) {
 		}
 	}
 }
+
+func TestApply_ConformanceStructure(t *testing.T) {
+	var buf bytes.Buffer
+	pw := pdf.NewWriter(&buf)
+	Apply(pw, WithLevel(LevelA2b), WithMetadata(MetadataInfo{
+		Title:      "Archive",
+		CreateDate: "2026-11-18T10:00:00+09:00",
+	}))
+	pw.SetInfo(pdf.DocumentInfo{Author: "ACME", Producer: "custom-producer"})
+	if err := pw.AddPage(pdf.PageObject{
+		MediaBox: pdf.Rectangle{LLX: 0, LLY: 0, URX: 612, URY: 792},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := pw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	s := buf.String()
+
+	if !strings.HasPrefix(s, "%PDF-1.7\n%\xE2\xE3\xCF\xD3\n") {
+		t.Error("missing binary comment after header (ISO 19005-2 6.1.2)")
+	}
+	if !strings.Contains(s, "/ID [<") {
+		t.Error("missing /ID in trailer (ISO 19005-2 6.1.3)")
+	}
+	for _, want := range []string{
+		"<pdf:Producer>custom-producer</pdf:Producer>",
+		"/Producer (custom-producer)",
+		"<dc:creator><rdf:Seq><rdf:li>ACME</rdf:li></rdf:Seq></dc:creator>",
+		"/Author (ACME)",
+		"/Title (Archive)",
+		"<xmp:CreatorTool>gpdf</xmp:CreatorTool>",
+	} {
+		if !strings.Contains(s, want) {
+			t.Errorf("output missing %q", want)
+		}
+	}
+}

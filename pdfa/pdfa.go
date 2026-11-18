@@ -4,6 +4,8 @@
 package pdfa
 
 import (
+	"crypto/md5"
+
 	"github.com/gpdf-dev/gpdf/pdf"
 )
 
@@ -45,21 +47,31 @@ func WithMetadata(info MetadataInfo) Option {
 }
 
 // Apply configures a pdf.Writer for PDF/A conformance.
-// It registers beforeClose hooks to write the ICC profile and XMP metadata,
-// and adds OutputIntents and Metadata entries to the catalog.
+// It adds the binary header comment, registers beforeClose hooks to write the
+// ICC profile and XMP metadata, adds OutputIntents and Metadata entries to the
+// catalog, and writes a file identifier (/ID) to the trailer.
+//
+// Fields left empty in MetadataInfo are taken from the document information
+// dictionary, and the dictionary is then rewritten from the merged values, so
+// that the Info dictionary and the XMP packet always agree.
 func Apply(pw *pdf.Writer, opts ...Option) {
-	cfg := &config{
-		level: LevelA1b,
-		metadata: MetadataInfo{
-			Producer: "gpdf",
-			Creator:  "gpdf",
-		},
-	}
+	cfg := &config{level: LevelA1b}
 	for _, opt := range opts {
 		opt(cfg)
 	}
 
+	pw.EnableBinaryComment()
+
 	pw.OnBeforeClose(func(pw *pdf.Writer) error {
+		meta := mergeMetadata(cfg.metadata, pw.Info())
+		pw.SetInfo(pdf.DocumentInfo{
+			Title:    meta.Title,
+			Author:   meta.Author,
+			Subject:  meta.Subject,
+			Creator:  meta.Creator,
+			Producer: meta.Producer,
+		})
+
 		// 1. Write ICC profile stream.
 		iccRef := pw.AllocObject()
 		iccData := sRGBICCProfile()
@@ -93,7 +105,7 @@ func Apply(pw *pdf.Writer, opts ...Option) {
 
 		// 4. Write XMP metadata stream.
 		xmpRef := pw.AllocObject()
-		xmpData := generateXMP(cfg.level, cfg.metadata)
+		xmpData := generateXMP(cfg.level, meta)
 		xmpStream := pdf.Stream{
 			Dict: pdf.Dict{
 				pdf.Name("Type"):    pdf.Name("Metadata"),
@@ -108,6 +120,35 @@ func Apply(pw *pdf.Writer, opts ...Option) {
 		// 5. Add Metadata to catalog.
 		pw.AddCatalogEntry(pdf.Name("Metadata"), xmpRef)
 
+		// 6. File identifier (ISO 19005, 6.1.3). Derived from the XMP packet,
+		// which carries the title, author, and timestamps, so output stays
+		// deterministic when CreateDate is fixed.
+		if !pw.HasTrailerEntry(pdf.Name("ID")) {
+			sum := md5.Sum(xmpData)
+			id := pdf.HexString(string(sum[:]))
+			pw.AddTrailerEntry(pdf.Name("ID"), pdf.Array{id, id})
+		}
+
 		return nil
 	})
+}
+
+// mergeMetadata fills empty fields of m from the document information
+// dictionary and falls back to "gpdf" for Creator and Producer.
+func mergeMetadata(m MetadataInfo, info pdf.DocumentInfo) MetadataInfo {
+	pick := func(a, b, fallback string) string {
+		if a != "" {
+			return a
+		}
+		if b != "" {
+			return b
+		}
+		return fallback
+	}
+	m.Title = pick(m.Title, info.Title, "")
+	m.Author = pick(m.Author, info.Author, "")
+	m.Subject = pick(m.Subject, info.Subject, "")
+	m.Creator = pick(m.Creator, info.Creator, "gpdf")
+	m.Producer = pick(m.Producer, info.Producer, "gpdf")
+	return m
 }
