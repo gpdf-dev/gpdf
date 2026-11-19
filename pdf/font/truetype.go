@@ -137,6 +137,9 @@ type TrueTypeFont struct {
 	hmtxTbl    hmtxTable
 	numGlyphs  int
 	usedRunes  map[rune]bool
+	// usedGlyphs holds glyphs drawn by ID through EncodeGlyph (shaped
+	// text), with the source text each one stands for.
+	usedGlyphs map[uint16]string
 }
 
 // ParseTrueType parses a TrueType font file from the given data.
@@ -179,8 +182,9 @@ func ParseTrueType(data []byte) (*TrueTypeFont, error) {
 	}
 
 	ttf := &TrueTypeFont{
-		data:      data,
-		usedRunes: make(map[rune]bool),
+		data:       data,
+		usedRunes:  make(map[rune]bool),
+		usedGlyphs: make(map[uint16]string),
 	}
 
 	// Parse head table.
@@ -644,6 +648,36 @@ func (ttf *TrueTypeFont) Encode(text string) []byte {
 	return result
 }
 
+// GlyphAdvance returns the advance width of a glyph, by glyph ID, in font
+// design units.
+func (ttf *TrueTypeFont) GlyphAdvance(gid uint16) (int, bool) {
+	if int(gid) >= len(ttf.hmtxTbl.advanceWidths) {
+		return 0, false
+	}
+	return int(ttf.hmtxTbl.advanceWidths[gid]), true
+}
+
+// EncodeGlyph encodes a glyph chosen by a [Shaper] for a PDF content
+// stream, and records it for subsetting and for the ToUnicode map. text is
+// the source text the glyph stands for; the first non-empty text recorded
+// for a glyph wins.
+func (ttf *TrueTypeFont) EncodeGlyph(gid uint16, text string) []byte {
+	if prev, ok := ttf.usedGlyphs[gid]; !ok || prev == "" {
+		ttf.usedGlyphs[gid] = text
+	}
+	return []byte{byte(gid >> 8), byte(gid & 0xFF)}
+}
+
+// UsedGlyphs returns the glyphs encoded with EncodeGlyph so far, with the
+// text each one stands for (empty when unknown).
+func (ttf *TrueTypeFont) UsedGlyphs() map[uint16]string {
+	result := make(map[uint16]string, len(ttf.usedGlyphs))
+	for gid, text := range ttf.usedGlyphs {
+		result[gid] = text
+	}
+	return result
+}
+
 // Subset creates a subsetted font containing only the specified runes.
 // In addition to what SubsetTrueType does, the cmap table is rebuilt to
 // cover only these runes.
@@ -665,6 +699,17 @@ func (ttf *TrueTypeFont) Subset(runes []rune) ([]byte, error) {
 			seen[gid] = true
 		}
 	}
+	// Glyphs drawn by ID (shaped text) have no rune of their own, e.g.
+	// ligatures and contextual forms. Keep them in the subset too.
+	shaped := make([]uint16, 0, len(ttf.usedGlyphs))
+	for gid := range ttf.usedGlyphs {
+		if !seen[gid] && int(gid) < ttf.numGlyphs {
+			shaped = append(shaped, gid)
+			seen[gid] = true
+		}
+	}
+	sort.Slice(shaped, func(i, j int) bool { return shaped[i] < shaped[j] })
+	glyphIDs = append(glyphIDs, shaped...)
 
 	return subsetTrueType(ttf.data, glyphIDs, cmapping)
 }

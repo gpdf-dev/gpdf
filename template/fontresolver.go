@@ -13,6 +13,12 @@ import (
 // approximate metrics so that layout can proceed without embedded fonts.
 type builtinFontResolver struct {
 	fonts map[string]*font.TrueTypeFont
+
+	// Optional shaping (see WithShaper). fontData holds the raw files the
+	// shaper reads; fallbacks are tried for characters a font lacks.
+	shaper    font.Shaper
+	fontData  map[string][]byte
+	fallbacks []string
 }
 
 // newBuiltinFontResolver creates a FontResolver backed by the given fonts.
@@ -102,8 +108,35 @@ func buildFontVariantID(family string, bold, italic bool) string {
 	}
 }
 
+// shaped reports whether text in the given font goes through the shaper.
+func (r *builtinFontResolver) shaped(id string) bool {
+	if r.shaper == nil {
+		return false
+	}
+	_, ok := r.fonts[id]
+	return ok
+}
+
+// measureShaped returns the width of text drawn through the shaper with
+// the font registered as id and the configured fallbacks.
+func (r *builtinFontResolver) measureShaped(id, text string, size float64) float64 {
+	keys := append([]string{id}, font.FallbackKeys(id, r.fallbacks, func(k string) bool {
+		_, ok := r.fonts[k]
+		return ok
+	})...)
+	faces := make([]font.ShapeFace, len(keys))
+	for i, k := range keys {
+		faces[i] = font.ShapeFace{Key: k, Data: r.fontData[k]}
+	}
+	runs := r.shaper.Shape(text, faces, font.DirectionAuto)
+	return font.ShapedWidth(runs, func(i int) int { return r.fonts[keys[i]].Metrics().UnitsPerEm }, size)
+}
+
 // MeasureString measures the width of text at the given font size.
 func (r *builtinFontResolver) MeasureString(f layout.ResolvedFont, text string, size float64) float64 {
+	if r.shaped(f.ID) {
+		return r.measureShaped(f.ID, text, size)
+	}
 	if ttf, ok := r.fonts[f.ID]; ok {
 		return font.MeasureString(ttf, text, size)
 	}
@@ -117,6 +150,11 @@ func (r *builtinFontResolver) MeasureString(f layout.ResolvedFont, text string, 
 
 // LineBreak splits text into lines fitting within maxWidth.
 func (r *builtinFontResolver) LineBreak(f layout.ResolvedFont, text string, size float64, maxWidth float64) []string {
+	if r.shaped(f.ID) {
+		return font.WrapWords(text, maxWidth, func(s string) float64 {
+			return r.measureShaped(f.ID, s, size)
+		})
+	}
 	if ttf, ok := r.fonts[f.ID]; ok {
 		return font.LineBreak(ttf, text, size, maxWidth)
 	}

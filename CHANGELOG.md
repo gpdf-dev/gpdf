@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- Pluggable text shaping for complex scripts (Arabic, Hebrew, Indic, ...): `template.WithShaper` takes a `font.Shaper` that turns a line into positioned glyph runs in visual order. gpdf stays dependency-free; implement the interface with a shaping engine such as go-text/typesetting (HarfBuzz port). Shaped text is measured and wrapped by gpdf in logical order, drawn by glyph ID (`TJ` advances, `Ts` offsets), and wrapped in `/ActualText` so it copies and searches as the original text; ToUnicode maps ligature glyphs to all their characters
+- `template.WithFallbackFonts` for characters missing from a text's font (used with a shaper)
+- `document.Style.Direction` with `template.Direction` / `template.RTL`
+- `font.TrueTypeFont.EncodeGlyph`, `GlyphAdvance`, `UsedGlyphs`; `font.GenerateToUnicodeCMapText`; helpers `font.WrapWords`, `font.ShapedWidth`, `font.FallbackKeys`
+
 ## [1.0.17] - 2026-11-10
 
 ### Added

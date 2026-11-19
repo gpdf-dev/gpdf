@@ -24,6 +24,9 @@ type Style struct {
 	TextIndent     Value          // first-line indentation
 	TextDecoration TextDecoration // bitmask: underline, strikethrough, overline
 	VerticalAlign  VerticalAlign  // vertical alignment in table cells
+	// Direction is the base text direction. It only takes effect when a
+	// text shaper is configured; the zero value lets the shaper detect it.
+	Direction TextDirection
 
 	// Box model
 	Margin  Edges
@@ -59,6 +62,18 @@ func DefaultStyle() Style {
 		LineHeight: 1.2,
 	}
 }
+
+// TextDirection is the base direction of a paragraph of text.
+type TextDirection int
+
+const (
+	// DirectionAuto detects the direction from the first strong character.
+	DirectionAuto TextDirection = iota
+	// DirectionLTR is left-to-right text (Latin, CJK, ...).
+	DirectionLTR
+	// DirectionRTL is right-to-left text (Arabic, Hebrew, ...).
+	DirectionRTL
+)
 
 // FontWeight represents the weight (boldness) of a font, using the
 // standard CSS numeric scale where 400 is normal and 700 is bold.

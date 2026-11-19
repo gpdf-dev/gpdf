@@ -102,6 +102,56 @@ QR codes natively support Unicode content:
 c.QRCode("こんにちは世界", template.QRSize(document.Mm(30)))
 ```
 
+## Complex Scripts (Arabic, Hebrew, Indic)
+
+On its own, gpdf maps each character to one glyph and lays text out left to
+right. That is enough for Latin, Cyrillic, Greek and CJK, but not for scripts
+where letters change shape with their neighbours, combine into ligatures,
+carry positioned marks, or run right to left. For those, plug in a text
+shaper with `template.WithShaper`. gpdf stays dependency-free: the shaper is
+an interface (`font.Shaper`) that you implement with a shaping engine such
+as [go-text/typesetting](https://github.com/go-text/typesetting) (a pure-Go
+HarfBuzz port with the Unicode Bidi Algorithm).
+
+```go
+doc := gpdf.NewDocument(
+    gpdf.WithFont("NotoSans", sans),
+    gpdf.WithFont("NotoNaskhArabic", naskh),
+    template.WithShaper(myShaper),                 // implements font.Shaper
+    template.WithFallbackFonts("NotoNaskhArabic"), // for characters NotoSans lacks
+    gpdf.WithDefaultFont("NotoSans", 12),
+)
+
+page.AutoRow(func(r *template.RowBuilder) {
+    r.Col(12, func(c *template.ColBuilder) {
+        c.Text("رقم الطلب: 1024", template.RTL(), template.AlignRight())
+    })
+})
+```
+
+With a shaper configured, text in registered TrueType fonts is:
+
+- **broken into lines by gpdf**, in logical order, measuring candidate lines
+  with the shaper (`font.WrapWords`), as the Unicode Bidi Algorithm requires;
+- **shaped per line** by the shaper, which returns glyph runs in visual order
+  with advances and offsets (contextual forms, ligatures, mark positioning,
+  kerning, bidi reordering);
+- **drawn by glyph ID**, using `TJ` adjustments for advances and text rise
+  (`Ts`) for vertical offsets;
+- **searchable and copyable**: each line is wrapped in an `/ActualText`
+  marked-content span holding its logical text, and the ToUnicode map gets
+  the text of each glyph (all characters of a ligature).
+
+`WithFallbackFonts` lists families tried, in order, for characters the
+text's own font does not cover (the same bold/italic variant is used when
+registered). `template.Direction` / `template.RTL` set the base direction;
+by default the shaper detects it from the first strong character.
+
+Without `WithShaper`, nothing changes. Overlays (`gpdf.Open`) and the JSON
+schema do not use the shaper yet, and a `RichText` line is shaped per
+fragment, so bidi reordering does not cross fragment boundaries: prefer a
+single `Text` with fallback fonts for mixed-script lines.
+
 ## Font Metrics
 
 gpdf uses TrueType font metrics for accurate text measurement:

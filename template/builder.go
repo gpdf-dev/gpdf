@@ -36,6 +36,9 @@ type Config struct {
 	// Background is painted beneath the content of every page. Set it with
 	// [WithBackgroundColor] and/or [WithBackgroundImage].
 	Background *document.PageBackground
+
+	shaper        font.Shaper // see WithShaper
+	fallbackFonts []string    // see WithFallbackFonts
 }
 
 // Option configures a Document.
@@ -59,6 +62,27 @@ func WithFont(family string, data []byte) Option {
 		}
 		c.rawFonts[family] = data
 	}
+}
+
+// WithShaper draws text in registered TrueType fonts through a text
+// shaper, which gpdf does not include itself. A shaper is needed for
+// scripts whose letters change shape with context or are written right to
+// left, such as Arabic: it picks contextual forms and ligatures, positions
+// marks and reorders bidirectional text. Lines are still broken by gpdf,
+// in logical order, and measured with the shaper. Use [Direction] or [RTL]
+// on text to set the base direction; by default it is detected from the
+// text. See [font.Shaper].
+func WithShaper(s font.Shaper) Option {
+	return func(c *Config) { c.shaper = s }
+}
+
+// WithFallbackFonts lists registered font families to use, in order, for
+// characters missing from a text's own font, e.g. Latin digits and email
+// addresses inside Arabic text set in an Arabic-only font. The same
+// variant (bold, italic) is used when registered. It only takes effect
+// with [WithShaper].
+func WithFallbackFonts(families ...string) Option {
+	return func(c *Config) { c.fallbackFonts = families }
 }
 
 // WithDefaultFont sets the default font family and size.
@@ -111,6 +135,11 @@ func New(opts ...Option) *Document {
 	}
 
 	doc.fontResolver = newBuiltinFontResolver(doc.fonts)
+	if cfg.shaper != nil {
+		doc.fontResolver.shaper = cfg.shaper
+		doc.fontResolver.fontData = doc.fontDataMap
+		doc.fontResolver.fallbacks = cfg.fallbackFonts
+	}
 
 	return doc
 }
@@ -178,6 +207,9 @@ func (d *Document) Render(w io.Writer) error {
 	// Register TrueType fonts with the renderer for Type0/CIDFont encoding.
 	for family, ttf := range d.fonts {
 		renderer.RegisterTTFont(family, ttf, d.fontDataMap[family])
+	}
+	if d.config.shaper != nil {
+		renderer.SetShaper(d.config.shaper, d.config.fallbackFonts)
 	}
 
 	return renderer.RenderDocument(pages, doc.Metadata)

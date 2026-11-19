@@ -10,6 +10,7 @@ import (
 
 	"github.com/gpdf-dev/gpdf/document"
 	"github.com/gpdf-dev/gpdf/document/layout"
+	"github.com/gpdf-dev/gpdf/internal/testfont"
 	"github.com/gpdf-dev/gpdf/pdf"
 	"github.com/gpdf-dev/gpdf/pdf/font"
 )
@@ -992,7 +993,7 @@ func buildArabicTestFont(t *testing.T) (*font.TrueTypeFont, []byte) {
 		' ': 4,
 	}
 	widths := []uint16{0, 300, 500, 500, 250}
-	data := buildTestTTFData(5, widths, runeMap)
+	data := testfont.Build(5, widths, runeMap)
 
 	ttf, err := font.ParseTrueType(data)
 	if err != nil {

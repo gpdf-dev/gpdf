@@ -1717,8 +1717,8 @@ func TestParsePost_ItalicAngle(t *testing.T) {
 
 func TestWriteBFCharEntries_BMPAndSupplementary(t *testing.T) {
 	entries := []cmapEntry{
-		{gid: 1, r: 'A'},
-		{gid: 2, r: 0x1F600},
+		{gid: 1, text: []rune{'A'}},
+		{gid: 2, text: []rune{0x1F600}},
 	}
 
 	var b strings.Builder

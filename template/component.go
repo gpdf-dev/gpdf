@@ -52,6 +52,18 @@ func AlignRight() TextOption {
 	return func(s *document.Style) { s.TextAlign = document.AlignRight }
 }
 
+// Direction sets the base text direction (see [WithShaper]). Without a
+// shaper it has no effect.
+func Direction(d document.TextDirection) TextOption {
+	return func(s *document.Style) { s.Direction = d }
+}
+
+// RTL sets a right-to-left base direction. Shorthand for
+// Direction(document.DirectionRTL).
+func RTL() TextOption {
+	return Direction(document.DirectionRTL)
+}
+
 // FontFamily sets the font family name.
 func FontFamily(family string) TextOption {
 	return func(s *document.Style) { s.FontFamily = family }

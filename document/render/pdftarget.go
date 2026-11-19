@@ -6,8 +6,11 @@ import (
 	"encoding/hex"
 	"fmt"
 	"image/png"
+	"math"
 	"sort"
+	"strconv"
 	"strings"
+	"unicode/utf16"
 
 	"github.com/gpdf-dev/gpdf/document"
 	"github.com/gpdf-dev/gpdf/document/layout"
@@ -37,6 +40,9 @@ type PDFRenderer struct {
 	bgSuppress *pdf.Color // inherited background that children must not repaint
 	pageAnnots []pdf.Dict // link annotations collected for the current page
 	formCount  int        // number of SVG form XObjects registered
+
+	shaper    font.Shaper // optional complex-script shaper (nil: draw runes)
+	fallbacks []string    // fallback font families used with shaper
 }
 
 // NewPDFRenderer creates a PDFRenderer that writes to the given pdf.Writer.
@@ -61,6 +67,15 @@ func NewPDFRenderer(w *pdf.Writer) *PDFRenderer {
 func (r *PDFRenderer) RegisterTTFont(family string, ttf *font.TrueTypeFont, rawData []byte) {
 	r.ttFonts[family] = ttf
 	r.ttFontData[family] = rawData
+}
+
+// SetShaper makes the renderer draw TrueType text through a [font.Shaper]
+// (contextual forms, ligatures, mark positioning, bidi reordering) instead
+// of mapping each rune to one glyph. fallbacks are font families tried, in
+// order, for characters the requested font does not cover.
+func (r *PDFRenderer) SetShaper(s font.Shaper, fallbacks []string) {
+	r.shaper = s
+	r.fallbacks = fallbacks
 }
 
 // BeginDocument sets the document metadata on the underlying PDF writer.
@@ -195,6 +210,12 @@ func (r *PDFRenderer) RenderText(text string, pos document.Point, style document
 
 	pdfY := r.pageHeight - pos.Y - fontSize
 
+	if r.shaper != nil {
+		if _, ok := r.ttFonts[ttFontName]; ok {
+			return r.renderShapedText(text, pos.X, pdfY, fontSize, ttFontName, style, simulateBold, simulateItalic)
+		}
+	}
+
 	var buf strings.Builder
 	buf.WriteString(style.Color.FillColorCmd())
 	buf.WriteByte('\n')
@@ -215,6 +236,140 @@ func (r *PDFRenderer) RenderText(text string, pos document.Point, style document
 	r.writeTextEnd(&buf, style, simulateBold)
 	r.pageContent = append(r.pageContent, buf.String()...)
 	return nil
+}
+
+// renderShapedText draws one line of text through the configured shaper.
+// Glyphs are written by glyph ID with TJ, using kerning adjustments to
+// apply the shaper's advances and text rise (Ts) for vertical offsets. The
+// line is wrapped in an /ActualText span so that copying or searching
+// returns the logical text, not the visual glyph order.
+func (r *PDFRenderer) renderShapedText(text string, x, y, fontSize float64, primary string, style document.Style, simulateBold, simulateItalic bool) error {
+	keys := append([]string{primary}, font.FallbackKeys(primary, r.fallbacks, func(k string) bool {
+		_, ok := r.ttFonts[k]
+		return ok
+	})...)
+	faces := make([]font.ShapeFace, len(keys))
+	for i, k := range keys {
+		faces[i] = font.ShapeFace{Key: k, Data: r.ttFontData[k]}
+	}
+	runs := r.shaper.Shape(text, faces, shapeDirection(style.Direction))
+
+	var buf strings.Builder
+	fmt.Fprintf(&buf, "/Span <</ActualText <%s>>> BDC\n", utf16BEHex(text))
+	buf.WriteString(style.Color.FillColorCmd())
+	buf.WriteByte('\n')
+	r.writeTextBoldSetup(&buf, simulateBold, style, fontSize)
+
+	buf.WriteString("BT\n")
+	if simulateBold {
+		buf.WriteString("2 Tr\n")
+	}
+	if simulateItalic {
+		fmt.Fprintf(&buf, "1 0 0.2126 1 %g %g Tm\n", x, y)
+	} else {
+		fmt.Fprintf(&buf, "%g %g Td\n", x, y)
+	}
+	r.writeTextSpacing(&buf, style)
+
+	currentFace := -1
+	for _, run := range runs {
+		if run.Face < 0 || run.Face >= len(keys) || len(run.Glyphs) == 0 {
+			continue
+		}
+		ttf := r.ttFonts[keys[run.Face]]
+		if run.Face != currentFace {
+			resName, err := r.ensureFont(keys[run.Face])
+			if err != nil {
+				return err
+			}
+			fmt.Fprintf(&buf, "/%s %g Tf\n", resName, fontSize)
+			currentFace = run.Face
+		}
+		writeShapedGlyphs(&buf, ttf, run.Glyphs, fontSize)
+	}
+
+	r.writeTextEnd(&buf, style, simulateBold)
+	buf.WriteString("EMC\n")
+	r.pageContent = append(r.pageContent, buf.String()...)
+	return nil
+}
+
+// writeShapedGlyphs writes glyphs of one face as TJ arrays. In TJ, a number
+// n moves the pen left by n/1000 em, so after a glyph of PDF width w (from
+// the /W array) the adjustment w - advance makes the pen move by exactly
+// the shaper's advance. Offset glyphs (marks) are written on their own,
+// shifted with a leading adjustment and Ts.
+func writeShapedGlyphs(buf *strings.Builder, ttf *font.TrueTypeFont, glyphs []font.Glyph, fontSize float64) {
+	upem := float64(ttf.Metrics().UnitsPerEm)
+	if upem <= 0 {
+		return
+	}
+	scale := 1000 / upem
+	var open bool
+	flush := func() {
+		if open {
+			buf.WriteString("] TJ\n")
+			open = false
+		}
+	}
+	for _, g := range glyphs {
+		adv, _ := ttf.GlyphAdvance(g.ID)
+		pdfW := float64(adv * 1000 / int(upem)) // as written to /W
+		code := hex.EncodeToString(ttf.EncodeGlyph(g.ID, g.Text))
+		xAdv := float64(g.XAdvance) * scale
+
+		if g.XOffset == 0 && g.YOffset == 0 {
+			if !open {
+				buf.WriteString("[")
+				open = true
+			}
+			fmt.Fprintf(buf, "<%s>", code)
+			if d := pdfW - xAdv; math.Abs(d) >= 0.0005 {
+				fmt.Fprintf(buf, " %s ", fmtTJ(d))
+			}
+			continue
+		}
+
+		flush()
+		xOff := float64(g.XOffset) * scale
+		if g.YOffset != 0 {
+			fmt.Fprintf(buf, "%g Ts\n", float64(g.YOffset)*fontSize/upem)
+		}
+		fmt.Fprintf(buf, "[%s <%s> %s] TJ\n", fmtTJ(-xOff), code, fmtTJ(pdfW-xAdv+xOff))
+		if g.YOffset != 0 {
+			buf.WriteString("0 Ts\n")
+		}
+	}
+	flush()
+}
+
+// fmtTJ formats a TJ adjustment (thousandths of an em) to three decimals.
+func fmtTJ(v float64) string {
+	return strconv.FormatFloat(math.Round(v*1000)/1000, 'f', -1, 64)
+}
+
+// shapeDirection maps a document text direction to the shaper direction.
+func shapeDirection(d document.TextDirection) font.Direction {
+	switch d {
+	case document.DirectionLTR:
+		return font.DirectionLTR
+	case document.DirectionRTL:
+		return font.DirectionRTL
+	default:
+		return font.DirectionAuto
+	}
+}
+
+// utf16BEHex encodes s as a PDF text string: UTF-16BE with a byte order
+// mark, in hex.
+func utf16BEHex(s string) string {
+	units := utf16.Encode([]rune(s))
+	b := make([]byte, 2, 2+2*len(units))
+	b[0], b[1] = 0xFE, 0xFF
+	for _, u := range units {
+		b = append(b, byte(u>>8), byte(u))
+	}
+	return strings.ToUpper(hex.EncodeToString(b))
 }
 
 func (r *PDFRenderer) resolveTextFont(style document.Style) (fontName, ttFontName string, simulateBold, simulateItalic bool) {
@@ -851,7 +1006,8 @@ func writeType0Font(sink objectSink, family string, fontRef pdf.ObjectRef, ttf *
 
 	// Build widths and write CIDFont + ToUnicode + Type0.
 	runeToGID := ttf.RuneToGID()
-	wArray := buildGlyphWidthArray(ttf, runeToGID, metrics.UnitsPerEm)
+	usedGlyphs := ttf.UsedGlyphs()
+	wArray := buildGlyphWidthArray(ttf, runeToGID, usedGlyphs, metrics.UnitsPerEm)
 
 	dw := 1000
 	if spaceW, ok := ttf.GlyphWidth(' '); ok {
@@ -863,7 +1019,7 @@ func writeType0Font(sink objectSink, family string, fontRef pdf.ObjectRef, ttf *
 		return err
 	}
 
-	toUnicodeRef, err := writeToUnicodeCMap(sink, runeToGID)
+	toUnicodeRef, err := writeToUnicodeCMap(sink, runeToGID, usedGlyphs)
 	if err != nil {
 		return err
 	}
@@ -923,13 +1079,23 @@ type gidWidth struct {
 	width int
 }
 
-func buildGlyphWidthArray(ttf *font.TrueTypeFont, runeToGID map[rune]uint16, unitsPerEm int) pdf.Array {
+func buildGlyphWidthArray(ttf *font.TrueTypeFont, runeToGID map[rune]uint16, usedGlyphs map[uint16]string, unitsPerEm int) pdf.Array {
 	var gidWidths []gidWidth
+	seen := make(map[uint16]bool, len(runeToGID)+len(usedGlyphs))
 	for r, gid := range runeToGID {
 		w, ok := ttf.GlyphWidth(r)
-		if !ok {
+		if !ok || seen[gid] {
 			continue
 		}
+		seen[gid] = true
+		gidWidths = append(gidWidths, gidWidth{gid: gid, width: w * 1000 / unitsPerEm})
+	}
+	for gid := range usedGlyphs {
+		w, ok := ttf.GlyphAdvance(gid)
+		if !ok || seen[gid] {
+			continue
+		}
+		seen[gid] = true
 		gidWidths = append(gidWidths, gidWidth{gid: gid, width: w * 1000 / unitsPerEm})
 	}
 	sort.Slice(gidWidths, func(i, j int) bool {
@@ -972,9 +1138,32 @@ func writeCIDFont(sink objectSink, family string, descRef pdf.ObjectRef, dw int,
 	return cidFontRef, sink.WriteObject(cidFontRef, cidFontDict)
 }
 
-func writeToUnicodeCMap(sink objectSink, runeToGID map[rune]uint16) (pdf.ObjectRef, error) {
-	data := font.GenerateToUnicodeCMap(runeToGID)
+// writeToUnicodeCMap writes the ToUnicode map for text drawn by rune
+// (runeToGID) and for glyphs drawn by ID from a Shaper (usedGlyphs). A
+// glyph reached both ways keeps the rune mapping.
+func writeToUnicodeCMap(sink objectSink, runeToGID map[rune]uint16, usedGlyphs map[uint16]string) (pdf.ObjectRef, error) {
+	data := font.GenerateToUnicodeCMapText(toUnicodeText(runeToGID, usedGlyphs))
 	return writeCompressedStream(sink, data, pdf.Dict{})
+}
+
+// toUnicodeText merges the two glyph-to-text sources. A glyph drawn from a
+// rune maps to that rune (the lowest one if several runes share a glyph),
+// otherwise to the text the shaper gave it.
+func toUnicodeText(runeToGID map[rune]uint16, usedGlyphs map[uint16]string) map[uint16]string {
+	text := make(map[uint16]string, len(runeToGID)+len(usedGlyphs))
+	for gid, s := range usedGlyphs {
+		text[gid] = s
+	}
+	lowest := make(map[uint16]rune, len(runeToGID))
+	for r, gid := range runeToGID {
+		if prev, ok := lowest[gid]; !ok || r < prev {
+			lowest[gid] = r
+		}
+	}
+	for gid, r := range lowest {
+		text[gid] = string(r)
+	}
+	return text
 }
 
 // ensureImage ensures an image is registered and returns its resource name.

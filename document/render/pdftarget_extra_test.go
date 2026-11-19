@@ -251,7 +251,7 @@ func TestBuildGlyphWidthArray_Empty(t *testing.T) {
 	}
 	// Empty runeToGID should produce empty/nil array.
 	emptyMap := map[rune]uint16{}
-	result := buildGlyphWidthArray(ttf, emptyMap, ttf.Metrics().UnitsPerEm)
+	result := buildGlyphWidthArray(ttf, emptyMap, nil, ttf.Metrics().UnitsPerEm)
 	if len(result) != 0 {
 		t.Errorf("empty runeToGID should produce empty array, got %d elements", len(result))
 	}
@@ -274,7 +274,7 @@ func TestBuildGlyphWidthArray_WithGlyphs(t *testing.T) {
 	ttf.Encode("ABC")
 	runeToGID := ttf.RuneToGID()
 	metrics := ttf.Metrics()
-	result := buildGlyphWidthArray(ttf, runeToGID, metrics.UnitsPerEm)
+	result := buildGlyphWidthArray(ttf, runeToGID, nil, metrics.UnitsPerEm)
 	if len(result) == 0 {
 		t.Error("width array should not be empty for encoded glyphs")
 	}
@@ -643,7 +643,7 @@ func TestWriteToUnicodeCMap(t *testing.T) {
 		'B': 2,
 		'C': 3,
 	}
-	ref, err := writeToUnicodeCMap(w, runeToGID)
+	ref, err := writeToUnicodeCMap(w, runeToGID, nil)
 	if err != nil {
 		t.Fatalf("writeToUnicodeCMap error: %v", err)
 	}
@@ -656,7 +656,7 @@ func TestWriteToUnicodeCMap_Empty(t *testing.T) {
 	var buf bytes.Buffer
 	w := pdf.NewWriter(&buf)
 
-	ref, err := writeToUnicodeCMap(w, map[rune]uint16{})
+	ref, err := writeToUnicodeCMap(w, map[rune]uint16{}, nil)
 	if err != nil {
 		t.Fatalf("writeToUnicodeCMap error: %v", err)
 	}
