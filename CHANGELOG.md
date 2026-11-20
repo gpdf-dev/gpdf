@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.0.18] - 2026-11-20
+
+### Added
+- `pdf.Writer.EnableBinaryComment`, `Writer.Info` and `Writer.HasTrailerEntry`, used by `pdfa.Apply` and available to other `WithWriterSetup` hooks (#54)
+
+### Fixed
+- `gpdf.WithPDFA` output failed veraPDF even with an embedded TrueType font. PDF/A files now get the binary comment after the `%PDF-` header (ISO 19005 6.1.2) and a trailer `/ID` (6.1.3), and for PDF/A-1b the XMP metadata and the Info dictionary are kept in sync, so `pdf:Producer` is no longer empty when `pdfa.WithMetadata` is passed (6.7.3). A4 documents with an embedded font now pass veraPDF 1.30.4 for both PDF/A-1b and PDF/A-2b. Output without `WithPDFA` is byte-for-byte unchanged (#54)
+
 ## [1.0.17] - 2026-11-10
 
 ### Added
@@ -284,7 +292,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Reed-Solomon coefficient order in QR code encoder
 - binary.Write return value handling for errcheck lint
 
-[Unreleased]: https://github.com/gpdf-dev/gpdf/compare/v1.0.17...HEAD
+[Unreleased]: https://github.com/gpdf-dev/gpdf/compare/v1.0.18...HEAD
+[1.0.18]: https://github.com/gpdf-dev/gpdf/compare/v1.0.17...v1.0.18
 [1.0.17]: https://github.com/gpdf-dev/gpdf/compare/v1.0.16...v1.0.17
 [1.0.16]: https://github.com/gpdf-dev/gpdf/compare/v1.0.15...v1.0.16
 [1.0.15]: https://github.com/gpdf-dev/gpdf/compare/v1.0.14...v1.0.15
