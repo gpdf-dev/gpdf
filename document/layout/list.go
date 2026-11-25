@@ -45,6 +45,7 @@ func (bl *BlockLayout) layoutList(lst *document.List, constraints Constraints) R
 			AvailableWidth:  constraints.AvailableWidth - indent,
 			AvailableHeight: constraints.AvailableHeight - cursorY,
 			FontResolver:    constraints.FontResolver,
+			belowContent:    constraints.belowContent || cursorY > 0,
 		}
 		contentResult := bl.Layout(contentBox, contentConstraints)
 

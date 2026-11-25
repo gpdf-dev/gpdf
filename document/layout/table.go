@@ -32,25 +32,37 @@ func (bl *BlockLayout) layoutTable(tbl *document.Table, constraints Constraints)
 	cursorY := 0.0
 
 	// Layout header rows (always placed first).
-	headerPlaced, headerHeight := bl.layoutTableSection(tbl.Header, tc, constraints)
+	headerPlaced, headerHeight, headerOverflow := bl.layoutTableSection(tbl.Header, tc, constraints)
+	if (headerOverflow || headerHeight > contentAvailH) && constraints.belowContent {
+		return deferTable(tbl)
+	}
 	offsetPlacedNodes(headerPlaced, tc.contentX, tc.contentY)
 	placed = append(placed, headerPlaced...)
 	cursorY += headerHeight
 
 	// Layout body rows one at a time, checking for overflow.
 	for i, row := range tbl.Body {
-		rowPlaced, rowHeight := bl.layoutTableRow(row, tc.colWidths, tc.colOffsets, tc.numCols, constraints)
+		rowPlaced, rowHeight, rowOverflow := bl.layoutTableRow(row, tc.colWidths, tc.colOffsets, tc.numCols, constraints)
 
-		if cursorY+rowHeight > contentAvailH && len(placed) > 0 {
-			// This row doesn't fit. Build an overflow table with header + remaining body + footer.
-			overflow := &document.Table{
-				Columns:    tbl.Columns,
-				Header:     tbl.Header,
-				Body:       tbl.Body[i:],
-				Footer:     tbl.Footer,
-				TableStyle: tbl.TableStyle,
+		if rowOverflow || cursorY+rowHeight > contentAvailH {
+			if i > 0 {
+				// This row doesn't fit. Build an overflow table with header + remaining body + footer.
+				overflow := &document.Table{
+					Columns:    tbl.Columns,
+					Header:     tbl.Header,
+					Body:       tbl.Body[i:],
+					Footer:     tbl.Footer,
+					TableStyle: tbl.TableStyle,
+				}
+				return bl.tableOverflowResult(tbl, constraints, tc, placed, cursorY, overflow)
 			}
-			return bl.tableOverflowResult(tbl, constraints, tc, placed, cursorY, overflow)
+			if constraints.belowContent {
+				// Not even the first row fits below the content already
+				// on this page: move the whole table to the next page.
+				return deferTable(tbl)
+			}
+			// At the top of a page the row cannot get more room on the
+			// next one, so place it here (clipped) rather than looping.
 		}
 
 		offsetPlacedNodes(rowPlaced, tc.contentX, tc.contentY+cursorY)
@@ -59,7 +71,7 @@ func (bl *BlockLayout) layoutTable(tbl *document.Table, constraints Constraints)
 	}
 
 	// Layout footer rows.
-	footerPlaced, footerHeight := bl.layoutTableSection(tbl.Footer, tc, constraints)
+	footerPlaced, footerHeight, _ := bl.layoutTableSection(tbl.Footer, tc, constraints)
 	offsetPlacedNodes(footerPlaced, tc.contentX, tc.contentY+cursorY)
 	placed = append(placed, footerPlaced...)
 	cursorY += footerHeight
@@ -112,17 +124,26 @@ func (bl *BlockLayout) resolveTableContext(tbl *document.Table, constraints Cons
 }
 
 // layoutTableSection lays out a slice of table rows, returning all placed
-// nodes and the total section height.
-func (bl *BlockLayout) layoutTableSection(rows []document.TableRow, tc tableContext, constraints Constraints) ([]PlacedNode, float64) {
+// nodes, the total section height, and whether any cell overflowed.
+func (bl *BlockLayout) layoutTableSection(rows []document.TableRow, tc tableContext, constraints Constraints) ([]PlacedNode, float64, bool) {
 	var placed []PlacedNode
 	var totalHeight float64
+	overflowed := false
 	for _, row := range rows {
-		rp, rh := bl.layoutTableRow(row, tc.colWidths, tc.colOffsets, tc.numCols, constraints)
+		rp, rh, ro := bl.layoutTableRow(row, tc.colWidths, tc.colOffsets, tc.numCols, constraints)
 		offsetPlacedNodes(rp, 0, totalHeight)
 		placed = append(placed, rp...)
 		totalHeight += rh
+		overflowed = overflowed || ro
 	}
-	return placed, totalHeight
+	return placed, totalHeight, overflowed
+}
+
+// deferTable returns a Result that places nothing and carries the whole
+// table as overflow. Its zero bounds make the enclosing vertical layout
+// move the table (and a BreakAvoid ancestor) to the next page.
+func deferTable(tbl *document.Table) Result {
+	return Result{Overflow: tbl}
 }
 
 // tableOverflowResult builds a Result that overflows the given table.
@@ -145,11 +166,13 @@ func offsetPlacedNodes(nodes []PlacedNode, dx, dy float64) {
 	}
 }
 
-// layoutTableRow lays out a single table row, returning the placed cells and
-// the row height (tallest cell).
-func (bl *BlockLayout) layoutTableRow(row document.TableRow, colWidths []float64, colOffsets []float64, numCols int, constraints Constraints) ([]PlacedNode, float64) {
+// layoutTableRow lays out a single table row, returning the placed cells,
+// the row height (tallest cell), and whether any cell's content did not
+// fit in the available height.
+func (bl *BlockLayout) layoutTableRow(row document.TableRow, colWidths []float64, colOffsets []float64, numCols int, constraints Constraints) ([]PlacedNode, float64, bool) {
 	var placed []PlacedNode
 	maxHeight := 0.0
+	overflowed := false
 
 	colIdx := 0
 	for i := range row.Cells {
@@ -188,9 +211,13 @@ func (bl *BlockLayout) layoutTableRow(row document.TableRow, colWidths []float64
 			AvailableWidth:  cellWidth,
 			AvailableHeight: constraints.AvailableHeight,
 			FontResolver:    constraints.FontResolver,
+			belowContent:    constraints.belowContent,
 		}
 
 		cellResult := bl.Layout(cellBox, cellConstraints)
+		if cellResult.Overflow != nil {
+			overflowed = true
+		}
 
 		placed = append(placed, PlacedNode{
 			Node: &document.CellNode{Cell: cell},
@@ -219,7 +246,7 @@ func (bl *BlockLayout) layoutTableRow(row document.TableRow, colWidths []float64
 		}
 	}
 
-	return placed, maxHeight
+	return placed, maxHeight, overflowed
 }
 
 // tableColumnCount determines the number of columns from the table definition.

@@ -167,6 +167,7 @@ func (bl *BlockLayout) layoutVerticalChild(bc *blockContext, child document.Docu
 		AvailableWidth:  bc.contentWidth,
 		AvailableHeight: bc.contentHeight - cursorY,
 		FontResolver:    bc.constraints.FontResolver,
+		belowContent:    bc.constraints.belowContent || cursorY > 0,
 	}
 
 	if childConstraints.AvailableHeight <= 0 {
@@ -373,6 +374,7 @@ func (bl *BlockLayout) layoutHorizontal(node document.DocumentNode, constraints 
 			AvailableWidth:  childWidths[i],
 			AvailableHeight: childAvailHeight,
 			FontResolver:    constraints.FontResolver,
+			belowContent:    constraints.belowContent,
 		}
 
 		childResult := bl.layoutChild(child, childConstraints)
