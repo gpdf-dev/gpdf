@@ -2410,7 +2410,7 @@ func TestLayoutTableRow_ColSpan(t *testing.T) {
 		AvailableHeight: 700,
 		FontResolver:    &mockFontResolver{},
 	}
-	placed, rowHeight := bl.layoutTableRow(row, colWidths, colOffsets, 3, constraints)
+	placed, rowHeight, _ := bl.layoutTableRow(row, colWidths, colOffsets, 3, constraints)
 	if len(placed) != 2 {
 		t.Fatalf("Expected 2 placed cells, got %d", len(placed))
 	}
@@ -2448,7 +2448,7 @@ func TestLayoutTableRow_ColSpanExceedsColumns(t *testing.T) {
 		AvailableHeight: 700,
 		FontResolver:    &mockFontResolver{},
 	}
-	placed, _ := bl.layoutTableRow(row, colWidths, colOffsets, 2, constraints)
+	placed, _, _ := bl.layoutTableRow(row, colWidths, colOffsets, 2, constraints)
 	if len(placed) != 1 {
 		t.Fatalf("Expected 1 placed cell, got %d", len(placed))
 	}
@@ -2479,7 +2479,7 @@ func TestLayoutTableRow_ZeroColSpanTreatedAsOne(t *testing.T) {
 		AvailableHeight: 700,
 		FontResolver:    &mockFontResolver{},
 	}
-	placed, _ := bl.layoutTableRow(row, colWidths, colOffsets, 2, constraints)
+	placed, _, _ := bl.layoutTableRow(row, colWidths, colOffsets, 2, constraints)
 	if len(placed) != 2 {
 		t.Fatalf("Expected 2 placed cells, got %d", len(placed))
 	}

@@ -32,6 +32,14 @@ type Constraints struct {
 	PageHeight float64
 	// FontResolver provides font metrics and text measurement.
 	FontResolver FontResolver
+
+	// belowContent reports that content has already been placed above
+	// this area on the current page, so content that does not fit can
+	// be moved to the next page, where it gets more room. When false
+	// (the zero value, e.g. at the top of a page) moving content cannot
+	// help, and layouts that would otherwise defer everything place
+	// what they can instead.
+	belowContent bool
 }
 
 // Result is the output of a layout calculation.
