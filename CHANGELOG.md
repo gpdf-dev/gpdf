@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.0.19] - 2026-11-25
+
+### Fixed
+- A table that started with less room than one row at the bottom of a page drew all its rows on top of each other there and reported no overflow, so the enclosing row (`BreakAvoid`, as every template row is) was never moved to the next page. A row whose cell does not fit is now treated as not fitting: later rows continue on the next page as before, and when not even the first row fits below content already on the page, the whole table moves to the next page. A table at the top of a page whose first row is taller than the page is still placed (clipped) instead of failing with `layout.ErrContentDoesNotFit` (#56)
+  - Thanks to the analysis in #56, whose cause and fix direction this follows
+
 ## [1.0.18] - 2026-11-20
 
 ### Added
@@ -292,7 +298,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Reed-Solomon coefficient order in QR code encoder
 - binary.Write return value handling for errcheck lint
 
-[Unreleased]: https://github.com/gpdf-dev/gpdf/compare/v1.0.18...HEAD
+[Unreleased]: https://github.com/gpdf-dev/gpdf/compare/v1.0.19...HEAD
+[1.0.19]: https://github.com/gpdf-dev/gpdf/compare/v1.0.18...v1.0.19
 [1.0.18]: https://github.com/gpdf-dev/gpdf/compare/v1.0.17...v1.0.18
 [1.0.17]: https://github.com/gpdf-dev/gpdf/compare/v1.0.16...v1.0.17
 [1.0.16]: https://github.com/gpdf-dev/gpdf/compare/v1.0.15...v1.0.16
