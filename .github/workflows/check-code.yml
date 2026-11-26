@@ -8,6 +8,11 @@ permissions:
   contents: write
   pull-requests: write
 
+# The PR branch name comes from the PR author, so scripts read it from the
+# environment instead of interpolating it into the shell.
+env:
+  HEAD_REF: ${{ github.head_ref }}
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -49,6 +54,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
           ref: ${{ github.head_ref }}
 
       - uses: actions/setup-go@v5
@@ -60,15 +66,21 @@ jobs:
         run: gofmt -s -w .
 
       - name: Push gofmt changes
+        env:
+          IS_FORK: ${{ github.event.pull_request.head.repo.full_name != github.repository }}
         run: |
           if git diff --quiet; then
             echo "No gofmt changes needed"
+          elif [ "$IS_FORK" = "true" ]; then
+            git diff --name-only
+            echo "::error::These files are not gofmt -s formatted. Run 'gofmt -s -w .' and push again."
+            exit 1
           else
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add -A
             git commit -m "style: gofmt -s"
-            git push origin HEAD:${{ github.head_ref }}
+            git push origin "HEAD:${HEAD_REF}"
           fi
 
       - name: Check gocyclo
@@ -81,16 +93,20 @@ jobs:
           fi
 
   version-sync:
+    # Pushes a version bump to the PR branch, which needs a write token.
+    # Fork PRs get a read-only token, so this runs for same-repo PRs only.
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
           ref: ${{ github.head_ref }}
 
       - name: Extract version from branch name
         id: extract
         run: |
-          BRANCH="${{ github.head_ref }}"
+          BRANCH="${HEAD_REF}"
           if [[ "$BRANCH" =~ ^v/([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
             echo "version=${BASH_REMATCH[1]}" >> "$GITHUB_OUTPUT"
             echo "Extracted version: ${BASH_REMATCH[1]}"
@@ -112,7 +128,7 @@ jobs:
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add internal/buildinfo/version.go
             git commit -m "chore: bump version to v${VERSION}"
-            git push origin HEAD:${{ github.head_ref }}
+            git push origin "HEAD:${HEAD_REF}"
           fi
 
   coverage:
@@ -121,6 +137,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
           ref: ${{ github.head_ref }}
 
       - uses: actions/setup-go@v5
@@ -191,6 +208,8 @@ jobs:
           fi
 
       - name: Comment on PR
+        # Fork PRs get a read-only token and cannot comment.
+        if: github.event.pull_request.head.repo.full_name == github.repository
         uses: actions/github-script@v7
         with:
           script: |
@@ -243,7 +262,8 @@ jobs:
         run: exit 1
 
       - name: Update coverage badge
-        if: steps.coverage.outputs.pass == 'true'
+        # Pushes to the PR branch, so same-repo PRs only.
+        if: steps.coverage.outputs.pass == 'true' && github.event.pull_request.head.repo.full_name == github.repository
         run: |
           TOTAL=${{ steps.coverage.outputs.total }}
 
@@ -268,5 +288,5 @@ jobs:
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add README.md
             git commit -m "update coverage badge to ${TOTAL}%"
-            git push origin HEAD:${{ github.head_ref }}
+            git push origin "HEAD:${HEAD_REF}"
           fi
