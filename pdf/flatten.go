@@ -369,7 +369,7 @@ func (m *Modifier) overlayFlattenedContent(info PageInfo, pageDict Dict, content
 		if existingRes == nil {
 			existingRes = make(Dict)
 		}
-		merged := mergeResources(existingRes, *resources)
+		merged := mergeResources(m.resolveResourceEntries(existingRes, *resources), *resources)
 		pageDict[Name("Resources")] = merged
 	}
 
