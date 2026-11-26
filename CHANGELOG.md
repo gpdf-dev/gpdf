@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.0.20] - 2026-11-27
+
+### Fixed
+- Overlaying (`ExistingDocument.Overlay` / `EachPage`) and form flattening (`FlattenForms`) removed the page's own text on PDFs from LibreOffice and Ghostscript. These write the page's `/Font` (and often `/XObject` and `/ExtGState`) as indirect objects, and the overlay's `/Font` replaced them instead of being merged in, so the original text could no longer be drawn. Indirect resource dictionaries are now merged, and the shared original is left unmodified (#53)
+  - Thanks to @jayhemnani9910 for the report and the fix
+
 ## [1.0.19] - 2026-11-25
 
 ### Fixed
@@ -298,7 +304,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Reed-Solomon coefficient order in QR code encoder
 - binary.Write return value handling for errcheck lint
 
-[Unreleased]: https://github.com/gpdf-dev/gpdf/compare/v1.0.19...HEAD
+[Unreleased]: https://github.com/gpdf-dev/gpdf/compare/v1.0.20...HEAD
+[1.0.20]: https://github.com/gpdf-dev/gpdf/compare/v1.0.19...v1.0.20
 [1.0.19]: https://github.com/gpdf-dev/gpdf/compare/v1.0.18...v1.0.19
 [1.0.18]: https://github.com/gpdf-dev/gpdf/compare/v1.0.17...v1.0.18
 [1.0.17]: https://github.com/gpdf-dev/gpdf/compare/v1.0.16...v1.0.17
